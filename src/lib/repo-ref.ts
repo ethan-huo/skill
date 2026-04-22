@@ -1,4 +1,4 @@
-import type { RepoRef } from "../types";
+import type { AddTarget, RepoRef } from "../types";
 
 const GITHUB_HOST = "github.com";
 
@@ -28,6 +28,28 @@ export function parseRepoRef(raw: string): RepoRef {
   );
 }
 
+export function parseAddTarget(raw: string): AddTarget {
+  const value = raw.trim();
+  if (!value) {
+    throw new Error("Repository cannot be empty.");
+  }
+
+  const skillMatch = parseShortSkillRef(value);
+  if (!skillMatch) {
+    return { repo: parseRepoRef(value) };
+  }
+
+  return {
+    repo: {
+      owner: skillMatch.owner,
+      repo: skillMatch.repo,
+      cloneUrl: `https://${GITHUB_HOST}/${skillMatch.owner}/${skillMatch.repo}.git`,
+      display: `${skillMatch.owner}/${skillMatch.repo}`,
+    },
+    skill: skillMatch.skill,
+  };
+}
+
 function parseHttpRepo(value: string): RepoRef | null {
   let url: URL;
   try {
@@ -49,6 +71,12 @@ function parseHttpRepo(value: string): RepoRef | null {
     throw new Error("GitHub repository URLs must include owner and repo.");
   }
 
+  if (segments.length > 2) {
+    throw new Error(
+      "GitHub repository URLs must point to the repository root. Use owner/repo/skill or --skill <folder> to target a specific skill.",
+    );
+  }
+
   const owner = segments[0]!;
   const repo = segments[1]!;
 
@@ -61,7 +89,7 @@ function parseHttpRepo(value: string): RepoRef | null {
 }
 
 function parseSshRepo(value: string): RepoRef | null {
-  const match = /^git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/.exec(value);
+  const match = /^git@github\.com:([^/\s]+)\/([^/\s]+?)(?:\.git)?$/.exec(value);
   if (!match) {
     return null;
   }
@@ -91,5 +119,18 @@ function parseShortRepo(value: string): RepoRef | null {
     repo,
     cloneUrl: `https://${GITHUB_HOST}/${owner}/${repo}.git`,
     display: `${owner}/${repo}`,
+  };
+}
+
+function parseShortSkillRef(value: string): { owner: string; repo: string; skill: string } | null {
+  const match = /^([^/\s]+)\/([^/\s]+)\/([^/\s]+)$/.exec(value);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    owner: match[1]!,
+    repo: match[2]!,
+    skill: match[3]!,
   };
 }

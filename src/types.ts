@@ -7,6 +7,11 @@ export type RepoRef = {
   display: string;
 };
 
+export type AddTarget = {
+  repo: RepoRef;
+  skill?: string;
+};
+
 export type SkillCandidate = {
   relativeDir: string;
   sourceDir: string;

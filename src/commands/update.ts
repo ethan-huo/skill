@@ -1,4 +1,3 @@
-import { rm } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { fmt } from "argc/terminal";
@@ -34,28 +33,24 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
     const repoRef = parseRepoRef(`${repo.owner}/${repo.repo}`);
     const cloneDir = await shallowCloneRepo(repoRef);
 
-    try {
-      const latestSkills = await discoverSkills(cloneDir);
-      const installedIds = installedByRepo.get(repo.installRoot) ?? [];
-      const latestIds = latestSkills.map((skill) => skill.relativeDir);
-      const diff = diffSkillSets(installedIds, latestIds);
+    const latestSkills = await discoverSkills(cloneDir);
+    const installedIds = installedByRepo.get(repo.installRoot) ?? [];
+    const latestIds = latestSkills.map((skill) => skill.relativeDir);
+    const diff = diffSkillSets(installedIds, latestIds);
 
-      console.log(fmt.info(`${repo.owner}/${repo.repo} (${scope})`));
+    console.log(fmt.info(`${repo.owner}/${repo.repo} (${scope})`));
 
-      if (diff.updated.length > 0) {
-        const selectedSkills = latestSkills.filter((skill) =>
-          diff.updated.includes(skill.relativeDir),
-        );
-        await replaceInstalledSkills(cloneDir, repo.installRoot, selectedSkills);
-      } else if (diff.removed.length > 0) {
-        await removeInstalledRepo(repo.installRoot);
-      }
-
-      await pruneEmptyParents(dirname(repo.installRoot), skillsBaseDir);
-      printDiff(diff);
-    } finally {
-      await rm(cloneDir, { recursive: true, force: true });
+    if (diff.updated.length > 0) {
+      const selectedSkills = latestSkills.filter((skill) =>
+        diff.updated.includes(skill.relativeDir),
+      );
+      await replaceInstalledSkills(cloneDir, repo.installRoot, selectedSkills);
+    } else if (diff.removed.length > 0) {
+      await removeInstalledRepo(repo.installRoot);
     }
+
+    await pruneEmptyParents(dirname(repo.installRoot), skillsBaseDir);
+    printDiff(diff);
   }
 }
 

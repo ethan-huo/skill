@@ -10,6 +10,7 @@ export const schema = {
       description: "Clone a GitHub repository, select skills, and install them.",
       examples: [
         "skill add ethan-huo/agents",
+        "skill add pbakaus/impeccable/audit",
         "skill add https://github.com/ethan-huo/agents --global",
         "skill add ethan-huo/agents --skill cx --skill fp-thinking",
       ],

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { parseRepoRef } from "../src/lib/repo-ref";
+import { parseAddTarget, parseRepoRef } from "../src/lib/repo-ref";
 
 describe("parseRepoRef", () => {
   test("parses owner/repo shorthand", () => {
@@ -28,5 +28,23 @@ describe("parseRepoRef", () => {
       cloneUrl: "https://github.com/ethan-huo/agents.git",
       display: "ethan-huo/agents",
     });
+  });
+
+  test("parses owner/repo/skill shorthand for add", () => {
+    expect(parseAddTarget("pbakaus/impeccable/audit")).toEqual({
+      repo: {
+        owner: "pbakaus",
+        repo: "impeccable",
+        cloneUrl: "https://github.com/pbakaus/impeccable.git",
+        display: "pbakaus/impeccable",
+      },
+      skill: "audit",
+    });
+  });
+
+  test("rejects github urls with extra path segments", () => {
+    expect(() =>
+      parseRepoRef("https://github.com/pbakaus/impeccable/tree/main/.codex/skills/audit"),
+    ).toThrow("GitHub repository URLs must point to the repository root.");
   });
 });

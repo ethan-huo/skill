@@ -6,6 +6,7 @@ Install or remove agent skills from GitHub repositories.
 
 ```bash
 skill add ethan-huo/agents
+skill add pbakaus/impeccable/audit
 skill add https://github.com/ethan-huo/agents --global
 skill add ethan-huo/agents --skill cx --skill fp-thinking
 
@@ -23,8 +24,10 @@ skill remove ethan-huo/agents --global
 ## Behavior
 
 - `add` shallow-clones the target repository into a temporary directory
+- `add owner/repo/skill` is supported as shorthand for `add owner/repo --skill skill`
 - `find` queries the public `skills.sh` search API and prints the results in a compact table
 - it scans the clone for `SKILL.md`, including hidden skill roots such as `.agents/skills` and `.codex/skills`
+- shallow clones are cached under the system temp directory by remote `HEAD` hash, so repeated installs/updates can reuse the same checkout
 - discovered skills are keyed by the folder that contains each `SKILL.md`, so installed IDs are always `{owner}/{repo}/{folder}`
 - when multiple skills are found, it prompts the user to select which ones to install
 - local install is blocked when the same `{owner}/{repo}` is already installed globally
@@ -43,4 +46,5 @@ skill remove ethan-huo/agents --global
 ## Notes
 
 - non-interactive installs that match multiple skills must pass one or more `--skill <folder>` selectors
+- when `owner/repo/skill` shorthand is used, `--skill` must be omitted or match the same folder
 - only `github.com` repositories are supported right now
