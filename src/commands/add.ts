@@ -29,7 +29,7 @@ export async function runAdd(args: { input: AddInput }): Promise<void> {
 
     console.log(`Installed ${selectedSkills.length} skill(s) to ${installRoot}`);
     for (const skill of selectedSkills) {
-      console.log(`- ${skill.relativeDir}`);
+      console.log(`- ${repo.display}/${skill.relativeDir}`);
     }
   } finally {
     await rm(cloneDir, { recursive: true, force: true });

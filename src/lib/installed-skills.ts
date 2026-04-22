@@ -62,11 +62,11 @@ async function listSkillsForRepo(repo: InstalledRepo): Promise<InstalledSkill[]>
   const skills = await Promise.all(
     relativeSkills.map(async (skill) => {
       const description = await readSkillDescription(
-        join(repo.installRoot, skill.relativeDir, "SKILL.md"),
+        join(repo.installRoot, skill.sourceDir, "SKILL.md"),
       ).catch(() => "");
 
       return {
-        id: `${repo.owner}/${repo.repo}:${skill.relativeDir}`,
+        id: `${repo.owner}/${repo.repo}/${skill.relativeDir}`,
         owner: repo.owner,
         repo: repo.repo,
         relativeDir: skill.relativeDir,

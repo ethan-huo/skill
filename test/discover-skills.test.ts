@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { discoverSkills } from "../src/lib/discover-skills";
 
 describe("discoverSkills", () => {
-  test("finds nested skills in visible and hidden roots and ignores node_modules", async () => {
+  test("finds nested skills and normalizes them to folder IDs", async () => {
     const root = await mkTempDir();
     await writeSkill(root, "skills/cx");
     await writeSkill(root, "skills/group/fp-thinking");
@@ -17,13 +17,37 @@ describe("discoverSkills", () => {
     const skills = await discoverSkills(root);
     expect(skills).toEqual([
       {
-        relativeDir: ".agents/skills/local/demo",
-        displayLabel: ".agents/skills/local/demo",
+        relativeDir: "cx",
+        sourceDir: "skills/cx",
+        displayLabel: "cx",
       },
-      { relativeDir: "skills/cx", displayLabel: "skills/cx" },
       {
-        relativeDir: "skills/group/fp-thinking",
-        displayLabel: "skills/group/fp-thinking",
+        relativeDir: "demo",
+        sourceDir: ".agents/skills/local/demo",
+        displayLabel: "demo",
+      },
+      {
+        relativeDir: "fp-thinking",
+        sourceDir: "skills/group/fp-thinking",
+        displayLabel: "fp-thinking",
+      },
+    ]);
+  });
+
+  test("dedupes repeated skill folders and prefers codex sources", async () => {
+    const root = await mkTempDir();
+    await writeSkill(root, ".claude/skills/adapt");
+    await writeSkill(root, ".agents/skills/adapt");
+    await writeSkill(root, ".codex/skills/adapt");
+    await writeSkill(root, "source/skills/adapt");
+    await writeSkill(root, ".cursor/skills/optimize");
+
+    const skills = await discoverSkills(root);
+    expect(skills).toEqual([
+      {
+        relativeDir: "adapt",
+        sourceDir: ".codex/skills/adapt",
+        displayLabel: "adapt",
       },
     ]);
   });
@@ -34,17 +58,15 @@ describe("discoverSkills", () => {
     await mkdir(join(root, "links", "file"), { recursive: true });
     await mkdir(join(root, "links", "dir"), { recursive: true });
 
-    await symlink(
-      join(root, "real", "demo", "SKILL.md"),
-      join(root, "links", "file", "SKILL.md"),
-    );
+    await symlink(join(root, "real", "demo", "SKILL.md"), join(root, "links", "file", "SKILL.md"));
     await symlink(join(root, "real", "demo"), join(root, "links", "dir", "demo"));
 
     const skills = await discoverSkills(root);
     expect(skills).toEqual([
       {
-        relativeDir: "real/demo",
-        displayLabel: "real/demo",
+        relativeDir: "demo",
+        sourceDir: "real/demo",
+        displayLabel: "demo",
       },
     ]);
   });

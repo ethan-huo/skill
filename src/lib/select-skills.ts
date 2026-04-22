@@ -22,7 +22,7 @@ export async function selectSkills(
       const installed = new Set(selected.map((skill) => skill.relativeDir));
       const missing = [...wanted].filter((value) => !installed.has(value));
       throw new Error(
-        `Unknown skill selector(s): ${missing.join(", ")}. Use relative skill paths from the prompt list.`,
+        `Unknown skill selector(s): ${missing.join(", ")}. Use skill folder IDs from the prompt list.`,
       );
     }
     return selected;
@@ -30,7 +30,7 @@ export async function selectSkills(
 
   if (!process.stdout.isTTY) {
     throw new Error(
-      `Repository ${repoDisplay} contains multiple skills. Re-run in a TTY or pass --skill <relative/path>.`,
+      `Repository ${repoDisplay} contains multiple skills. Re-run in a TTY or pass --skill <folder>.`,
     );
   }
 

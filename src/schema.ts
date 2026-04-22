@@ -11,7 +11,7 @@ export const schema = {
       examples: [
         "skill add ethan-huo/agents",
         "skill add https://github.com/ethan-huo/agents --global",
-        "skill add ethan-huo/agents --skill skills/cx --skill skills/fp-thinking",
+        "skill add ethan-huo/agents --skill cx --skill fp-thinking",
       ],
     })
     .args("repo")
@@ -21,6 +21,28 @@ export const schema = {
           repo: v.string(),
           global: v.optional(v.boolean(), false),
           skill: v.optional(v.union([v.string(), v.array(v.string())]), []),
+        }),
+      ),
+    ),
+
+  find: c
+    .meta({
+      description: "Search published skills and print the results as a TOON list.",
+      examples: ["skill find seo", "skill find animation --limit 5"],
+    })
+    .args("query")
+    .input(
+      s(
+        v.object({
+          query: v.string(),
+          limit: v.optional(
+            v.pipe(
+              v.string(),
+              v.transform((value) => Number(value)),
+              v.number(),
+              v.minValue(1),
+            ),
+          ),
         }),
       ),
     ),

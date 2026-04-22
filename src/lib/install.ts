@@ -16,7 +16,7 @@ export async function replaceInstalledSkills(
 
   try {
     for (const skill of selectedSkills) {
-      const sourceDir = join(repoDir, skill.relativeDir);
+      const sourceDir = join(repoDir, skill.sourceDir);
       const destDir = join(stagingRoot, skill.relativeDir);
       await mkdir(dirname(destDir), { recursive: true });
       await cp(sourceDir, destDir, { recursive: true });

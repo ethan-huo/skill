@@ -9,6 +9,7 @@ export type RepoRef = {
 
 export type SkillCandidate = {
   relativeDir: string;
+  sourceDir: string;
   displayLabel: string;
 };
 
@@ -16,6 +17,11 @@ export type AddInput = {
   repo: string;
   global: boolean;
   skill: string | string[];
+};
+
+export type FindInput = {
+  query: string;
+  limit?: number;
 };
 
 export type RemoveInput = {
@@ -44,6 +50,13 @@ export type InstalledRepo = {
   repo: string;
   scope: SkillScopeLabel;
   installRoot: string;
+};
+
+export type SearchSkill = {
+  id: string;
+  name: string;
+  source: string;
+  installs: number;
 };
 
 export type UpdateDiff = {

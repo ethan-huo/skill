@@ -2,6 +2,7 @@
 import { cli } from "argc";
 
 import { runAdd } from "./commands/add";
+import { runFind } from "./commands/find";
 import { runList } from "./commands/list";
 import { runRemove } from "./commands/remove";
 import { runUpdate } from "./commands/update";
@@ -19,6 +20,7 @@ app.run(
   {
     handlers: {
       add: runAdd,
+      find: runFind,
       list: runList,
       remove: runRemove,
       update: runUpdate,

@@ -1,12 +1,35 @@
-import { mkdir, readdir, stat } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { pruneEmptyParents, removeInstalledRepo } from "../src/lib/install";
+import { pruneEmptyParents, removeInstalledRepo, replaceInstalledSkills } from "../src/lib/install";
 
 describe("removeInstalledRepo", () => {
+  test("installs selected skills into flat folder IDs", async () => {
+    const root = join(tmpdir(), `skill-install-${crypto.randomUUID()}`);
+    const repoDir = join(root, "repo");
+    const target = join(root, ".agents", "skills", "pbakaus", "impeccable");
+
+    await mkdir(join(repoDir, ".codex", "skills", "adapt"), { recursive: true });
+    await writeFile(
+      join(repoDir, ".codex", "skills", "adapt", "SKILL.md"),
+      "---\nname: adapt\ndescription: Adapt skill\n---\n",
+    );
+
+    await replaceInstalledSkills(repoDir, target, [
+      {
+        relativeDir: "adapt",
+        sourceDir: ".codex/skills/adapt",
+        displayLabel: "adapt",
+      },
+    ]);
+
+    expect(await readFile(join(target, "adapt", "SKILL.md"), "utf8")).toContain("name: adapt");
+    expect(await stat(join(target, ".codex")).catch(() => null)).toBeNull();
+  });
+
   test("removes installed directory trees", async () => {
     const root = join(tmpdir(), `skill-remove-${crypto.randomUUID()}`);
     const target = join(root, "ethan-huo", "agents");
