@@ -1,72 +1,171 @@
 # skill
 
-Install or remove agent skills from GitHub repositories.
+Install, update, and curate agent skills from GitHub repositories.
 
-## Commands
+`skill` is a small CLI for managing installable `SKILL.md` bundles across projects. It supports direct installation from GitHub repos, local and global install roots, and a favorites workflow that helps agents and users reuse the same curated skill set across projects.
+
+## The Problem
+
+Agent skills are useful only if they are easy to reuse.
+
+Without a dedicated manager, teams usually end up copying `SKILL.md` files by hand, duplicating the same setup work across repositories, and losing track of which curated skills they actually want to keep using.
+
+`skill` gives that workflow a stable contract:
+
+- install skills directly from GitHub repositories
+- keep project-local and global skill roots separate
+- save favorite skill refs for repeated use
+- refresh installed skills and favorite metadata over time
+
+## Install
+
+This repository currently ships as a Bun-first CLI.
 
 ```bash
-skill add ethan-huo/agents
-skill add pbakaus/impeccable/audit
-skill add https://github.com/ethan-huo/agents --global
-skill add ethan-huo/agents --skill cx --skill fp-thinking
+git clone https://github.com/ethan-huo/skill.git
+cd skill
+bun install
+```
 
-skill find seo
-skill find animation --limit 5
+Run directly during development:
 
-skill favorite add ethan-huo/agents
-skill favorite add ethan-huo/agents/cx
-skill favorite add ethan-huo/agents ethan-huo/agents/cx
-skill favorite remove ethan-huo/agents
-skill favorite remove ethan-huo/agents/cx
-skill favorite remove ethan-huo/agents ethan-huo/agents/cx
-skill favorite list
-skill favorite list --json
-skill favorite refresh
+```bash
+bun run src/cli.ts --help
+```
+
+Optional local link:
+
+```bash
+bun link
+```
+
+Requirements:
+
+- Bun 1.3+
+- `git` on `PATH`
+- `gh` on `PATH` for favorite metadata refresh and repo validation
+
+## Core Workflow
+
+### 1. Favorite-first project setup
+
+For most real usage, start from favorites and install only what the current project needs.
+
+```bash
+skill add owner/repo/skill
+skill add owner/repo --skill skill-a --skill skill-b
+skill list
+```
+
+Agents should prefer this path over broad search when the user's favorites already contain good candidates.
+
+### 2. Interactive user workflow
+
+When a user wants prompt-driven selection instead of explicit install refs:
+
+```bash
 skill favorite pick
 skill favorite pick --add
+```
 
-skill list
+`favorite pick --add` merges same-repo selections into one install flow. Repo-level favorites may trigger a second skill-selection prompt when the repo contains multiple skills.
+
+### 3. Search and discovery
+
+When favorites do not cover the task, use the public search index:
+
+```bash
+skill find seo
+skill find animation --limit 5
+```
+
+Search is a discovery path, not the default install path.
+
+### 4. Maintenance
+
+```bash
 skill update
 skill update --global
 
-skill remove ethan-huo/agents
-skill remove ethan-huo/agents/cx
-skill remove ethan-huo/agents --global
+skill remove owner/repo
+skill remove owner/repo/skill
+
+skill favorite refresh
+skill favorite remove owner/repo owner/repo/skill
 ```
 
-## Behavior
+## Command Reference
 
-- `add` shallow-clones the target repository into a temporary directory
-- `add owner/repo/skill` is supported as shorthand for `add owner/repo --skill skill`
-- `remove owner/repo/skill` removes one installed skill by ID; `remove owner/repo` still removes the whole installed repo
-- `find` queries the public `skills.sh` search API and prints the results in a compact table
-- `favorite add/remove/list` manages a global list of canonical `owner/repo` and `owner/repo/skill` refs
-- `favorite add` validates that the upstream repository exists before saving the ref
-- `favorite refresh` refreshes cached metadata and removes favorites that no longer exist upstream
-- `favorite pick` opens an interactive multiselect prompt; by default it prints the selected IDs, one per line
-- `favorite pick --add` installs the selected favorites; repo-level picks may trigger a second skill-selection prompt, and same-repo picks are merged into one install flow
-- it scans the clone for `SKILL.md`, including hidden skill roots such as `.agents/skills` and `.codex/skills`
-- shallow clones are cached under the system temp directory by remote `HEAD` hash, so repeated installs/updates can reuse the same checkout
-- discovered skills are keyed by the folder that contains each `SKILL.md`, so installed IDs are always `{owner}/{repo}/{folder}`
-- when multiple skills are found, it prompts the user to select which ones to install
+### Install And Remove
+
+| Command                                    | Purpose                                                      |
+| ------------------------------------------ | ------------------------------------------------------------ |
+| `skill add owner/repo/skill`               | Install one known skill directly                             |
+| `skill add owner/repo --skill a --skill b` | Install multiple skills from one repo without prompts        |
+| `skill add owner/repo`                     | Interactive selection when the repo contains multiple skills |
+| `skill remove owner/repo`                  | Remove one installed repo root                               |
+| `skill remove owner/repo/skill`            | Remove one installed skill without touching siblings         |
+
+### Favorites
+
+| Command                           | Purpose                                                            |
+| --------------------------------- | ------------------------------------------------------------------ |
+| `skill favorite add <refs...>`    | Save one or more favorite refs                                     |
+| `skill favorite remove <refs...>` | Remove one or more favorite refs                                   |
+| `skill favorite list`             | Show favorite refs with cached descriptions                        |
+| `skill favorite list --json`      | Machine-readable favorite list                                     |
+| `skill favorite refresh`          | Refresh descriptions and remove upstream refs that no longer exist |
+| `skill favorite pick`             | Interactive favorite selection                                     |
+| `skill favorite pick --add`       | Interactive favorite selection followed by install                 |
+
+### Search And Inventory
+
+| Command                 | Purpose                                |
+| ----------------------- | -------------------------------------- |
+| `skill find <query>`    | Search published skills on `skills.sh` |
+| `skill list`            | List installed local and global skills |
+| `skill update`          | Refresh installed local skills         |
+| `skill update --global` | Refresh installed global skills        |
+
+## How Installation Works
+
+- `skill` scans a cloned repository for `SKILL.md`, including common hidden roots such as `.agents/skills` and `.codex/skills`
+- discovered skill IDs are normalized to `{owner}/{repo}/{folder}`
+- `owner/repo/skill` is shorthand for `skill add owner/repo --skill skill`
+- repeated installs reuse shallow clone caches keyed by the remote `HEAD` hash
 - local install is blocked when the same `{owner}/{repo}` is already installed globally
-- `list` scans both local and global installed skills and prints a compact table
-- `update` refreshes one scope at a time:
-  - `~` updates skills that still exist upstream
-  - `-` removes skills that were installed before but no longer exist upstream
-  - `+` reports newly available upstream skills without auto-installing them
-- installed skills are written under:
-  - local: `{cwd}/.agents/skills/{owner}/{repo}/`
-  - global: `~/.agents/skills/{owner}/{repo}/`
-- installs copy each selected skill into `{owner}/{repo}/{folder}` instead of preserving the upstream path
-- re-installing the same repository replaces the whole `{owner}/{repo}` install root in place
-- favorites are stored globally at `~/.agents/skill-favorites.json` with cached descriptions
-- known foreign agent roots such as `.claude/` and `.cursor/` are ignored during discovery
 
-## Notes
+Install roots:
 
-- non-interactive installs that match multiple skills must pass one or more `--skill <folder>` selectors
-- when `owner/repo/skill` shorthand is used, `--skill` must be omitted or match the same folder
-- `favorite pick` requires a TTY; use `favorite list --json` for non-interactive tooling
+- local: `{cwd}/.agents/skills/{owner}/{repo}/`
+- global: `~/.agents/skills/{owner}/{repo}/`
+
+Favorites:
+
+- stored at `~/.agents/skill-favorites.json`
+- support both `owner/repo` and `owner/repo/skill`
+- include cached descriptions and last refresh timestamps
+
+## Agent Integration
+
+This repository ships with an installable agent-facing skill at [skills/skill/SKILL.md](skills/skill/SKILL.md).
+
+That skill is intentionally narrower than this README. It teaches agents the main workflow:
+
+1. inspect `skill --schema` first to learn the command surface
+2. read project context
+3. inspect favorites
+4. pick a small set of relevant skills
+5. install locally by default
+6. fall back to `find` only when favorites are insufficient
+
+If you want an agent to use this tool in new projects, install this skill into the agent's skill root first.
+
+## Operational Notes
+
+- non-interactive installs that match multiple skills must pass explicit `--skill <folder>` selectors
+- `favorite pick` requires a TTY
 - `favorite pick --global` is only valid together with `--add`
+- `favorite add` validates upstream repo existence before writing the favorite
+- `favorite refresh` depends on authenticated `gh` access
 - only `github.com` repositories are supported right now
