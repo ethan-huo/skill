@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { parseRepoRef, parseRepoSkillTarget, parseSkillId } from "../src/lib/repo-ref";
+import { parseFavoriteRef, parseRepoRef, parseRepoSkillTarget } from "../src/lib/repo-ref";
 
 describe("parseRepoRef", () => {
   test("parses owner/repo shorthand", () => {
@@ -54,18 +54,28 @@ describe("parseRepoRef", () => {
     );
   });
 
-  test("parses canonical skill ids", () => {
-    expect(parseSkillId("ethan-huo/agents/cx")).toEqual({
+  test("parses repo-level favorite refs", () => {
+    expect(parseFavoriteRef("ethan-huo/agents")).toEqual({
+      id: "ethan-huo/agents",
+      owner: "ethan-huo",
+      repo: "agents",
+      description: "",
+    });
+  });
+
+  test("parses skill-level favorite refs", () => {
+    expect(parseFavoriteRef("ethan-huo/agents/cx")).toEqual({
       id: "ethan-huo/agents/cx",
       owner: "ethan-huo",
       repo: "agents",
       skill: "cx",
+      description: "",
     });
   });
 
-  test("rejects repo-only favorite ids", () => {
-    expect(() => parseSkillId("ethan-huo/agents")).toThrow(
-      "Skill ID must use owner/repo/skill format.",
+  test("rejects invalid favorite refs", () => {
+    expect(() => parseFavoriteRef("ethan-huo")).toThrow(
+      "Favorite ref must use owner/repo or owner/repo/skill format.",
     );
   });
 });

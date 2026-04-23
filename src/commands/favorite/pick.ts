@@ -14,7 +14,7 @@ export async function runFavoritePick(args: { input: FavoritePickInput }): Promi
 
   const favorites = await listFavorites();
   if (favorites.length === 0) {
-    console.log(fmt.info("No favorite skills found."));
+    console.log(fmt.info("No favorite refs found."));
     return;
   }
 
@@ -23,9 +23,9 @@ export async function runFavoritePick(args: { input: FavoritePickInput }): Promi
   }
 
   const response = await p.multiselect({
-    message: "Select favorite skills",
+    message: "Select favorite repositories or skills",
     options: favorites.map((favorite) => ({
-      label: favorite.id,
+      label: favorite.description ? `${favorite.id} (${favorite.description})` : favorite.id,
       value: favorite.id,
     })),
     required: true,
@@ -49,6 +49,8 @@ export async function runFavoritePick(args: { input: FavoritePickInput }): Promi
       global: input.global,
       repo: group.repo,
       selectors: group.selectors,
+      initialSelectors: group.selectors,
+      promptForSelection: group.promptForSelection,
     });
 
     console.log(`Installed ${selectedSkills.length} skill(s) to ${installRoot}`);

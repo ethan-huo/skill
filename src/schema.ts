@@ -50,13 +50,16 @@ export const schema = {
 
   favorite: group(
     {
-      description: "Manage favorite skill IDs.",
+      description: "Manage favorite repository and skill refs.",
     },
     {
       add: c
         .meta({
-          description: "Save a favorite skill ID.",
-          examples: ["skill favorite add ethan-huo/agents/cx"],
+          description: "Save a favorite repository or skill ref.",
+          examples: [
+            "skill favorite add ethan-huo/agents",
+            "skill favorite add ethan-huo/agents/cx",
+          ],
         })
         .args("id")
         .input(
@@ -69,8 +72,11 @@ export const schema = {
 
       remove: c
         .meta({
-          description: "Remove a favorite skill ID.",
-          examples: ["skill favorite remove ethan-huo/agents/cx"],
+          description: "Remove a favorite repository or skill ref.",
+          examples: [
+            "skill favorite remove ethan-huo/agents",
+            "skill favorite remove ethan-huo/agents/cx",
+          ],
         })
         .args("id")
         .input(
@@ -83,7 +89,7 @@ export const schema = {
 
       list: c
         .meta({
-          description: "List saved favorite skill IDs.",
+          description: "List saved favorite repository and skill refs.",
           examples: ["skill favorite list", "skill favorite list --json"],
         })
         .input(
@@ -93,6 +99,13 @@ export const schema = {
             }),
           ),
         ),
+
+      refresh: c
+        .meta({
+          description: "Refresh favorite metadata and remove refs that no longer exist upstream.",
+          examples: ["skill favorite refresh"],
+        })
+        .input(s(v.object({}))),
 
       pick: c
         .meta({

@@ -1,4 +1,4 @@
-import type { FavoriteSkill, RepoRef, RepoSkillTarget } from "../types";
+import type { FavoriteRef, RepoRef, RepoSkillTarget } from "../types";
 
 const GITHUB_HOST = "github.com";
 
@@ -50,26 +50,37 @@ export function parseRepoSkillTarget(raw: string): RepoSkillTarget {
   };
 }
 
-export function parseSkillId(raw: string): FavoriteSkill {
+export function parseFavoriteRef(raw: string): FavoriteRef {
   const value = raw.trim();
   if (!value) {
-    throw new Error("Skill ID cannot be empty.");
+    throw new Error("Favorite ref cannot be empty.");
   }
 
-  const match = parseShortSkillRef(value);
-  if (!match) {
-    throw new Error("Skill ID must use owner/repo/skill format.");
+  const skillMatch = parseShortSkillRef(value);
+  if (skillMatch) {
+    const owner = assertSafeSegment(skillMatch.owner, "Owner");
+    const repo = assertSafeSegment(skillMatch.repo, "Repository");
+    const skill = assertSafeSegment(skillMatch.skill, "Skill");
+
+    return {
+      id: `${owner}/${repo}/${skill}`,
+      owner,
+      repo,
+      skill,
+      description: "",
+    };
   }
 
-  const owner = assertSafeSegment(match.owner, "Owner");
-  const repo = assertSafeSegment(match.repo, "Repository");
-  const skill = assertSafeSegment(match.skill, "Skill");
+  const repoMatch = parseShortRepo(value);
+  if (!repoMatch) {
+    throw new Error("Favorite ref must use owner/repo or owner/repo/skill format.");
+  }
 
   return {
-    id: `${owner}/${repo}/${skill}`,
-    owner,
-    repo,
-    skill,
+    id: repoMatch.display,
+    owner: repoMatch.owner,
+    repo: repoMatch.repo,
+    description: "",
   };
 }
 

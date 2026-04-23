@@ -7,22 +7,31 @@ describe("groupFavoritesForInstall", () => {
     expect(
       groupFavoritesForInstall([
         {
+          id: "ethan-huo/agents",
+          owner: "ethan-huo",
+          repo: "agents",
+          description: "",
+        },
+        {
           id: "ethan-huo/agents/cx",
           owner: "ethan-huo",
           repo: "agents",
           skill: "cx",
+          description: "",
         },
         {
           id: "ethan-huo/agents/fp-thinking",
           owner: "ethan-huo",
           repo: "agents",
           skill: "fp-thinking",
+          description: "",
         },
         {
           id: "pbakaus/impeccable/audit",
           owner: "pbakaus",
           repo: "impeccable",
           skill: "audit",
+          description: "",
         },
       ]),
     ).toEqual([
@@ -34,6 +43,7 @@ describe("groupFavoritesForInstall", () => {
           display: "ethan-huo/agents",
         },
         selectors: ["cx", "fp-thinking"],
+        promptForSelection: true,
       },
       {
         repo: {
@@ -43,6 +53,7 @@ describe("groupFavoritesForInstall", () => {
           display: "pbakaus/impeccable",
         },
         selectors: ["audit"],
+        promptForSelection: false,
       },
     ]);
   });

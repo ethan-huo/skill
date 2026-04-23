@@ -12,6 +12,8 @@ export async function installRepoSkills(options: {
   global: boolean;
   repo: RepoRef;
   selectors: string[];
+  initialSelectors?: string[];
+  promptForSelection?: boolean;
 }): Promise<{ installRoot: string; selectedSkills: SkillCandidate[] }> {
   const scope = getInstallScope(options.global);
   await assertNoConflictingGlobalInstall(options.cwd, scope, options.repo);
@@ -22,11 +24,11 @@ export async function installRepoSkills(options: {
     throw new Error(`No SKILL.md files found in ${options.repo.display}.`);
   }
 
-  const selectedSkills = await selectSkills(
-    options.repo.display,
-    discoveredSkills,
-    options.selectors,
-  );
+  const selectedSkills = await selectSkills(options.repo.display, discoveredSkills, {
+    selectors: options.selectors,
+    initialSelectors: options.initialSelectors,
+    promptForSelection: options.promptForSelection,
+  });
   const installRoot = getInstallRoot(scope, options.cwd, options.repo);
 
   await replaceInstalledSkills(cloneDir, installRoot, selectedSkills);

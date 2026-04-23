@@ -2,14 +2,25 @@ import * as p from "@clack/prompts";
 
 import type { SkillCandidate } from "../types";
 
+type SelectSkillsOptions = {
+  selectors?: string[];
+  initialSelectors?: string[];
+  promptForSelection?: boolean;
+};
+
 export async function selectSkills(
   repoDisplay: string,
   skills: SkillCandidate[],
-  selectors: string[],
+  options: SelectSkillsOptions = {},
 ): Promise<SkillCandidate[]> {
   if (skills.length === 0) {
     return [];
   }
+
+  const selectors = options.selectors ?? [];
+  const initialSelectors = new Set(
+    (options.initialSelectors ?? []).map((value) => value.trim()).filter(Boolean),
+  );
 
   if (skills.length === 1 && selectors.length === 0) {
     return skills;
@@ -28,6 +39,14 @@ export async function selectSkills(
     return selected;
   }
 
+  if (!options.promptForSelection && initialSelectors.size === 0 && skills.length > 1) {
+    if (!process.stdout.isTTY) {
+      throw new Error(
+        `Repository ${repoDisplay} contains multiple skills. Re-run in a TTY or pass --skill <folder>.`,
+      );
+    }
+  }
+
   if (!process.stdout.isTTY) {
     throw new Error(
       `Repository ${repoDisplay} contains multiple skills. Re-run in a TTY or pass --skill <folder>.`,
@@ -40,6 +59,9 @@ export async function selectSkills(
       label: skill.displayLabel,
       value: skill.relativeDir,
     })),
+    initialValues: skills
+      .map((skill) => skill.relativeDir)
+      .filter((relativeDir) => initialSelectors.has(relativeDir)),
     required: true,
   });
 

@@ -41,6 +41,8 @@ export type FavoriteListInput = {
   json: boolean;
 };
 
+export type FavoriteRefreshInput = {};
+
 export type FavoritePickInput = {
   add: boolean;
   global: boolean;
@@ -81,11 +83,13 @@ export type SearchSkill = {
   installs: number;
 };
 
-export type FavoriteSkill = {
+export type FavoriteRef = {
   id: string;
   owner: string;
   repo: string;
-  skill: string;
+  skill?: string;
+  description: string;
+  updatedAt?: string;
 };
 
 export type UpdateDiff = {

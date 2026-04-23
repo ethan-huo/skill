@@ -8,5 +8,7 @@ export async function runFavoriteAdd(args: { input: FavoriteAddInput }): Promise
     return;
   }
 
-  console.log(`Favorited ${result.favorite.id}`);
+  console.log(
+    `Favorited ${result.favorite.id}${result.favorite.description ? ` ${result.favorite.description}` : ""}`,
+  );
 }

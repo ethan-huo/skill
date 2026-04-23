@@ -2,21 +2,36 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { parseSkillId } from "./repo-ref";
-import type { FavoriteSkill } from "../types";
+import {
+  FavoriteMissingError,
+  loadFavoriteMetadata,
+  type FavoriteMetadata,
+} from "./favorite-metadata";
+import { parseFavoriteRef } from "./repo-ref";
+import type { FavoriteRef } from "../types";
 
 const FAVORITES_FILE_VERSION = 1;
 
+type FavoriteFileEntry = {
+  id: string;
+  description?: string;
+  updatedAt?: string;
+};
+
 type FavoritesFile = {
   version: number;
-  favorites: string[];
+  favorites: Array<string | FavoriteFileEntry>;
 };
 
 type FavoriteStoreOptions = {
   filePath?: string;
 };
 
-export async function listFavorites(options: FavoriteStoreOptions = {}): Promise<FavoriteSkill[]> {
+type FavoriteServices = {
+  loadMetadata?: (favorite: FavoriteRef) => Promise<FavoriteMetadata>;
+};
+
+export async function listFavorites(options: FavoriteStoreOptions = {}): Promise<FavoriteRef[]> {
   const file = await readFavoritesFile(options.filePath);
   return normalizeFavorites(file.favorites);
 }
@@ -24,14 +39,18 @@ export async function listFavorites(options: FavoriteStoreOptions = {}): Promise
 export async function addFavorite(
   id: string,
   options: FavoriteStoreOptions = {},
-): Promise<{ added: boolean; favorite: FavoriteSkill }> {
-  const favorite = parseSkillId(id);
+  services: FavoriteServices = {},
+): Promise<{ added: boolean; favorite: FavoriteRef }> {
+  const baseFavorite = parseFavoriteRef(id);
   const favorites = await listFavorites(options);
+  const metadataLoader = services.loadMetadata ?? loadFavoriteMetadata;
+  const metadata = await metadataLoader(baseFavorite);
+  const favorite = { ...baseFavorite, ...metadata };
   if (favorites.some((entry) => entry.id === favorite.id)) {
     return { added: false, favorite };
   }
 
-  const next = [...favorites.map((entry) => entry.id), favorite.id].sort();
+  const next = [...favorites, favorite].sort((left, right) => left.id.localeCompare(right.id));
   await writeFavoritesFile(next, options.filePath);
   return { added: true, favorite };
 }
@@ -39,19 +58,55 @@ export async function addFavorite(
 export async function removeFavorite(
   id: string,
   options: FavoriteStoreOptions = {},
-): Promise<{ removed: boolean; favorite: FavoriteSkill }> {
-  const favorite = parseSkillId(id);
+): Promise<{ removed: boolean; favorite: FavoriteRef }> {
+  const favorite = parseFavoriteRef(id);
   const favorites = await listFavorites(options);
   const next = favorites.filter((entry) => entry.id !== favorite.id);
   if (next.length === favorites.length) {
     return { removed: false, favorite };
   }
 
-  await writeFavoritesFile(
-    next.map((entry) => entry.id),
-    options.filePath,
-  );
+  await writeFavoritesFile(next, options.filePath);
   return { removed: true, favorite };
+}
+
+export async function refreshFavorites(
+  options: FavoriteStoreOptions = {},
+  services: FavoriteServices = {},
+): Promise<{
+  refreshed: FavoriteRef[];
+  removed: FavoriteRef[];
+  changed: FavoriteRef[];
+}> {
+  const favorites = await listFavorites(options);
+  const metadataLoader = services.loadMetadata ?? loadFavoriteMetadata;
+  const refreshed: FavoriteRef[] = [];
+  const removed: FavoriteRef[] = [];
+  const changed: FavoriteRef[] = [];
+
+  for (const favorite of favorites) {
+    try {
+      const metadata = await metadataLoader(favorite);
+      const nextFavorite = { ...favorite, ...metadata };
+      if (
+        nextFavorite.description !== favorite.description ||
+        nextFavorite.updatedAt !== favorite.updatedAt
+      ) {
+        changed.push(nextFavorite);
+      }
+      refreshed.push(nextFavorite);
+    } catch (error) {
+      if (error instanceof FavoriteMissingError) {
+        removed.push(favorite);
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  await writeFavoritesFile(refreshed, options.filePath);
+  return { refreshed, removed, changed };
 }
 
 export function getFavoritesFilePath(): string {
@@ -68,19 +123,23 @@ async function readFavoritesFile(filePath = getFavoritesFilePath()): Promise<Fav
   const parsed = JSON.parse(raw) as Partial<FavoritesFile>;
   return {
     version: FAVORITES_FILE_VERSION,
-    favorites: Array.isArray(parsed.favorites) ? parsed.favorites.filter(isString) : [],
+    favorites: Array.isArray(parsed.favorites) ? parsed.favorites : [],
   };
 }
 
 async function writeFavoritesFile(
-  favorites: string[],
+  favorites: FavoriteRef[],
   filePath = getFavoritesFilePath(),
 ): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true });
   const body = JSON.stringify(
     {
       version: FAVORITES_FILE_VERSION,
-      favorites,
+      favorites: favorites.map((favorite) => ({
+        id: favorite.id,
+        description: favorite.description || undefined,
+        updatedAt: favorite.updatedAt,
+      })),
     } satisfies FavoritesFile,
     null,
     2,
@@ -88,18 +147,26 @@ async function writeFavoritesFile(
   await writeFile(filePath, `${body}\n`, "utf8");
 }
 
-function normalizeFavorites(favorites: string[]): FavoriteSkill[] {
+function normalizeFavorites(favorites: Array<string | FavoriteFileEntry>): FavoriteRef[] {
   const seen = new Set<string>();
+  const parsedFavorites: Array<FavoriteRef | null> = favorites.map((entry) => {
+    try {
+      const ref = parseFavoriteRef(getFavoriteId(entry));
+      const metadata = isFavoriteEntry(entry)
+        ? {
+            description: normalizeOptionalString(entry.description),
+            updatedAt: normalizeOptionalString(entry.updatedAt) || undefined,
+          }
+        : { description: "", updatedAt: undefined };
 
-  return favorites
-    .map((id) => {
-      try {
-        return parseSkillId(id);
-      } catch {
-        return null;
-      }
-    })
-    .filter((favorite): favorite is FavoriteSkill => favorite !== null)
+      return { ...ref, ...metadata };
+    } catch {
+      return null;
+    }
+  });
+
+  return parsedFavorites
+    .filter((favorite): favorite is FavoriteRef => favorite !== null)
     .filter((favorite) => {
       if (seen.has(favorite.id)) {
         return false;
@@ -113,4 +180,16 @@ function normalizeFavorites(favorites: string[]): FavoriteSkill[] {
 
 function isString(value: unknown): value is string {
   return typeof value === "string";
+}
+
+function isFavoriteEntry(value: unknown): value is FavoriteFileEntry {
+  return typeof value === "object" && value !== null && "id" in value && isString(value.id);
+}
+
+function getFavoriteId(value: string | FavoriteFileEntry): string {
+  return isString(value) ? value : value.id;
+}
+
+function normalizeOptionalString(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }
