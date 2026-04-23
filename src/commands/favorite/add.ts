@@ -1,14 +1,16 @@
-import { addFavorite } from "../../lib/favorites";
+import { addFavorites } from "../../lib/favorites";
 import type { FavoriteAddInput } from "../../types";
 
 export async function runFavoriteAdd(args: { input: FavoriteAddInput }): Promise<void> {
-  const result = await addFavorite(args.input.id);
-  if (!result.added) {
-    console.log(`Already favorited ${result.favorite.id}`);
-    return;
+  const result = await addFavorites(args.input.ids);
+
+  for (const favorite of result.added) {
+    console.log(
+      `Favorited ${favorite.id}${favorite.description ? ` ${favorite.description}` : ""}`,
+    );
   }
 
-  console.log(
-    `Favorited ${result.favorite.id}${result.favorite.description ? ` ${result.favorite.description}` : ""}`,
-  );
+  for (const favorite of result.existing) {
+    console.log(`Already favorited ${favorite.id}`);
+  }
 }

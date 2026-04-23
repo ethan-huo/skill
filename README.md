@@ -15,8 +15,10 @@ skill find animation --limit 5
 
 skill favorite add ethan-huo/agents
 skill favorite add ethan-huo/agents/cx
+skill favorite add ethan-huo/agents ethan-huo/agents/cx
 skill favorite remove ethan-huo/agents
 skill favorite remove ethan-huo/agents/cx
+skill favorite remove ethan-huo/agents ethan-huo/agents/cx
 skill favorite list
 skill favorite list --json
 skill favorite refresh

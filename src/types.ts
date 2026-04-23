@@ -30,11 +30,11 @@ export type FindInput = {
 };
 
 export type FavoriteAddInput = {
-  id: string;
+  ids: string[];
 };
 
 export type FavoriteRemoveInput = {
-  id: string;
+  ids: string[];
 };
 
 export type FavoriteListInput = {

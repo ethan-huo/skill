@@ -55,6 +55,35 @@ export async function addFavorite(
   return { added: true, favorite };
 }
 
+export async function addFavorites(
+  ids: string[],
+  options: FavoriteStoreOptions = {},
+  services: FavoriteServices = {},
+): Promise<{ added: FavoriteRef[]; existing: FavoriteRef[] }> {
+  const favorites = await listFavorites(options);
+  const metadataLoader = services.loadMetadata ?? loadFavoriteMetadata;
+  const requestedFavorites = dedupeFavorites(ids.map((id) => parseFavoriteRef(id)));
+  const existingById = new Map(favorites.map((favorite) => [favorite.id, favorite]));
+  const existing = requestedFavorites
+    .filter((favorite) => existingById.has(favorite.id))
+    .map((favorite) => existingById.get(favorite.id)!);
+  const toAdd = requestedFavorites.filter((favorite) => !existingById.has(favorite.id));
+
+  const added = await Promise.all(
+    toAdd.map(async (favorite) => ({
+      ...favorite,
+      ...(await metadataLoader(favorite)),
+    })),
+  );
+
+  if (added.length > 0) {
+    const next = [...favorites, ...added].sort((left, right) => left.id.localeCompare(right.id));
+    await writeFavoritesFile(next, options.filePath);
+  }
+
+  return { added, existing };
+}
+
 export async function removeFavorite(
   id: string,
   options: FavoriteStoreOptions = {},
@@ -68,6 +97,35 @@ export async function removeFavorite(
 
   await writeFavoritesFile(next, options.filePath);
   return { removed: true, favorite };
+}
+
+export async function removeFavorites(
+  ids: string[],
+  options: FavoriteStoreOptions = {},
+): Promise<{ removed: FavoriteRef[]; missing: FavoriteRef[] }> {
+  const favorites = await listFavorites(options);
+  const requestedFavorites = dedupeFavorites(ids.map((id) => parseFavoriteRef(id)));
+  const installedById = new Map(favorites.map((favorite) => [favorite.id, favorite]));
+  const removed: FavoriteRef[] = [];
+  const missing: FavoriteRef[] = [];
+
+  for (const favorite of requestedFavorites) {
+    const existing = installedById.get(favorite.id);
+    if (existing) {
+      removed.push(existing);
+      installedById.delete(favorite.id);
+      continue;
+    }
+
+    missing.push(favorite);
+  }
+
+  if (removed.length > 0) {
+    const next = [...installedById.values()].sort((left, right) => left.id.localeCompare(right.id));
+    await writeFavoritesFile(next, options.filePath);
+  }
+
+  return { removed, missing };
 }
 
 export async function refreshFavorites(
@@ -192,4 +250,16 @@ function getFavoriteId(value: string | FavoriteFileEntry): string {
 
 function normalizeOptionalString(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function dedupeFavorites(favorites: FavoriteRef[]): FavoriteRef[] {
+  const seen = new Set<string>();
+  return favorites.filter((favorite) => {
+    if (seen.has(favorite.id)) {
+      return false;
+    }
+
+    seen.add(favorite.id);
+    return true;
+  });
 }

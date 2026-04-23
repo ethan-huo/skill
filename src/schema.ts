@@ -59,13 +59,14 @@ export const schema = {
           examples: [
             "skill favorite add ethan-huo/agents",
             "skill favorite add ethan-huo/agents/cx",
+            "skill favorite add ethan-huo/agents ethan-huo/agents/cx",
           ],
         })
-        .args("id")
+        .args("ids...")
         .input(
           s(
             v.object({
-              id: v.string(),
+              ids: v.array(v.string()),
             }),
           ),
         ),
@@ -76,13 +77,14 @@ export const schema = {
           examples: [
             "skill favorite remove ethan-huo/agents",
             "skill favorite remove ethan-huo/agents/cx",
+            "skill favorite remove ethan-huo/agents ethan-huo/agents/cx",
           ],
         })
-        .args("id")
+        .args("ids...")
         .input(
           s(
             v.object({
-              id: v.string(),
+              ids: v.array(v.string()),
             }),
           ),
         ),

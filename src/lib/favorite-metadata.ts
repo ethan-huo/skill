@@ -6,8 +6,6 @@ import { parseRepoRef } from "./repo-ref";
 import { readSkillDescription } from "./skill-frontmatter";
 import type { FavoriteRef, RepoRef } from "../types";
 
-const GITHUB_API_BASE = "https://api.github.com";
-
 type GitHubRepoResponse = {
   description?: unknown;
 };
@@ -48,25 +46,47 @@ export async function loadFavoriteMetadata(favorite: FavoriteRef): Promise<Favor
 }
 
 async function fetchRepoDescription(repo: RepoRef): Promise<string> {
-  const response = await fetch(`${GITHUB_API_BASE}/repos/${repo.owner}/${repo.repo}`, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      "User-Agent": "skill-cli",
-    },
-  });
-
-  if (response.status === 404) {
-    throw new FavoriteMissingError(`Favorite no longer exists: ${repo.display}`);
-  }
-
-  if (!response.ok) {
-    throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}`);
-  }
-
-  const payload = (await response.json()) as GitHubRepoResponse;
+  const payload = (await runGhApi([
+    "api",
+    `repos/${repo.owner}/${repo.repo}`,
+  ])) as GitHubRepoResponse;
   return sanitizeDescription(typeof payload.description === "string" ? payload.description : "");
 }
 
 function sanitizeDescription(value: string): string {
   return value.replace(/\s+/g, " ").trim();
+}
+
+async function runGhApi(args: string[]): Promise<unknown> {
+  let proc: ReturnType<typeof Bun.spawn>;
+  try {
+    proc = Bun.spawn(["gh", ...args], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+  } catch {
+    throw new Error("GitHub CLI is required for favorite metadata. Install `gh` and retry.");
+  }
+
+  const exitCode = await proc.exited;
+  const stderr = (await new Response(proc.stderr as ReadableStream).text()).trim();
+  if (exitCode !== 0) {
+    if (/\b404\b/.test(stderr)) {
+      throw new FavoriteMissingError(stderr);
+    }
+
+    if (
+      /authentication failed|not logged into any GitHub hosts|try authenticating with/i.test(stderr)
+    ) {
+      throw new Error("GitHub CLI is not authenticated. Run `gh auth login` and retry.");
+    }
+
+    if (/unknown command|not found|No such file or directory/i.test(stderr)) {
+      throw new Error("GitHub CLI is required for favorite metadata. Install `gh` and retry.");
+    }
+
+    throw new Error(stderr || "gh api failed.");
+  }
+
+  return new Response(proc.stdout as ReadableStream).json();
 }

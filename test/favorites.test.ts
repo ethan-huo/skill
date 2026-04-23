@@ -5,7 +5,14 @@ import { dirname, join } from "node:path";
 import { describe, expect, test } from "bun:test";
 
 import { FavoriteMissingError } from "../src/lib/favorite-metadata";
-import { addFavorite, listFavorites, refreshFavorites, removeFavorite } from "../src/lib/favorites";
+import {
+  addFavorite,
+  addFavorites,
+  listFavorites,
+  refreshFavorites,
+  removeFavorite,
+  removeFavorites,
+} from "../src/lib/favorites";
 
 const metadataById = new Map([
   [
@@ -68,6 +75,24 @@ describe("favorite store", () => {
     ]);
   });
 
+  test("adds multiple favorites atomically and reports existing refs separately", async () => {
+    const filePath = join(tmpdir(), `skill-favorites-${crypto.randomUUID()}.json`);
+    await addFavorite("ethan-huo/agents", { filePath }, { loadMetadata });
+
+    const result = await addFavorites(
+      ["ethan-huo/agents", "ethan-huo/agents/cx", "ethan-huo/agents/fp-thinking"],
+      { filePath },
+      { loadMetadata },
+    );
+
+    expect(result.existing.map((favorite) => favorite.id)).toEqual(["ethan-huo/agents"]);
+    expect(result.added.map((favorite) => favorite.id)).toEqual([
+      "ethan-huo/agents/cx",
+      "ethan-huo/agents/fp-thinking",
+    ]);
+    expect(await listFavorites({ filePath })).toHaveLength(3);
+  });
+
   test("removes favorites by canonical ref", async () => {
     const filePath = join(tmpdir(), `skill-favorites-${crypto.randomUUID()}.json`);
 
@@ -95,6 +120,24 @@ describe("favorite store", () => {
         updatedAt: "2026-04-23T00:00:02.000Z",
       },
     ]);
+  });
+
+  test("removes multiple favorites and reports missing refs separately", async () => {
+    const filePath = join(tmpdir(), `skill-favorites-${crypto.randomUUID()}.json`);
+    await addFavorite("ethan-huo/agents", { filePath }, { loadMetadata });
+    await addFavorite("ethan-huo/agents/cx", { filePath }, { loadMetadata });
+
+    const result = await removeFavorites(
+      ["ethan-huo/agents", "missing/repo", "ethan-huo/agents/cx"],
+      { filePath },
+    );
+
+    expect(result.removed.map((favorite) => favorite.id)).toEqual([
+      "ethan-huo/agents",
+      "ethan-huo/agents/cx",
+    ]);
+    expect(result.missing.map((favorite) => favorite.id)).toEqual(["missing/repo"]);
+    expect(await listFavorites({ filePath })).toEqual([]);
   });
 
   test("ignores invalid and duplicate file entries while reading", async () => {
