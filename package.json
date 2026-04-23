@@ -10,7 +10,7 @@
     "dev": "bun run src/cli.ts",
     "fmt": "bunx oxfmt .",
     "fmt:check": "bunx oxfmt --check .",
-    "typecheck": "bunx tsc --noEmit",
+    "typecheck": "tsgo --noEmit",
     "test": "bun test",
     "check": "bun run fmt:check && bun run typecheck && bun test"
   },
@@ -22,8 +22,9 @@
   },
   "devDependencies": {
     "@types/bun": "^1.3.12",
+    "@typescript/native-preview": "^7.0.0-dev.20260421.2",
     "oxfmt": "^0.46.0",
-    "typescript": "^6.0.3"
+    "typescript": "npm:@typescript/typescript6@^6.0.0"
   },
   "engines": {
     "bun": ">=1.3.0"
