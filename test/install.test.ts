@@ -4,9 +4,14 @@ import { dirname, join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { pruneEmptyParents, removeInstalledRepo, replaceInstalledSkills } from "../src/lib/install";
+import {
+  pruneEmptyParents,
+  removeInstalledRepo,
+  removeInstalledSkill,
+  replaceInstalledSkills,
+} from "../src/lib/install";
 
-describe("removeInstalledRepo", () => {
+describe("install helpers", () => {
   test("installs selected skills into flat folder IDs", async () => {
     const root = join(tmpdir(), `skill-install-${crypto.randomUUID()}`);
     const repoDir = join(root, "repo");
@@ -39,6 +44,18 @@ describe("removeInstalledRepo", () => {
 
     const remaining = await stat(target).catch(() => null);
     expect(remaining).toBeNull();
+  });
+
+  test("removes one installed skill without touching siblings", async () => {
+    const root = join(tmpdir(), `skill-remove-one-${crypto.randomUUID()}`);
+    const target = join(root, "ethan-huo", "agents");
+    await mkdir(join(target, "cx"), { recursive: true });
+    await mkdir(join(target, "fp-thinking"), { recursive: true });
+
+    expect(await removeInstalledSkill(target, "cx")).toBe(true);
+
+    expect(await stat(join(target, "cx")).catch(() => null)).toBeNull();
+    expect((await stat(join(target, "fp-thinking"))).isDirectory()).toBe(true);
   });
 
   test("prunes empty owner directories", async () => {

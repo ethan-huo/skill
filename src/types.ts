@@ -7,7 +7,7 @@ export type RepoRef = {
   display: string;
 };
 
-export type AddTarget = {
+export type RepoSkillTarget = {
   repo: RepoRef;
   skill?: string;
 };
@@ -27,6 +27,23 @@ export type AddInput = {
 export type FindInput = {
   query: string;
   limit?: number;
+};
+
+export type FavoriteAddInput = {
+  id: string;
+};
+
+export type FavoriteRemoveInput = {
+  id: string;
+};
+
+export type FavoriteListInput = {
+  json: boolean;
+};
+
+export type FavoritePickInput = {
+  add: boolean;
+  global: boolean;
 };
 
 export type RemoveInput = {
@@ -62,6 +79,13 @@ export type SearchSkill = {
   name: string;
   source: string;
   installs: number;
+};
+
+export type FavoriteSkill = {
+  id: string;
+  owner: string;
+  repo: string;
+  skill: string;
 };
 
 export type UpdateDiff = {

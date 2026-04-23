@@ -40,6 +40,17 @@ export async function removeInstalledRepo(targetRoot: string): Promise<boolean> 
   return true;
 }
 
+export async function removeInstalledSkill(targetRoot: string, skillId: string): Promise<boolean> {
+  const skillRoot = join(targetRoot, skillId);
+  const directory = await stat(skillRoot).catch(() => null);
+  if (!directory?.isDirectory()) {
+    return false;
+  }
+
+  await rm(skillRoot, { recursive: true, force: true });
+  return true;
+}
+
 export async function pruneEmptyParents(startDir: string, stopDir: string): Promise<void> {
   let currentDir = startDir;
 

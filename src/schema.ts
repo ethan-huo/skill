@@ -1,5 +1,5 @@
 import { toStandardJsonSchema } from "@valibot/to-json-schema";
-import { c } from "argc";
+import { c, group } from "argc";
 import * as v from "valibot";
 
 const s = toStandardJsonSchema;
@@ -48,10 +48,80 @@ export const schema = {
       ),
     ),
 
+  favorite: group(
+    {
+      description: "Manage favorite skill IDs.",
+    },
+    {
+      add: c
+        .meta({
+          description: "Save a favorite skill ID.",
+          examples: ["skill favorite add ethan-huo/agents/cx"],
+        })
+        .args("id")
+        .input(
+          s(
+            v.object({
+              id: v.string(),
+            }),
+          ),
+        ),
+
+      remove: c
+        .meta({
+          description: "Remove a favorite skill ID.",
+          examples: ["skill favorite remove ethan-huo/agents/cx"],
+        })
+        .args("id")
+        .input(
+          s(
+            v.object({
+              id: v.string(),
+            }),
+          ),
+        ),
+
+      list: c
+        .meta({
+          description: "List saved favorite skill IDs.",
+          examples: ["skill favorite list", "skill favorite list --json"],
+        })
+        .input(
+          s(
+            v.object({
+              json: v.optional(v.boolean(), false),
+            }),
+          ),
+        ),
+
+      pick: c
+        .meta({
+          description: "Interactively pick favorite skills and optionally install them.",
+          examples: [
+            "skill favorite pick",
+            "skill favorite pick --add",
+            "skill favorite pick --add --global",
+          ],
+        })
+        .input(
+          s(
+            v.object({
+              add: v.optional(v.boolean(), false),
+              global: v.optional(v.boolean(), false),
+            }),
+          ),
+        ),
+    },
+  ),
+
   remove: c
     .meta({
-      description: "Remove all skills previously installed from a repository.",
-      examples: ["skill remove ethan-huo/agents", "skill remove ethan-huo/agents --global"],
+      description: "Remove an installed repository or a single installed skill.",
+      examples: [
+        "skill remove ethan-huo/agents",
+        "skill remove ethan-huo/agents/cx",
+        "skill remove ethan-huo/agents --global",
+      ],
     })
     .args("repo")
     .input(

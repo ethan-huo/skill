@@ -1,4 +1,4 @@
-import type { AddTarget, RepoRef } from "../types";
+import type { FavoriteSkill, RepoRef, RepoSkillTarget } from "../types";
 
 const GITHUB_HOST = "github.com";
 
@@ -28,7 +28,7 @@ export function parseRepoRef(raw: string): RepoRef {
   );
 }
 
-export function parseAddTarget(raw: string): AddTarget {
+export function parseRepoSkillTarget(raw: string): RepoSkillTarget {
   const value = raw.trim();
   if (!value) {
     throw new Error("Repository cannot be empty.");
@@ -41,12 +41,35 @@ export function parseAddTarget(raw: string): AddTarget {
 
   return {
     repo: {
-      owner: skillMatch.owner,
-      repo: skillMatch.repo,
+      owner: assertSafeSegment(skillMatch.owner, "Owner"),
+      repo: assertSafeSegment(skillMatch.repo, "Repository"),
       cloneUrl: `https://${GITHUB_HOST}/${skillMatch.owner}/${skillMatch.repo}.git`,
       display: `${skillMatch.owner}/${skillMatch.repo}`,
     },
-    skill: skillMatch.skill,
+    skill: assertSafeSegment(skillMatch.skill, "Skill"),
+  };
+}
+
+export function parseSkillId(raw: string): FavoriteSkill {
+  const value = raw.trim();
+  if (!value) {
+    throw new Error("Skill ID cannot be empty.");
+  }
+
+  const match = parseShortSkillRef(value);
+  if (!match) {
+    throw new Error("Skill ID must use owner/repo/skill format.");
+  }
+
+  const owner = assertSafeSegment(match.owner, "Owner");
+  const repo = assertSafeSegment(match.repo, "Repository");
+  const skill = assertSafeSegment(match.skill, "Skill");
+
+  return {
+    id: `${owner}/${repo}/${skill}`,
+    owner,
+    repo,
+    skill,
   };
 }
 
@@ -73,12 +96,12 @@ function parseHttpRepo(value: string): RepoRef | null {
 
   if (segments.length > 2) {
     throw new Error(
-      "GitHub repository URLs must point to the repository root. Use owner/repo/skill or --skill <folder> to target a specific skill.",
+      "GitHub repository URLs must point to the repository root. Use owner/repo/skill shorthand to target a specific skill.",
     );
   }
 
-  const owner = segments[0]!;
-  const repo = segments[1]!;
+  const owner = assertSafeSegment(segments[0]!, "Owner");
+  const repo = assertSafeSegment(segments[1]!, "Repository");
 
   return {
     owner,
@@ -94,8 +117,8 @@ function parseSshRepo(value: string): RepoRef | null {
     return null;
   }
 
-  const owner = match[1]!;
-  const repo = match[2]!;
+  const owner = assertSafeSegment(match[1]!, "Owner");
+  const repo = assertSafeSegment(match[2]!, "Repository");
 
   return {
     owner,
@@ -111,8 +134,8 @@ function parseShortRepo(value: string): RepoRef | null {
     return null;
   }
 
-  const owner = match[1]!;
-  const repo = match[2]!;
+  const owner = assertSafeSegment(match[1]!, "Owner");
+  const repo = assertSafeSegment(match[2]!, "Repository");
 
   return {
     owner,
@@ -133,4 +156,12 @@ function parseShortSkillRef(value: string): { owner: string; repo: string; skill
     repo: match[2]!,
     skill: match[3]!,
   };
+}
+
+function assertSafeSegment(value: string, label: string): string {
+  if (value === "." || value === "..") {
+    throw new Error(`${label} cannot be "." or "..".`);
+  }
+
+  return value;
 }
