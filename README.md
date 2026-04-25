@@ -90,6 +90,7 @@ skill update
 skill update --global
 skill install
 
+skill remove --global
 skill remove owner/repo
 skill remove owner/repo/skill
 
@@ -106,6 +107,7 @@ skill favorite remove owner/repo owner/repo/skill
 | `skill add owner/repo/skill`               | Install one known skill directly                             |
 | `skill add owner/repo --skill a --skill b` | Install multiple skills from one repo without prompts        |
 | `skill add owner/repo`                     | Interactive selection when the repo contains multiple skills |
+| `skill remove --global`                    | Interactively remove one or more global skills               |
 | `skill remove owner/repo`                  | Remove one installed repo root                               |
 | `skill remove owner/repo/skill`            | Remove one installed skill without touching siblings         |
 
@@ -153,6 +155,8 @@ Install roots:
 - global visible links: `~/.agents/skills/{owner}/{repo}/`
 - shared sources: `~/.agents/.skills/{owner}/{repo}/`
 - project visible links: `{cwd}/.agents/skills/{owner}/{repo}/`
+- Claude visible links: `~/.claude/skills/{owner}/{repo}/` when `~/.claude/` already exists
+- project Claude visible links: `{cwd}/.claude/skills/{owner}/{repo}/` when `{cwd}/.claude/` already exists
 
 Favorites:
 

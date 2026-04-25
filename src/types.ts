@@ -54,7 +54,7 @@ export type FavoritePickInput = {
 };
 
 export type RemoveInput = {
-  repo: string;
+  repo: string[];
   global: boolean;
 };
 

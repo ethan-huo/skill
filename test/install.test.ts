@@ -83,6 +83,17 @@ describe("install helpers", () => {
     expect((await stat(join(target, "fp-thinking"))).isDirectory()).toBe(true);
   });
 
+  test("removes one installed skill from legacy nested layouts", async () => {
+    const root = join(tmpdir(), `skill-remove-legacy-${crypto.randomUUID()}`);
+    const target = join(root, "ethan-huo", "ghd");
+    await mkdir(join(target, "skills", "ghd"), { recursive: true });
+    await writeFile(join(target, "skills", "ghd", "SKILL.md"), "---\nname: ghd\n---\n");
+
+    expect(await removeInstalledSkill(target, "ghd")).toBe(true);
+
+    expect(await stat(join(target, "skills", "ghd")).catch(() => null)).toBeNull();
+  });
+
   test("prunes empty owner directories", async () => {
     const root = join(tmpdir(), `skill-prune-${crypto.randomUUID()}`);
     const baseDir = join(root, ".agents", "skills");

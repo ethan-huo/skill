@@ -3,7 +3,13 @@ import { stat } from "node:fs/promises";
 import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, replaceInstalledSkills, upsertInstalledSkills } from "./install";
-import { getInstallRoot, getInstallScope, getSourceInstallRoot } from "./paths";
+import {
+  getClaudeInstallRoot,
+  getClaudeRoot,
+  getInstallRoot,
+  getInstallScope,
+  getSourceInstallRoot,
+} from "./paths";
 import { selectSkills } from "./select-skills";
 import type { RepoRef, SkillCandidate } from "../types";
 
@@ -24,6 +30,12 @@ export async function installRepoSkills(options: {
     const sourceRoot = getSourceInstallRoot(options.repo);
     await upsertInstalledSkills(cloneDir, sourceRoot, selectedSkills);
     await linkInstalledSkills(sourceRoot, installRoot, selectedSkills);
+    await linkClaudeSkillsIfAvailable({
+      claudeRoot: getClaudeRoot(),
+      repo: options.repo,
+      selectedSkills,
+      sourceRoot,
+    });
     return { installRoot, selectedSkills };
   }
 
@@ -51,6 +63,22 @@ export async function selectRepoSkills(options: {
   });
 
   return { cloneDir, selectedSkills };
+}
+
+export async function linkClaudeSkillsIfAvailable(options: {
+  claudeRoot: string;
+  repo: RepoRef;
+  sourceRoot: string;
+  selectedSkills: SkillCandidate[];
+}): Promise<string | null> {
+  const claudeRoot = await stat(options.claudeRoot).catch(() => null);
+  if (!claudeRoot?.isDirectory()) {
+    return null;
+  }
+
+  const installRoot = getClaudeInstallRoot(options.claudeRoot, options.repo);
+  await linkInstalledSkills(options.sourceRoot, installRoot, options.selectedSkills);
+  return installRoot;
 }
 
 async function assertNoConflictingGlobalInstall(

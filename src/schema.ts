@@ -153,16 +153,17 @@ export const schema = {
     .meta({
       description: "Remove an installed repository or a single installed skill.",
       examples: [
+        "skill remove --global",
         "skill remove ethan-huo/agents",
         "skill remove ethan-huo/agents/cx",
         "skill remove ethan-huo/agents --global",
       ],
     })
-    .args("repo")
+    .args("repo...")
     .input(
       s(
         v.object({
-          repo: v.string(),
+          repo: v.optional(v.array(v.string()), []),
           global: v.optional(v.boolean(), false),
         }),
       ),

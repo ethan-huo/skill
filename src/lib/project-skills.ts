@@ -2,11 +2,11 @@ import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import { selectRepoSkills } from "./add-skills";
+import { linkClaudeSkillsIfAvailable, selectRepoSkills } from "./add-skills";
 import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, upsertInstalledSkills } from "./install";
-import { getInstallRoot, getSourceInstallRoot } from "./paths";
+import { getInstallRoot, getProjectClaudeRoot, getSourceInstallRoot } from "./paths";
 import {
   addProjectManifestSkills,
   readProjectManifest,
@@ -29,6 +29,7 @@ export async function installProjectRepoSkills(options: {
 
   await upsertInstalledSkills(cloneDir, sourceRoot, selectedSkills);
   await linkInstalledSkills(sourceRoot, installRoot, selectedSkills);
+  await linkProjectClaudeSkillsIfAvailable(options.cwd, options.repo, sourceRoot, selectedSkills);
   await addProjectManifestSkills(
     options.cwd,
     selectedSkills.map(
@@ -73,6 +74,7 @@ export async function restoreProjectSkills(cwd: string): Promise<{
     const installRoot = getInstallRoot("local", cwd, repo);
     await upsertInstalledSkills(cloneDir, sourceRoot, selectedSkills);
     await linkInstalledSkills(sourceRoot, installRoot, selectedSkills);
+    await linkProjectClaudeSkillsIfAvailable(cwd, repo, sourceRoot, selectedSkills);
 
     for (const skill of selectedSkills) {
       const skillId = `${group.owner}/${group.repo}/${skill.relativeDir}`;
@@ -141,5 +143,23 @@ function groupManifestSkills(
 
 async function removeProjectSkill(repo: RepoRef, cwd: string, skill: string): Promise<void> {
   await rm(join(getInstallRoot("local", cwd, repo), skill), { force: true, recursive: true });
+  await rm(join(getProjectClaudeRoot(cwd), "skills", repo.owner, repo.repo, skill), {
+    force: true,
+    recursive: true,
+  });
   await rm(join(getSourceInstallRoot(repo), skill), { force: true, recursive: true });
+}
+
+async function linkProjectClaudeSkillsIfAvailable(
+  cwd: string,
+  repo: RepoRef,
+  sourceRoot: string,
+  selectedSkills: SkillCandidate[],
+): Promise<void> {
+  await linkClaudeSkillsIfAvailable({
+    claudeRoot: getProjectClaudeRoot(cwd),
+    repo,
+    selectedSkills,
+    sourceRoot,
+  });
 }

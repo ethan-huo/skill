@@ -1,6 +1,7 @@
 import { cp, mkdir, mkdtemp, readdir, rename, rm, stat, symlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { discoverSkills } from "./discover-skills";
 import type { SkillCandidate } from "../types";
 
 export async function replaceInstalledSkills(
@@ -73,14 +74,35 @@ export async function removeInstalledRepo(targetRoot: string): Promise<boolean> 
 }
 
 export async function removeInstalledSkill(targetRoot: string, skillId: string): Promise<boolean> {
-  const skillRoot = join(targetRoot, skillId);
+  const skillRoot = await findInstalledSkillRoot(targetRoot, skillId);
+  if (skillRoot === null) {
+    return false;
+  }
+
   const directory = await stat(skillRoot).catch(() => null);
   if (!directory?.isDirectory()) {
     return false;
   }
 
   await rm(skillRoot, { recursive: true, force: true });
+  await pruneEmptyParents(dirname(skillRoot), targetRoot);
   return true;
+}
+
+async function findInstalledSkillRoot(targetRoot: string, skillId: string): Promise<string | null> {
+  const flatSkillRoot = join(targetRoot, skillId);
+  const flatSkill = await stat(flatSkillRoot).catch(() => null);
+  if (flatSkill?.isDirectory()) {
+    return flatSkillRoot;
+  }
+
+  const discoveredSkills = await discoverSkills(targetRoot);
+  const legacySkill = discoveredSkills.find((skill) => skill.relativeDir === skillId);
+  if (!legacySkill) {
+    return null;
+  }
+
+  return join(targetRoot, legacySkill.sourceDir);
 }
 
 export async function pruneEmptyParents(startDir: string, stopDir: string): Promise<void> {
