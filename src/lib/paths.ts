@@ -35,8 +35,8 @@ export function getProjectClaudeRoot(cwd: string): string {
   return join(cwd, ".claude");
 }
 
-export function getClaudeInstallRoot(claudeRoot: string, repo: RepoRef): string {
-  return join(claudeRoot, "skills", repo.owner, repo.repo);
+export function getClaudeSkillRoot(claudeRoot: string, repo: RepoRef, skill: string): string {
+  return join(claudeRoot, "skills", `${repo.owner}.${repo.repo}.${skill}`);
 }
 
 export function getProjectManifestPath(cwd: string): string {

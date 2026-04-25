@@ -1,10 +1,11 @@
-import { stat } from "node:fs/promises";
+import { mkdir, rm, stat, symlink } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, replaceInstalledSkills, upsertInstalledSkills } from "./install";
 import {
-  getClaudeInstallRoot,
+  getClaudeSkillRoot,
   getClaudeRoot,
   getInstallRoot,
   getInstallScope,
@@ -70,15 +71,22 @@ export async function linkClaudeSkillsIfAvailable(options: {
   repo: RepoRef;
   sourceRoot: string;
   selectedSkills: SkillCandidate[];
-}): Promise<string | null> {
+}): Promise<string[] | null> {
   const claudeRoot = await stat(options.claudeRoot).catch(() => null);
   if (!claudeRoot?.isDirectory()) {
     return null;
   }
 
-  const installRoot = getClaudeInstallRoot(options.claudeRoot, options.repo);
-  await linkInstalledSkills(options.sourceRoot, installRoot, options.selectedSkills);
-  return installRoot;
+  const installRoots: string[] = [];
+  for (const skill of options.selectedSkills) {
+    const installRoot = getClaudeSkillRoot(options.claudeRoot, options.repo, skill.relativeDir);
+    await mkdir(dirname(installRoot), { recursive: true });
+    await rm(installRoot, { force: true, recursive: true });
+    await symlink(join(options.sourceRoot, skill.relativeDir), installRoot, "dir");
+    installRoots.push(installRoot);
+  }
+
+  return installRoots;
 }
 
 async function assertNoConflictingGlobalInstall(

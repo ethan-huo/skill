@@ -35,16 +35,16 @@ describe("add skills", () => {
     await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\n");
     await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
 
-    const installRoot = await linkClaudeSkillsIfAvailable({
+    const installRoots = await linkClaudeSkillsIfAvailable({
       claudeRoot,
       repo,
       selectedSkills,
       sourceRoot,
     });
 
-    expect(installRoot).toBe(join(claudeRoot, "skills", "ethan-huo", "agents"));
-    expect((await lstat(join(installRoot!, "cx"))).isSymbolicLink()).toBe(true);
-    expect(await readFile(join(installRoot!, "cx", "SKILL.md"), "utf8")).toContain("name: cx");
+    expect(installRoots).toEqual([join(claudeRoot, "skills", "ethan-huo.agents.cx")]);
+    expect((await lstat(installRoots![0]!)).isSymbolicLink()).toBe(true);
+    expect(await readFile(join(installRoots![0]!, "SKILL.md"), "utf8")).toContain("name: cx");
   });
 
   test("skips claude links when claude root is absent", async () => {
@@ -52,14 +52,14 @@ describe("add skills", () => {
     const sourceRoot = join(root, ".agents", ".skills", "ethan-huo", "agents");
     const claudeRoot = join(root, ".claude");
 
-    const installRoot = await linkClaudeSkillsIfAvailable({
+    const installRoots = await linkClaudeSkillsIfAvailable({
       claudeRoot,
       repo,
       selectedSkills,
       sourceRoot,
     });
 
-    expect(installRoot).toBeNull();
+    expect(installRoots).toBeNull();
     expect(await stat(join(claudeRoot, "skills")).catch(() => null)).toBeNull();
   });
 
@@ -75,15 +75,15 @@ describe("add skills", () => {
     await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\n");
     await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
 
-    const installRoot = await linkClaudeSkillsIfAvailable({
+    const installRoots = await linkClaudeSkillsIfAvailable({
       claudeRoot,
       repo,
       selectedSkills,
       sourceRoot,
     });
 
-    expect(installRoot).toBe(join(projectRoot, ".claude", "skills", "ethan-huo", "agents"));
-    expect((await lstat(join(installRoot!, "cx"))).isSymbolicLink()).toBe(true);
-    expect(await readFile(join(installRoot!, "cx", "SKILL.md"), "utf8")).toContain("name: cx");
+    expect(installRoots).toEqual([join(projectRoot, ".claude", "skills", "ethan-huo.agents.cx")]);
+    expect((await lstat(installRoots![0]!)).isSymbolicLink()).toBe(true);
+    expect(await readFile(join(installRoots![0]!, "SKILL.md"), "utf8")).toContain("name: cx");
   });
 });

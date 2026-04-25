@@ -6,7 +6,12 @@ import { linkClaudeSkillsIfAvailable, selectRepoSkills } from "./add-skills";
 import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, upsertInstalledSkills } from "./install";
-import { getInstallRoot, getProjectClaudeRoot, getSourceInstallRoot } from "./paths";
+import {
+  getClaudeSkillRoot,
+  getInstallRoot,
+  getProjectClaudeRoot,
+  getSourceInstallRoot,
+} from "./paths";
 import {
   addProjectManifestSkills,
   readProjectManifest,
@@ -143,7 +148,7 @@ function groupManifestSkills(
 
 async function removeProjectSkill(repo: RepoRef, cwd: string, skill: string): Promise<void> {
   await rm(join(getInstallRoot("local", cwd, repo), skill), { force: true, recursive: true });
-  await rm(join(getProjectClaudeRoot(cwd), "skills", repo.owner, repo.repo, skill), {
+  await rm(getClaudeSkillRoot(getProjectClaudeRoot(cwd), repo, skill), {
     force: true,
     recursive: true,
   });
