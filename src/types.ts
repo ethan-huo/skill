@@ -24,6 +24,11 @@ export type AddInput = {
   skill: string | string[];
 };
 
+export type InstallInput = {
+  repo: string[];
+  skill: string | string[];
+};
+
 export type FindInput = {
   query: string;
   limit?: number;

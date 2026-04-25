@@ -18,3 +18,15 @@ export function getSkillsBaseDir(scope: InstallScope, cwd: string): string {
 export function getInstallRoot(scope: InstallScope, cwd: string, repo: RepoRef): string {
   return join(getSkillsBaseDir(scope, cwd), repo.owner, repo.repo);
 }
+
+export function getSourceSkillsBaseDir(): string {
+  return join(homedir(), ".agents", ".skills");
+}
+
+export function getSourceInstallRoot(repo: RepoRef): string {
+  return join(getSourceSkillsBaseDir(), repo.owner, repo.repo);
+}
+
+export function getProjectManifestPath(cwd: string): string {
+  return join(cwd, ".agents", "skills", "manifest.json");
+}

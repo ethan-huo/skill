@@ -129,6 +129,26 @@ export const schema = {
     },
   ),
 
+  install: c
+    .meta({
+      description:
+        "Install shared project skills or restore project links from .agents/skills/manifest.json.",
+      examples: [
+        "skill install",
+        "skill install ethan-huo/agents/cx",
+        "skill install ethan-huo/agents --skill cx --skill fp-thinking",
+      ],
+    })
+    .args("repo...")
+    .input(
+      s(
+        v.object({
+          repo: v.optional(v.array(v.string()), []),
+          skill: v.optional(v.union([v.string(), v.array(v.string())]), []),
+        }),
+      ),
+    ),
+
   remove: c
     .meta({
       description: "Remove an installed repository or a single installed skill.",

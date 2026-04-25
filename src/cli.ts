@@ -8,6 +8,7 @@ import { runFavoritePick } from "./commands/favorite/pick";
 import { runFavoriteRefresh } from "./commands/favorite/refresh";
 import { runFavoriteRemove } from "./commands/favorite/remove";
 import { runFind } from "./commands/find";
+import { runInstall } from "./commands/install";
 import { runList } from "./commands/list";
 import { runRemove } from "./commands/remove";
 import { runUpdate } from "./commands/update";
@@ -33,6 +34,7 @@ app.run(
         remove: runFavoriteRemove,
       },
       find: runFind,
+      install: runInstall,
       list: runList,
       remove: runRemove,
       update: runUpdate,

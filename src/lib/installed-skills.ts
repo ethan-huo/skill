@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { discoverSkills } from "./discover-skills";
@@ -58,7 +58,7 @@ export async function listInstalledRepos(cwd: string): Promise<InstalledRepo[]> 
 }
 
 async function listSkillsForRepo(repo: InstalledRepo): Promise<InstalledSkill[]> {
-  const relativeSkills = await discoverSkills(repo.installRoot);
+  const relativeSkills = await discoverInstalledSkills(repo.installRoot);
   const skills = await Promise.all(
     relativeSkills.map(async (skill) => {
       const description = await readSkillDescription(
@@ -78,4 +78,31 @@ async function listSkillsForRepo(repo: InstalledRepo): Promise<InstalledSkill[]>
   );
 
   return skills;
+}
+
+async function discoverInstalledSkills(installRoot: string) {
+  const discovered = await discoverSkills(installRoot);
+  const byRelativeDir = new Map(discovered.map((skill) => [skill.relativeDir, skill]));
+  const entries = await readdir(installRoot, { withFileTypes: true }).catch(() => []);
+
+  for (const entry of entries) {
+    if (!entry.isSymbolicLink()) {
+      continue;
+    }
+
+    const skillFile = await stat(join(installRoot, entry.name, "SKILL.md")).catch(() => null);
+    if (!skillFile?.isFile()) {
+      continue;
+    }
+
+    byRelativeDir.set(entry.name, {
+      relativeDir: entry.name,
+      sourceDir: entry.name,
+      displayLabel: entry.name,
+    });
+  }
+
+  return [...byRelativeDir.values()].sort((left, right) =>
+    left.relativeDir.localeCompare(right.relativeDir),
+  );
 }

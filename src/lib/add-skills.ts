@@ -2,8 +2,8 @@ import { stat } from "node:fs/promises";
 
 import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
-import { replaceInstalledSkills } from "./install";
-import { getInstallRoot, getInstallScope } from "./paths";
+import { linkInstalledSkills, replaceInstalledSkills, upsertInstalledSkills } from "./install";
+import { getInstallRoot, getInstallScope, getSourceInstallRoot } from "./paths";
 import { selectSkills } from "./select-skills";
 import type { RepoRef, SkillCandidate } from "../types";
 
@@ -17,6 +17,26 @@ export async function installRepoSkills(options: {
 }): Promise<{ installRoot: string; selectedSkills: SkillCandidate[] }> {
   const scope = getInstallScope(options.global);
   await assertNoConflictingGlobalInstall(options.cwd, scope, options.repo);
+  const { cloneDir, selectedSkills } = await selectRepoSkills(options);
+  const installRoot = getInstallRoot(scope, options.cwd, options.repo);
+
+  if (scope === "global") {
+    const sourceRoot = getSourceInstallRoot(options.repo);
+    await upsertInstalledSkills(cloneDir, sourceRoot, selectedSkills);
+    await linkInstalledSkills(sourceRoot, installRoot, selectedSkills);
+    return { installRoot, selectedSkills };
+  }
+
+  await replaceInstalledSkills(cloneDir, installRoot, selectedSkills);
+  return { installRoot, selectedSkills };
+}
+
+export async function selectRepoSkills(options: {
+  repo: RepoRef;
+  selectors: string[];
+  initialSelectors?: string[];
+  promptForSelection?: boolean;
+}): Promise<{ cloneDir: string; selectedSkills: SkillCandidate[] }> {
   const cloneDir = await shallowCloneRepo(options.repo);
 
   const discoveredSkills = await discoverSkills(cloneDir);
@@ -29,10 +49,8 @@ export async function installRepoSkills(options: {
     initialSelectors: options.initialSelectors,
     promptForSelection: options.promptForSelection,
   });
-  const installRoot = getInstallRoot(scope, options.cwd, options.repo);
 
-  await replaceInstalledSkills(cloneDir, installRoot, selectedSkills);
-  return { installRoot, selectedSkills };
+  return { cloneDir, selectedSkills };
 }
 
 async function assertNoConflictingGlobalInstall(

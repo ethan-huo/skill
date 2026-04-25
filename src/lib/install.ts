@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, readdir, rename, rm, stat } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readdir, rename, rm, stat, symlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import type { SkillCandidate } from "../types";
@@ -27,6 +27,38 @@ export async function replaceInstalledSkills(
   } catch (error) {
     await rm(stagingRoot, { force: true, recursive: true });
     throw error;
+  }
+}
+
+export async function upsertInstalledSkills(
+  repoDir: string,
+  targetRoot: string,
+  selectedSkills: SkillCandidate[],
+): Promise<void> {
+  await mkdir(targetRoot, { recursive: true });
+
+  for (const skill of selectedSkills) {
+    const sourceDir = join(repoDir, skill.sourceDir);
+    const destDir = join(targetRoot, skill.relativeDir);
+    await mkdir(dirname(destDir), { recursive: true });
+    await rm(destDir, { force: true, recursive: true });
+    await cp(sourceDir, destDir, { recursive: true });
+  }
+}
+
+export async function linkInstalledSkills(
+  sourceRoot: string,
+  targetRoot: string,
+  selectedSkills: SkillCandidate[],
+): Promise<void> {
+  await mkdir(targetRoot, { recursive: true });
+
+  for (const skill of selectedSkills) {
+    const sourceDir = join(sourceRoot, skill.relativeDir);
+    const destDir = join(targetRoot, skill.relativeDir);
+    await mkdir(dirname(destDir), { recursive: true });
+    await rm(destDir, { force: true, recursive: true });
+    await symlink(sourceDir, destDir, "dir");
   }
 }
 

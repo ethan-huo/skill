@@ -7,6 +7,11 @@ import { shallowCloneRepo } from "../lib/git";
 import { pruneEmptyParents, removeInstalledRepo, replaceInstalledSkills } from "../lib/install";
 import { listInstalledRepos, listInstalledSkills } from "../lib/installed-skills";
 import { getInstallScope, getSkillsBaseDir } from "../lib/paths";
+import {
+  hasProjectManifest,
+  listProjectManifestRepoRoots,
+  restoreProjectSkills,
+} from "../lib/project-skills";
 import { parseRepoRef } from "../lib/repo-ref";
 import { diffSkillSets } from "../lib/update-diff";
 import type { UpdateInput } from "../types";
@@ -14,11 +19,19 @@ import type { UpdateInput } from "../types";
 export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
   const input = args.input;
   const scope = getInstallScope(input.global);
+  const projectLinkedRoots =
+    scope === "local" && hasProjectManifest(process.cwd())
+      ? await updateProjectLinkedSkills(process.cwd())
+      : new Set<string>();
   const installedRepos = (await listInstalledRepos(process.cwd())).filter(
-    (repo) => repo.scope === scope,
+    (repo) => repo.scope === scope && !projectLinkedRoots.has(repo.installRoot),
   );
 
   if (installedRepos.length === 0) {
+    if (projectLinkedRoots.size > 0) {
+      return;
+    }
+
     console.log(fmt.info(`No ${scope} skills are installed.`));
     return;
   }
@@ -52,6 +65,19 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
     await pruneEmptyParents(dirname(repo.installRoot), skillsBaseDir);
     printDiff(diff);
   }
+}
+
+async function updateProjectLinkedSkills(cwd: string): Promise<Set<string>> {
+  const result = await restoreProjectSkills(cwd);
+  for (const skill of result.restored) {
+    console.log(fmt.yellow(`  ~ ${skill} (project link)`));
+  }
+
+  for (const skill of result.missing) {
+    console.log(fmt.red(`  - ${skill} (missing upstream)`));
+  }
+
+  return listProjectManifestRepoRoots(cwd);
 }
 
 function groupInstalledSkills(

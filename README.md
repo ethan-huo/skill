@@ -52,12 +52,14 @@ Requirements:
 For most real usage, start from favorites and install only what the current project needs.
 
 ```bash
-skill add owner/repo/skill
-skill add owner/repo --skill skill-a --skill skill-b
+skill install owner/repo/skill
+skill install owner/repo --skill skill-a --skill skill-b
 skill list
 ```
 
 Agents should prefer this path over broad search when the user's favorites already contain good candidates.
+Project installs keep the selected skill list in `.agents/skills/manifest.json` and link visible
+project skills from the hidden shared source root under `~/.agents/.skills`.
 
 ### 2. Interactive user workflow
 
@@ -86,6 +88,7 @@ Search is a discovery path, not the default install path.
 ```bash
 skill update
 skill update --global
+skill install
 
 skill remove owner/repo
 skill remove owner/repo/skill
@@ -105,6 +108,14 @@ skill favorite remove owner/repo owner/repo/skill
 | `skill add owner/repo`                     | Interactive selection when the repo contains multiple skills |
 | `skill remove owner/repo`                  | Remove one installed repo root                               |
 | `skill remove owner/repo/skill`            | Remove one installed skill without touching siblings         |
+
+### Project Links
+
+| Command                                        | Purpose                                                      |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| `skill install`                                | Rebuild project links from `.agents/skills/manifest.json`    |
+| `skill install owner/repo/skill`               | Install a shared source and link one skill into this project |
+| `skill install owner/repo --skill a --skill b` | Link multiple selected skills into this project              |
 
 ### Favorites
 
@@ -134,11 +145,14 @@ skill favorite remove owner/repo owner/repo/skill
 - `owner/repo/skill` is shorthand for `skill add owner/repo --skill skill`
 - repeated installs reuse shallow clone caches keyed by the remote `HEAD` hash
 - local install is blocked when the same `{owner}/{repo}` is already installed globally
+- project installs link selected skills from `~/.agents/.skills` and record them in `.agents/skills/manifest.json`
 
 Install roots:
 
-- local: `{cwd}/.agents/skills/{owner}/{repo}/`
-- global: `~/.agents/skills/{owner}/{repo}/`
+- local copy: `{cwd}/.agents/skills/{owner}/{repo}/`
+- global visible links: `~/.agents/skills/{owner}/{repo}/`
+- shared sources: `~/.agents/.skills/{owner}/{repo}/`
+- project visible links: `{cwd}/.agents/skills/{owner}/{repo}/`
 
 Favorites:
 

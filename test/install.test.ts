@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -6,9 +6,11 @@ import { describe, expect, test } from "bun:test";
 
 import {
   pruneEmptyParents,
+  linkInstalledSkills,
   removeInstalledRepo,
   removeInstalledSkill,
   replaceInstalledSkills,
+  upsertInstalledSkills,
 } from "../src/lib/install";
 
 describe("install helpers", () => {
@@ -44,6 +46,29 @@ describe("install helpers", () => {
 
     const remaining = await stat(target).catch(() => null);
     expect(remaining).toBeNull();
+  });
+
+  test("links visible skills to hidden source skills", async () => {
+    const root = join(tmpdir(), `skill-link-${crypto.randomUUID()}`);
+    const repoDir = join(root, "repo");
+    const sourceRoot = join(root, ".agents", ".skills", "ethan-huo", "agents");
+    const targetRoot = join(root, ".agents", "skills", "ethan-huo", "agents");
+    const selectedSkills = [
+      {
+        relativeDir: "cx",
+        sourceDir: "skills/cx",
+        displayLabel: "cx",
+      },
+    ];
+
+    await mkdir(join(repoDir, "skills", "cx"), { recursive: true });
+    await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\n");
+
+    await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
+    await linkInstalledSkills(sourceRoot, targetRoot, selectedSkills);
+
+    expect((await lstat(join(targetRoot, "cx"))).isSymbolicLink()).toBe(true);
+    expect(await readFile(join(targetRoot, "cx", "SKILL.md"), "utf8")).toContain("name: cx");
   });
 
   test("removes one installed skill without touching siblings", async () => {
