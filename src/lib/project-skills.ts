@@ -2,7 +2,11 @@ import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import { linkClaudeSkillsIfAvailable, selectRepoSkills } from "./add-skills";
+import {
+  installLocalProjectSkills,
+  linkClaudeSkillsIfAvailable,
+  selectRepoSkills,
+} from "./add-skills";
 import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, upsertInstalledSkills } from "./install";
@@ -12,11 +16,7 @@ import {
   getProjectClaudeRoot,
   getSourceInstallRoot,
 } from "./paths";
-import {
-  addProjectManifestSkills,
-  readProjectManifest,
-  writeProjectManifest,
-} from "./project-manifest";
+import { readProjectManifest, writeProjectManifest } from "./project-manifest";
 import { parseFavoriteRef, parseRepoRef } from "./repo-ref";
 import type { RepoRef, SkillCandidate } from "../types";
 
@@ -29,18 +29,12 @@ export async function installProjectRepoSkills(options: {
     repo: options.repo,
     selectors: options.selectors,
   });
-  const sourceRoot = getSourceInstallRoot(options.repo);
-  const installRoot = getInstallRoot("local", options.cwd, options.repo);
-
-  await upsertInstalledSkills(cloneDir, sourceRoot, selectedSkills);
-  await linkInstalledSkills(sourceRoot, installRoot, selectedSkills);
-  await linkProjectClaudeSkillsIfAvailable(options.cwd, options.repo, sourceRoot, selectedSkills);
-  await addProjectManifestSkills(
-    options.cwd,
-    selectedSkills.map(
-      (skill) => `${options.repo.owner}/${options.repo.repo}/${skill.relativeDir}`,
-    ),
-  );
+  const { installRoot } = await installLocalProjectSkills({
+    cloneDir,
+    cwd: options.cwd,
+    repo: options.repo,
+    selectedSkills,
+  });
 
   return { installRoot, selectedSkills };
 }

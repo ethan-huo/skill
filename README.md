@@ -146,8 +146,9 @@ skill favorite remove owner/repo owner/repo/skill
 - discovered skill IDs are normalized to `{owner}/{repo}/{folder}`
 - `owner/repo/skill` is shorthand for `skill add owner/repo --skill skill`
 - repeated installs reuse shallow clone caches keyed by the remote `HEAD` hash
-- local install is blocked when the same `{owner}/{repo}` is already installed globally
+- local install is blocked only when the selected `{owner}/{repo}/{skill}` is already installed globally
 - project installs link selected skills from `~/.agents/.skills` and record them in `.agents/skills/manifest.json`
+- project-scope `skill add` and `skill install <ref>` share the same install effects
 
 Install roots:
 
