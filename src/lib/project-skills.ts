@@ -112,6 +112,46 @@ export async function listProjectManifestRepoRoots(cwd: string): Promise<Set<str
   return roots;
 }
 
+export async function syncProjectSkillLinks(options: {
+  cwd: string;
+  repo: RepoRef;
+  sourceRoot: string;
+  installedIds: string[];
+  updated: string[];
+  removed: string[];
+}): Promise<void> {
+  const { cwd, repo, sourceRoot, installedIds, updated, removed } = options;
+  const selectedSkills = toProjectCandidates(installedIds, updated);
+
+  if (selectedSkills.length > 0) {
+    await linkInstalledSkills(sourceRoot, getInstallRoot("local", cwd, repo), selectedSkills);
+    await linkProjectClaudeSkillsIfAvailable(cwd, repo, sourceRoot, selectedSkills);
+  }
+
+  for (const skill of removed) {
+    await rm(join(getInstallRoot("local", cwd, repo), skill), { force: true, recursive: true });
+    await rm(getClaudeSkillRoot(getProjectClaudeRoot(cwd), repo, skill), {
+      force: true,
+      recursive: true,
+    });
+  }
+}
+
+export async function pruneProjectManifestSkills(
+  cwd: string,
+  missingSkillIds: string[],
+): Promise<void> {
+  if (missingSkillIds.length === 0) {
+    return;
+  }
+
+  const missing = new Set(missingSkillIds);
+  const manifest = await readProjectManifest(cwd);
+  await writeProjectManifest(cwd, {
+    skills: manifest.skills.filter((skill) => !missing.has(skill)),
+  });
+}
+
 export function hasProjectManifest(cwd: string): boolean {
   return existsSync(`${cwd}/.agents/skills/manifest.json`);
 }
@@ -161,4 +201,15 @@ async function linkProjectClaudeSkillsIfAvailable(
     selectedSkills,
     sourceRoot,
   });
+}
+
+function toProjectCandidates(installedIds: string[], updated: string[]): SkillCandidate[] {
+  const updatedSet = new Set(updated);
+  return installedIds
+    .filter((skill) => updatedSet.has(skill))
+    .map((skill) => ({
+      relativeDir: skill,
+      sourceDir: skill,
+      displayLabel: skill,
+    }));
 }

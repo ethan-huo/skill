@@ -133,12 +133,12 @@ skill favorite remove owner/repo owner/repo/skill
 
 ### Search And Inventory
 
-| Command                 | Purpose                                |
-| ----------------------- | -------------------------------------- |
-| `skill find <query>`    | Search published skills on `skills.sh` |
-| `skill list`            | List installed local and global skills |
-| `skill update`          | Refresh installed local skills         |
-| `skill update --global` | Refresh installed global skills        |
+| Command                 | Purpose                                                          |
+| ----------------------- | ---------------------------------------------------------------- |
+| `skill find <query>`    | Search published skills on `skills.sh`                           |
+| `skill list`            | List installed local and global skills                           |
+| `skill update`          | Refresh shared source caches and reconcile current project links |
+| `skill update --global` | Refresh shared source caches and reconcile global links only     |
 
 ## How Installation Works
 
@@ -149,6 +149,7 @@ skill favorite remove owner/repo owner/repo/skill
 - local install is blocked only when the selected `{owner}/{repo}/{skill}` is already installed globally
 - project installs link selected skills from `~/.agents/.skills` and record them in `.agents/skills/manifest.json`
 - project-scope `skill add` and `skill install <ref>` share the same install effects
+- `skill update` updates `~/.agents/.skills/{owner}/{repo}` first; visible global and project roots are reconciled from that shared source cache
 
 Install roots:
 

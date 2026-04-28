@@ -1,83 +1,58 @@
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { rm, stat } from "node:fs/promises";
 
 import { fmt } from "argc/terminal";
 
-import { discoverSkills } from "../lib/discover-skills";
 import { shallowCloneRepo } from "../lib/git";
-import { pruneEmptyParents, removeInstalledRepo, replaceInstalledSkills } from "../lib/install";
-import { listInstalledRepos, listInstalledSkills } from "../lib/installed-skills";
-import { getInstallScope, getSkillsBaseDir } from "../lib/paths";
+import { linkInstalledSkills, pruneEmptyParents } from "../lib/install";
+import { listInstalledSkills } from "../lib/installed-skills";
+import { getClaudeRoot, getClaudeSkillRoot, getInstallRoot, getSkillsBaseDir } from "../lib/paths";
 import {
   hasProjectManifest,
-  listProjectManifestRepoRoots,
-  restoreProjectSkills,
+  pruneProjectManifestSkills,
+  syncProjectSkillLinks,
 } from "../lib/project-skills";
 import { parseRepoRef } from "../lib/repo-ref";
+import { listSourceRepos, updateSourceRepo } from "../lib/source-skills";
 import { diffSkillSets } from "../lib/update-diff";
-import type { UpdateInput } from "../types";
+import type { RepoRef, SkillCandidate, UpdateInput } from "../types";
 
 export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
   const input = args.input;
-  const scope = getInstallScope(input.global);
-  const projectLinkedRoots =
-    scope === "local" && hasProjectManifest(process.cwd())
-      ? await updateProjectLinkedSkills(process.cwd())
-      : new Set<string>();
-  const installedRepos = (await listInstalledRepos(process.cwd())).filter(
-    (repo) => repo.scope === scope && !projectLinkedRoots.has(repo.installRoot),
-  );
+  const sourceRepos = await listSourceRepos();
 
-  if (installedRepos.length === 0) {
-    if (projectLinkedRoots.size > 0) {
-      return;
-    }
-
-    console.log(fmt.info(`No ${scope} skills are installed.`));
+  if (sourceRepos.length === 0) {
+    console.log(fmt.info("No shared source skills are cached."));
     return;
   }
 
   const installedSkills = await listInstalledSkills(process.cwd());
-  const installedByRepo = groupInstalledSkills(
-    installedSkills.filter((skill) => skill.scope === scope),
-  );
-  const skillsBaseDir = getSkillsBaseDir(scope, process.cwd());
+  const installedByRepo = groupInstalledSkills(installedSkills);
 
-  for (const repo of installedRepos) {
-    const repoRef = parseRepoRef(`${repo.owner}/${repo.repo}`);
+  for (const sourceRepo of sourceRepos) {
+    const repoRef = parseRepoRef(`${sourceRepo.owner}/${sourceRepo.repo}`);
     const cloneDir = await shallowCloneRepo(repoRef);
+    const diff = await updateSourceRepo({
+      cloneDir,
+      sourceRoot: sourceRepo.sourceRoot,
+    });
+    console.log(fmt.info(`${sourceRepo.owner}/${sourceRepo.repo} (source)`));
 
-    const latestSkills = await discoverSkills(cloneDir);
-    const installedIds = installedByRepo.get(repo.installRoot) ?? [];
-    const latestIds = latestSkills.map((skill) => skill.relativeDir);
-    const diff = diffSkillSets(installedIds, latestIds);
+    await syncVisibleLinks({
+      cwd: process.cwd(),
+      input,
+      repo: repoRef,
+      globalInstalledIds:
+        installedByRepo.get(getInstallRoot("global", process.cwd(), repoRef)) ?? [],
+      projectInstalledIds:
+        installedByRepo.get(getInstallRoot("local", process.cwd(), repoRef)) ?? [],
+      updated: diff.updated,
+      removed: diff.removed,
+      sourceRoot: sourceRepo.sourceRoot,
+    });
 
-    console.log(fmt.info(`${repo.owner}/${repo.repo} (${scope})`));
-
-    if (diff.updated.length > 0) {
-      const selectedSkills = latestSkills.filter((skill) =>
-        diff.updated.includes(skill.relativeDir),
-      );
-      await replaceInstalledSkills(cloneDir, repo.installRoot, selectedSkills);
-    } else if (diff.removed.length > 0) {
-      await removeInstalledRepo(repo.installRoot);
-    }
-
-    await pruneEmptyParents(dirname(repo.installRoot), skillsBaseDir);
     printDiff(diff);
   }
-}
-
-async function updateProjectLinkedSkills(cwd: string): Promise<Set<string>> {
-  const result = await restoreProjectSkills(cwd);
-  for (const skill of result.restored) {
-    console.log(fmt.yellow(`  ~ ${skill} (project link)`));
-  }
-
-  for (const skill of result.missing) {
-    console.log(fmt.red(`  - ${skill} (missing upstream)`));
-  }
-
-  return listProjectManifestRepoRoots(cwd);
 }
 
 function groupInstalledSkills(
@@ -92,6 +67,135 @@ function groupInstalledSkills(
   }
 
   return grouped;
+}
+
+async function syncVisibleLinks(options: {
+  cwd: string;
+  input: UpdateInput;
+  repo: RepoRef;
+  globalInstalledIds: string[];
+  projectInstalledIds: string[];
+  updated: string[];
+  removed: string[];
+  sourceRoot: string;
+}): Promise<void> {
+  const {
+    cwd,
+    input,
+    repo,
+    globalInstalledIds,
+    projectInstalledIds,
+    updated,
+    removed,
+    sourceRoot,
+  } = options;
+
+  if (updated.length > 0) {
+    await relinkExistingSkills(repo, "global", cwd, sourceRoot, globalInstalledIds, updated);
+    await relinkClaudeSkills(repo, getClaudeRoot(), sourceRoot, globalInstalledIds, updated);
+  }
+
+  for (const skill of removed) {
+    await rm(join(getInstallRoot("global", cwd, repo), skill), {
+      force: true,
+      recursive: true,
+    });
+    await removeVisibleClaudeSkill(getClaudeRoot(), repo, skill);
+  }
+
+  await pruneEmptyParents(
+    dirname(getInstallRoot("global", cwd, repo)),
+    getSkillsBaseDir("global", cwd),
+  );
+
+  if (input.global || !hasProjectManifest(cwd)) {
+    return;
+  }
+
+  await syncProjectSkillLinks({
+    cwd,
+    repo,
+    sourceRoot,
+    installedIds: projectInstalledIds,
+    updated,
+    removed,
+  });
+  await pruneProjectManifestSkills(
+    cwd,
+    removed.map((skill) => `${repo.owner}/${repo.repo}/${skill}`),
+  );
+}
+
+async function relinkExistingSkills(
+  repo: RepoRef,
+  scope: "global",
+  cwd: string,
+  sourceRoot: string,
+  installedIds: string[],
+  updated: string[],
+): Promise<void> {
+  const selectedSkills = toInstalledCandidates(installedIds, updated);
+  if (selectedSkills.length === 0) {
+    return;
+  }
+
+  await linkInstalledSkills(sourceRoot, getInstallRoot(scope, cwd, repo), selectedSkills);
+}
+
+async function relinkClaudeSkills(
+  repo: RepoRef,
+  claudeRoot: string,
+  sourceRoot: string,
+  installedIds: string[],
+  updated: string[],
+): Promise<void> {
+  const existingClaudeRoot = await stat(claudeRoot).catch(() => null);
+  if (!existingClaudeRoot?.isDirectory()) {
+    return;
+  }
+
+  const selectedSkills = toInstalledCandidates(installedIds, updated);
+  if (selectedSkills.length === 0) {
+    return;
+  }
+
+  for (const skill of selectedSkills) {
+    await linkInstalledSkills(
+      sourceRoot,
+      dirname(getClaudeSkillRoot(claudeRoot, repo, skill.relativeDir)),
+      [
+        {
+          relativeDir: `${repo.owner}.${repo.repo}.${skill.relativeDir}`,
+          sourceDir: skill.relativeDir,
+          displayLabel: skill.displayLabel,
+        },
+      ],
+    );
+  }
+}
+
+async function removeVisibleClaudeSkill(
+  claudeRoot: string,
+  repo: RepoRef,
+  skill: string,
+): Promise<void> {
+  const existingClaudeRoot = await stat(claudeRoot).catch(() => null);
+  if (!existingClaudeRoot?.isDirectory()) {
+    return;
+  }
+
+  await rm(getClaudeSkillRoot(claudeRoot, repo, skill), { force: true, recursive: true });
+}
+
+function toInstalledCandidates(installedIds: string[], updated: string[]): SkillCandidate[] {
+  const updatedSet = new Set(updated);
+  return installedIds
+    .filter((skill) => updatedSet.has(skill))
+    .map((skill) => ({
+      relativeDir: skill,
+      sourceDir: skill,
+      displayLabel: skill,
+    }));
 }
 
 function printDiff(diff: ReturnType<typeof diffSkillSets>): void {

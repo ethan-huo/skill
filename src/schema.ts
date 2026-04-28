@@ -178,7 +178,7 @@ export const schema = {
 
   update: c
     .meta({
-      description: "Update installed skills for the selected scope.",
+      description: "Update shared source skill caches and reconcile visible links.",
       examples: ["skill update", "skill update --global", "skill update -g"],
     })
     .input(
