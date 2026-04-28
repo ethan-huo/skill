@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO="${SKILL_REPO:-ethan-huo/skill}"
+VERSION="${SKILL_VERSION:-latest}"
+BIN_DIR="${SKILL_INSTALL_DIR:-$HOME/.local/bin}"
+
+usage() {
+  cat <<'USAGE'
+Usage: install.sh [--dir DIR] [--version VERSION] [--repo OWNER/REPO]
+
+Download and install the skill executable JS bundle from GitHub Releases.
+
+Options:
+  --dir DIR          Install directory. Default: $SKILL_INSTALL_DIR or ~/.local/bin.
+  --version VERSION  Release version or tag. Default: $SKILL_VERSION or latest.
+  --repo OWNER/REPO  GitHub repository. Default: $SKILL_REPO or ethan-huo/skill.
+  -h, --help         Show this help.
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dir)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --dir" >&2
+        exit 1
+      fi
+      BIN_DIR="$2"
+      shift 2
+      ;;
+    --version)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --version" >&2
+        exit 1
+      fi
+      VERSION="$2"
+      shift 2
+      ;;
+    --repo)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --repo" >&2
+        exit 1
+      fi
+      REPO="$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if ! command -v curl >/dev/null 2>&1; then
+  echo "curl is required to install skill." >&2
+  exit 1
+fi
+
+if [[ "$VERSION" == "latest" ]]; then
+  URL="https://github.com/$REPO/releases/latest/download/skill"
+else
+  URL="https://github.com/$REPO/releases/download/$VERSION/skill"
+fi
+
+TMP_FILE="$(mktemp)"
+trap 'rm -f "$TMP_FILE"' EXIT
+
+echo "Downloading skill from $URL"
+curl -fsSL "$URL" -o "$TMP_FILE"
+
+mkdir -p "$BIN_DIR"
+cp "$TMP_FILE" "$BIN_DIR/skill"
+chmod +x "$BIN_DIR/skill"
+
+echo "Installed skill to $BIN_DIR/skill"
+case ":$PATH:" in
+  *":$BIN_DIR:"*) ;;
+  *) echo "Add $BIN_DIR to PATH before running skill directly." ;;
+esac

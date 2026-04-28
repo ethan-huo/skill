@@ -1,5 +1,6 @@
 #!/usr/bin/env -S bun --no-env-file
 import { cli } from "argc";
+import packageJson from "../package.json" with { type: "json" };
 
 import { runAdd } from "./commands/add";
 import { runFavoriteAdd } from "./commands/favorite/add";
@@ -16,7 +17,7 @@ import { schema } from "./schema";
 
 const app = cli(schema, {
   name: "skill",
-  version: "0.1.0",
+  version: packageJson.version,
   description: "Install and remove agent skills from GitHub repositories.",
 });
 

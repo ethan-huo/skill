@@ -1,12 +1,13 @@
 {
   "name": "skill",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Install and remove agent skills from GitHub repositories.",
   "bin": {
     "skill": "./src/cli.ts"
   },
   "type": "module",
   "scripts": {
+    "build": "./scripts/build.sh",
     "dev": "bun run src/cli.ts",
     "fmt": "bunx oxfmt .",
     "fmt:check": "bunx oxfmt --check .",

@@ -19,25 +19,16 @@ Without a dedicated manager, teams usually end up copying `SKILL.md` files by ha
 
 ## Install
 
-This repository currently ships as a Bun-first CLI.
+Install the latest release:
 
 ```bash
-git clone https://github.com/ethan-huo/skill.git
-cd skill
-bun install
+curl -fsSL https://raw.githubusercontent.com/ethan-huo/skill/main/install.sh | bash
 ```
 
-Run directly during development:
+By default, the installer downloads the executable JS bundle from GitHub Releases
+and installs it to `~/.local/bin/skill`.
 
-```bash
-bun run src/cli.ts --help
-```
-
-Optional local link:
-
-```bash
-bun link
-```
+Set `SKILL_INSTALL_DIR` to choose another install directory.
 
 Requirements:
 
