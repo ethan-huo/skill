@@ -1,6 +1,6 @@
-import { lstat, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
@@ -10,6 +10,7 @@ import {
   linkClaudeSkillsIfAvailable,
 } from "../src/lib/add-skills";
 import { upsertInstalledSkills } from "../src/lib/install";
+import { getSourceInstallRoot } from "../src/lib/paths";
 import type { RepoRef, SkillCandidate } from "../src/types";
 
 const repo = {
@@ -119,29 +120,34 @@ describe("add skills", () => {
     await mkdir(join(projectRoot, ".claude"), { recursive: true });
     await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\n");
 
-    const result = await installLocalProjectSkills({
-      cloneDir: repoDir,
-      cwd: projectRoot,
-      repo: isolatedRepo,
-      selectedSkills,
-    });
+    try {
+      const result = await installLocalProjectSkills({
+        cloneDir: repoDir,
+        cwd: projectRoot,
+        repo: isolatedRepo,
+        selectedSkills,
+      });
 
-    expect(result.installRoot).toBe(
-      join(projectRoot, ".agents", "skills", isolatedRepo.owner, "agents"),
-    );
-    expect(
-      (
-        await lstat(join(projectRoot, ".agents", "skills", isolatedRepo.owner, "agents", "cx"))
-      ).isSymbolicLink(),
-    ).toBe(true);
-    expect(
-      (
-        await lstat(join(projectRoot, ".claude", "skills", `${isolatedRepo.owner}.agents.cx`))
-      ).isSymbolicLink(),
-    ).toBe(true);
-    expect(
-      await readFile(join(projectRoot, ".agents", "skills", "manifest.json"), "utf8"),
-    ).toContain(`${isolatedRepo.owner}/agents/cx`);
+      expect(result.installRoot).toBe(
+        join(projectRoot, ".agents", "skills", isolatedRepo.owner, "agents"),
+      );
+      expect(
+        (
+          await lstat(join(projectRoot, ".agents", "skills", isolatedRepo.owner, "agents", "cx"))
+        ).isSymbolicLink(),
+      ).toBe(true);
+      expect(
+        (
+          await lstat(join(projectRoot, ".claude", "skills", `${isolatedRepo.owner}.agents.cx`))
+        ).isSymbolicLink(),
+      ).toBe(true);
+      expect(
+        await readFile(join(projectRoot, ".agents", "skills", "manifest.json"), "utf8"),
+      ).toContain(`${isolatedRepo.owner}/agents/cx`);
+    } finally {
+      await rm(getSourceInstallRoot(isolatedRepo), { force: true, recursive: true });
+      await rm(dirname(getSourceInstallRoot(isolatedRepo)), { force: true, recursive: true });
+    }
   });
 
   test("skips claude links when claude root is absent", async () => {
