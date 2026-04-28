@@ -26,7 +26,8 @@ jobs:
       - name: Read package version
         id: package-version
         run: |
-          echo "version=$(bun -e 'import packageJson from \"./package.json\" with { type: \"json\" }; console.log(packageJson.version);')" >> "$GITHUB_OUTPUT"
+          version="$(bun -e 'const packageJson = await Bun.file("package.json").json(); console.log(packageJson.version);')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Validate pushed tag
         if: github.ref_type == 'tag'
