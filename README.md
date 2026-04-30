@@ -148,8 +148,6 @@ Install roots:
 - global visible links: `~/.agents/skills/{owner}/{repo}/`
 - shared sources: `~/.agents/.skills/{owner}/{repo}/`
 - project visible links: `{cwd}/.agents/skills/{owner}/{repo}/`
-- Claude visible links: `~/.claude/skills/{owner}.{repo}.{skill}/` when `~/.claude/` already exists
-- project Claude visible links: `{cwd}/.claude/skills/{owner}.{repo}.{skill}/` when `{cwd}/.claude/` already exists
 
 Favorites:
 

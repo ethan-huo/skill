@@ -2,11 +2,8 @@ import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import {
-  installLocalProjectSkills,
-  linkClaudeSkillsIfAvailable,
-  selectRepoSkills,
-} from "./add-skills";
+import { installLocalProjectSkills, selectRepoSkills } from "./add-skills";
+import { linkClaudeSkillsIfAvailable } from "./claude-skills";
 import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, upsertInstalledSkills } from "./install";

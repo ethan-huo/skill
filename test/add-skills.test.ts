@@ -6,11 +6,17 @@ import { describe, expect, test } from "bun:test";
 
 import {
   getConflictingGlobalSkillIds,
+  installGlobalSkills,
   installLocalProjectSkills,
-  linkClaudeSkillsIfAvailable,
 } from "../src/lib/add-skills";
+import { linkClaudeSkillsIfAvailable } from "../src/lib/claude-skills";
 import { upsertInstalledSkills } from "../src/lib/install";
-import { getSourceInstallRoot } from "../src/lib/paths";
+import {
+  getClaudeRoot,
+  getClaudeSkillRoot,
+  getInstallRoot,
+  getSourceInstallRoot,
+} from "../src/lib/paths";
 import type { RepoRef, SkillCandidate } from "../src/types";
 
 const repo = {
@@ -105,7 +111,40 @@ describe("add skills", () => {
     expect(await readFile(join(installRoots![0]!, "SKILL.md"), "utf8")).toContain("name: cx");
   });
 
-  test("project install effects write hidden source links claude links and manifest", async () => {
+  test("global install effects write hidden source and visible agents links without claude links", async () => {
+    const root = join(tmpdir(), `skill-global-effects-${crypto.randomUUID()}`);
+    const repoDir = join(root, "repo");
+    const isolatedRepo = {
+      owner: `owner-${crypto.randomUUID()}`,
+      repo: "agents",
+      cloneUrl: "https://github.com/example/agents.git",
+      display: "example/agents",
+    } satisfies RepoRef;
+
+    await mkdir(join(repoDir, "skills", "cx"), { recursive: true });
+    await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\n");
+
+    try {
+      const result = await installGlobalSkills({
+        cloneDir: repoDir,
+        cwd: root,
+        repo: isolatedRepo,
+        selectedSkills,
+      });
+
+      expect(result.installRoot).toBe(getInstallRoot("global", root, isolatedRepo));
+      expect((await lstat(join(result.installRoot, "cx"))).isSymbolicLink()).toBe(true);
+      expect(
+        await stat(getClaudeSkillRoot(getClaudeRoot(), isolatedRepo, "cx")).catch(() => null),
+      ).toBeNull();
+    } finally {
+      await rm(getInstallRoot("global", root, isolatedRepo), { force: true, recursive: true });
+      await rm(getSourceInstallRoot(isolatedRepo), { force: true, recursive: true });
+      await rm(dirname(getSourceInstallRoot(isolatedRepo)), { force: true, recursive: true });
+    }
+  });
+
+  test("project install effects write hidden source links and manifest without claude links", async () => {
     const root = join(tmpdir(), `skill-project-effects-${crypto.randomUUID()}`);
     const repoDir = join(root, "repo");
     const projectRoot = join(root, "project");
@@ -137,10 +176,10 @@ describe("add skills", () => {
         ).isSymbolicLink(),
       ).toBe(true);
       expect(
-        (
-          await lstat(join(projectRoot, ".claude", "skills", `${isolatedRepo.owner}.agents.cx`))
-        ).isSymbolicLink(),
-      ).toBe(true);
+        await stat(join(projectRoot, ".claude", "skills", `${isolatedRepo.owner}.agents.cx`)).catch(
+          () => null,
+        ),
+      ).toBeNull();
       expect(
         await readFile(join(projectRoot, ".agents", "skills", "manifest.json"), "utf8"),
       ).toContain(`${isolatedRepo.owner}/agents/cx`);

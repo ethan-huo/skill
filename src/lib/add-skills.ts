@@ -1,18 +1,8 @@
-import { mkdir, rm, stat, symlink } from "node:fs/promises";
-import { dirname, join } from "node:path";
-
 import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, upsertInstalledSkills } from "./install";
 import { listInstalledSkills } from "./installed-skills";
-import {
-  getClaudeSkillRoot,
-  getClaudeRoot,
-  getInstallRoot,
-  getInstallScope,
-  getProjectClaudeRoot,
-  getSourceInstallRoot,
-} from "./paths";
+import { getInstallRoot, getInstallScope, getSourceInstallRoot } from "./paths";
 import { addProjectManifestSkills } from "./project-manifest";
 import { selectSkills } from "./select-skills";
 import type { RepoRef, SkillCandidate } from "../types";
@@ -30,14 +20,11 @@ export async function installRepoSkills(options: {
   const installRoot = getInstallRoot(scope, options.cwd, options.repo);
 
   if (scope === "global") {
-    const sourceRoot = getSourceInstallRoot(options.repo);
-    await upsertInstalledSkills(cloneDir, sourceRoot, selectedSkills);
-    await linkInstalledSkills(sourceRoot, installRoot, selectedSkills);
-    await linkClaudeSkillsIfAvailable({
-      claudeRoot: getClaudeRoot(),
+    await installGlobalSkills({
+      cloneDir,
+      cwd: options.cwd,
       repo: options.repo,
       selectedSkills,
-      sourceRoot,
     });
     return { installRoot, selectedSkills };
   }
@@ -73,27 +60,18 @@ export async function selectRepoSkills(options: {
   return { cloneDir, selectedSkills };
 }
 
-export async function linkClaudeSkillsIfAvailable(options: {
-  claudeRoot: string;
+export async function installGlobalSkills(options: {
+  cloneDir: string;
+  cwd: string;
   repo: RepoRef;
-  sourceRoot: string;
   selectedSkills: SkillCandidate[];
-}): Promise<string[] | null> {
-  const claudeRoot = await stat(options.claudeRoot).catch(() => null);
-  if (!claudeRoot?.isDirectory()) {
-    return null;
-  }
+}): Promise<{ installRoot: string }> {
+  const sourceRoot = getSourceInstallRoot(options.repo);
+  const installRoot = getInstallRoot("global", options.cwd, options.repo);
+  await upsertInstalledSkills(options.cloneDir, sourceRoot, options.selectedSkills);
+  await linkInstalledSkills(sourceRoot, installRoot, options.selectedSkills);
 
-  const installRoots: string[] = [];
-  for (const skill of options.selectedSkills) {
-    const installRoot = getClaudeSkillRoot(options.claudeRoot, options.repo, skill.relativeDir);
-    await mkdir(dirname(installRoot), { recursive: true });
-    await rm(installRoot, { force: true, recursive: true });
-    await symlink(join(options.sourceRoot, skill.relativeDir), installRoot, "dir");
-    installRoots.push(installRoot);
-  }
-
-  return installRoots;
+  return { installRoot };
 }
 
 export async function installLocalProjectSkills(options: {
@@ -108,12 +86,6 @@ export async function installLocalProjectSkills(options: {
   const installRoot = getInstallRoot("local", options.cwd, options.repo);
   await upsertInstalledSkills(options.cloneDir, sourceRoot, options.selectedSkills);
   await linkInstalledSkills(sourceRoot, installRoot, options.selectedSkills);
-  await linkClaudeSkillsIfAvailable({
-    claudeRoot: getProjectClaudeRoot(options.cwd),
-    repo: options.repo,
-    selectedSkills: options.selectedSkills,
-    sourceRoot,
-  });
   await addProjectManifestSkills(
     options.cwd,
     options.selectedSkills.map(
