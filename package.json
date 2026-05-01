@@ -11,7 +11,8 @@
     "dev": "bun run src/cli.ts",
     "fmt": "bunx oxfmt .",
     "fmt:check": "bunx oxfmt --check .",
-    "migrate:global-skills": "bun run scripts/migrate-global-skill-links.ts",
+    "migrate:global-skills": "bun run scripts/migrate-skill-links.ts",
+    "migrate:skills": "bun run scripts/migrate-skill-links.ts",
     "typecheck": "tsgo --noEmit",
     "test": "bun test",
     "check": "bun run fmt:check && bun run typecheck && bun test"

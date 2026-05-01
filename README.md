@@ -155,6 +155,13 @@ To migrate an existing global install from the old nested visible layout to one-
 bun run migrate:global-skills
 ```
 
+To migrate a project-local skill root:
+
+```bash
+bun run migrate:skills /path/to/project
+bun run migrate:skills /path/to/project/.agents/skills
+```
+
 Favorites:
 
 - stored at `~/.agents/skill-favorites.json`
