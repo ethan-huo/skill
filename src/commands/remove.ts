@@ -1,11 +1,11 @@
 import { dirname, join } from "node:path";
 
-import * as p from "@clack/prompts";
 import { fmt } from "argc/terminal";
 
 import { pruneEmptyParents, removeInstalledRepo, removeInstalledSkill } from "../lib/install";
 import { listInstalledSkills } from "../lib/installed-skills";
 import { getInstallRoot, getInstallScope, getSkillsBaseDir } from "../lib/paths";
+import { searchableMultiselect } from "../lib/prompt";
 import { parseRepoSkillTarget } from "../lib/repo-ref";
 import type { RemoveInput } from "../types";
 
@@ -56,7 +56,7 @@ async function selectInstalledSkillRefs(global: boolean): Promise<string[]> {
     throw new Error("Interactive remove requires a TTY or explicit refs.");
   }
 
-  const response = await p.multiselect({
+  const response = await searchableMultiselect({
     message: `Select ${scope} skills to remove`,
     options: installedSkills.map((skill) => ({
       label: skill.description ? `${skill.id} (${skill.description})` : skill.id,
@@ -64,10 +64,6 @@ async function selectInstalledSkillRefs(global: boolean): Promise<string[]> {
     })),
     required: true,
   });
-
-  if (p.isCancel(response)) {
-    throw new Error("Selection cancelled.");
-  }
 
   return [...response];
 }

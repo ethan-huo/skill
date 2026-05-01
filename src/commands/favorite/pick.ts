@@ -1,9 +1,9 @@
-import * as p from "@clack/prompts";
 import { fmt } from "argc/terminal";
 
 import { installRepoSkills } from "../../lib/add-skills";
 import { groupFavoritesForInstall } from "../../lib/favorite-groups";
 import { listFavorites } from "../../lib/favorites";
+import { searchableMultiselect } from "../../lib/prompt";
 import type { FavoritePickInput } from "../../types";
 
 export async function runFavoritePick(args: { input: FavoritePickInput }): Promise<void> {
@@ -22,7 +22,7 @@ export async function runFavoritePick(args: { input: FavoritePickInput }): Promi
     throw new Error("favorite pick requires a TTY.");
   }
 
-  const response = await p.multiselect({
+  const response = await searchableMultiselect({
     message: "Select favorite repositories or skills",
     options: favorites.map((favorite) => ({
       label: favorite.description ? `${favorite.id} (${favorite.description})` : favorite.id,
@@ -30,10 +30,6 @@ export async function runFavoritePick(args: { input: FavoritePickInput }): Promi
     })),
     required: true,
   });
-
-  if (p.isCancel(response)) {
-    throw new Error("Selection cancelled.");
-  }
 
   const selectedIds = new Set(response);
   const selectedFavorites = favorites.filter((favorite) => selectedIds.has(favorite.id));

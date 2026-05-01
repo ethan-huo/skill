@@ -1,5 +1,4 @@
-import * as p from "@clack/prompts";
-
+import { searchableMultiselect } from "./prompt";
 import type { SkillCandidate } from "../types";
 
 type SelectSkillsOptions = {
@@ -53,7 +52,7 @@ export async function selectSkills(
     );
   }
 
-  const response = await p.multiselect({
+  const response = await searchableMultiselect({
     message: `Select skills to install from ${repoDisplay}`,
     options: skills.map((skill) => ({
       label: skill.displayLabel,
@@ -64,10 +63,6 @@ export async function selectSkills(
       .filter((relativeDir) => initialSelectors.has(relativeDir)),
     required: true,
   });
-
-  if (p.isCancel(response)) {
-    throw new Error("Selection cancelled.");
-  }
 
   const selectedPaths = new Set(response);
   return skills.filter((skill) => selectedPaths.has(skill.relativeDir));
