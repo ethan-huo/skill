@@ -74,13 +74,6 @@ export type InstalledSkill = {
   installRoot: string;
 };
 
-export type InstalledRepo = {
-  owner: string;
-  repo: string;
-  scope: SkillScopeLabel;
-  installRoot: string;
-};
-
 export type SearchSkill = {
   id: string;
   name: string;

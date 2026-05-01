@@ -1,10 +1,15 @@
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 
 import { fmt } from "argc/terminal";
 
-import { pruneEmptyParents, removeInstalledRepo, removeInstalledSkill } from "../lib/install";
+import { pruneEmptyParents, removeInstalledSkill, removeVisibleRepoSkills } from "../lib/install";
 import { listInstalledSkills } from "../lib/installed-skills";
-import { getInstallRoot, getInstallScope, getSkillsBaseDir } from "../lib/paths";
+import {
+  getInstallScope,
+  getSkillsBaseDir,
+  getVisibleRepoDirPrefix,
+  getVisibleSkillRoot,
+} from "../lib/paths";
 import { searchableMultiselect } from "../lib/prompt";
 import { parseRepoSkillTarget } from "../lib/repo-ref";
 import type { RemoveInput } from "../types";
@@ -22,11 +27,12 @@ async function removeRef(ref: string, global: boolean): Promise<void> {
   const repo = target.repo;
   const scope = getInstallScope(global);
   const skillsBaseDir = getSkillsBaseDir(scope, process.cwd());
-  const installRoot = getInstallRoot(scope, process.cwd(), repo);
-  const targetPath = target.skill ? join(installRoot, target.skill) : installRoot;
+  const targetPath = target.skill
+    ? getVisibleSkillRoot(scope, process.cwd(), repo, target.skill)
+    : `${skillsBaseDir}/${getVisibleRepoDirPrefix(repo)}*`;
   const removed = target.skill
-    ? await removeInstalledSkill(installRoot, target.skill)
-    : await removeInstalledRepo(installRoot);
+    ? await removeInstalledSkill(targetPath)
+    : await removeVisibleRepoSkills(skillsBaseDir, repo);
 
   if (!removed) {
     throw new Error(`Nothing installed at ${targetPath}`);
@@ -38,7 +44,7 @@ async function removeRef(ref: string, global: boolean): Promise<void> {
     return;
   }
 
-  console.log(`Removed ${repo.display} from ${installRoot}`);
+  console.log(`Removed ${repo.display} from ${skillsBaseDir}`);
 }
 
 async function selectInstalledSkillRefs(global: boolean): Promise<string[]> {

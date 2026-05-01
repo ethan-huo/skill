@@ -9,9 +9,10 @@ import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, upsertInstalledSkills } from "./install";
 import {
   getClaudeSkillRoot,
-  getInstallRoot,
+  getSkillsBaseDir,
   getProjectClaudeRoot,
   getSourceInstallRoot,
+  getVisibleSkillRoot,
 } from "./paths";
 import { readProjectManifest, writeProjectManifest } from "./project-manifest";
 import { parseFavoriteRef, parseRepoRef } from "./repo-ref";
@@ -67,9 +68,9 @@ export async function restoreProjectSkills(cwd: string): Promise<{
     }
 
     const sourceRoot = getSourceInstallRoot(repo);
-    const installRoot = getInstallRoot("local", cwd, repo);
+    const installRoot = getSkillsBaseDir("local", cwd);
     await upsertInstalledSkills(cloneDir, sourceRoot, selectedSkills);
-    await linkInstalledSkills(sourceRoot, installRoot, selectedSkills);
+    await linkInstalledSkills(sourceRoot, installRoot, repo, selectedSkills);
     await linkProjectClaudeSkillsIfAvailable(cwd, repo, sourceRoot, selectedSkills);
 
     for (const skill of selectedSkills) {
@@ -86,29 +87,6 @@ export async function restoreProjectSkills(cwd: string): Promise<{
   return { restored: restored.sort(), missing: missing.sort() };
 }
 
-export async function listProjectManifestRepoRoots(cwd: string): Promise<Set<string>> {
-  const manifest = await readProjectManifest(cwd);
-  const roots = new Set<string>();
-
-  for (const skillId of manifest.skills) {
-    const favorite = parseFavoriteRef(skillId);
-    if (!favorite.skill) {
-      continue;
-    }
-
-    roots.add(
-      getInstallRoot("local", cwd, {
-        owner: favorite.owner,
-        repo: favorite.repo,
-        cloneUrl: `https://github.com/${favorite.owner}/${favorite.repo}.git`,
-        display: `${favorite.owner}/${favorite.repo}`,
-      }),
-    );
-  }
-
-  return roots;
-}
-
 export async function syncProjectSkillLinks(options: {
   cwd: string;
   repo: RepoRef;
@@ -121,12 +99,12 @@ export async function syncProjectSkillLinks(options: {
   const selectedSkills = toProjectCandidates(installedIds, updated);
 
   if (selectedSkills.length > 0) {
-    await linkInstalledSkills(sourceRoot, getInstallRoot("local", cwd, repo), selectedSkills);
+    await linkInstalledSkills(sourceRoot, getSkillsBaseDir("local", cwd), repo, selectedSkills);
     await linkProjectClaudeSkillsIfAvailable(cwd, repo, sourceRoot, selectedSkills);
   }
 
   for (const skill of removed) {
-    await rm(join(getInstallRoot("local", cwd, repo), skill), { force: true, recursive: true });
+    await rm(getVisibleSkillRoot("local", cwd, repo, skill), { force: true, recursive: true });
     await rm(getClaudeSkillRoot(getProjectClaudeRoot(cwd), repo, skill), {
       force: true,
       recursive: true,
@@ -178,7 +156,7 @@ function groupManifestSkills(
 }
 
 async function removeProjectSkill(repo: RepoRef, cwd: string, skill: string): Promise<void> {
-  await rm(join(getInstallRoot("local", cwd, repo), skill), { force: true, recursive: true });
+  await rm(getVisibleSkillRoot("local", cwd, repo, skill), { force: true, recursive: true });
   await rm(getClaudeSkillRoot(getProjectClaudeRoot(cwd), repo, skill), {
     force: true,
     recursive: true,

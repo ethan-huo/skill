@@ -1,6 +1,6 @@
 {
   "name": "skill",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Install and remove agent skills from GitHub repositories.",
   "bin": {
     "skill": "./src/cli.ts"
@@ -11,6 +11,7 @@
     "dev": "bun run src/cli.ts",
     "fmt": "bunx oxfmt .",
     "fmt:check": "bunx oxfmt --check .",
+    "migrate:global-skills": "bun run scripts/migrate-global-skill-links.ts",
     "typecheck": "tsgo --noEmit",
     "test": "bun test",
     "check": "bun run fmt:check && bun run typecheck && bun test"

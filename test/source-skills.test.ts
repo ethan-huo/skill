@@ -11,7 +11,7 @@ describe("source skills", () => {
     const root = join(tmpdir(), `skill-source-update-${crypto.randomUUID()}`);
     const cloneDir = join(root, "clone");
     const sourceRoot = join(root, ".agents", ".skills", "ethan-huo", "agents");
-    const visibleRoot = join(root, ".agents", "skills", "ethan-huo", "agents");
+    const visibleRoot = join(root, ".agents", "skills");
 
     await mkdir(join(cloneDir, "skills", "cx"), { recursive: true });
     await mkdir(join(cloneDir, "skills", "new-skill"), { recursive: true });
@@ -27,7 +27,7 @@ describe("source skills", () => {
     await writeFile(join(sourceRoot, "old-skill", "SKILL.md"), "---\nname: old-skill\n---\n");
 
     await mkdir(visibleRoot, { recursive: true });
-    await symlink(join(sourceRoot, "cx"), join(visibleRoot, "cx"), "dir");
+    await symlink(join(sourceRoot, "cx"), join(visibleRoot, "ethan-huo.agents.cx"), "dir");
 
     const diff = await updateSourceRepo({
       cloneDir,
@@ -42,6 +42,6 @@ describe("source skills", () => {
     expect(await readFile(join(sourceRoot, "cx", "SKILL.md"), "utf8")).toContain("new");
     expect(await stat(join(sourceRoot, "old-skill")).catch(() => null)).toBeNull();
     expect(await stat(join(sourceRoot, "new-skill")).catch(() => null)).toBeNull();
-    expect((await lstat(join(visibleRoot, "cx"))).isSymbolicLink()).toBe(true);
+    expect((await lstat(join(visibleRoot, "ethan-huo.agents.cx"))).isSymbolicLink()).toBe(true);
   });
 });

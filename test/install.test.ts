@@ -7,11 +7,20 @@ import { describe, expect, test } from "bun:test";
 import {
   pruneEmptyParents,
   linkInstalledSkills,
-  removeInstalledRepo,
   removeInstalledSkill,
+  removeVisibleRepoSkills,
   replaceInstalledSkills,
   upsertInstalledSkills,
 } from "../src/lib/install";
+import { listInstalledSkills } from "../src/lib/installed-skills";
+import type { RepoRef } from "../src/types";
+
+const repo = {
+  owner: "ethan-huo",
+  repo: "agents",
+  cloneUrl: "https://github.com/ethan-huo/agents.git",
+  display: "ethan-huo/agents",
+} satisfies RepoRef;
 
 describe("install helpers", () => {
   test("installs selected skills into flat folder IDs", async () => {
@@ -39,20 +48,21 @@ describe("install helpers", () => {
 
   test("removes installed directory trees", async () => {
     const root = join(tmpdir(), `skill-remove-${crypto.randomUUID()}`);
-    const target = join(root, "ethan-huo", "agents");
-    await mkdir(join(target, "skills", "cx"), { recursive: true });
+    const target = join(root, ".agents", "skills");
+    await mkdir(join(target, "ethan-huo.agents.cx"), { recursive: true });
+    await mkdir(join(target, "ethan-huo.agents.fp-thinking"), { recursive: true });
 
-    expect(await removeInstalledRepo(target)).toBe(true);
+    expect(await removeVisibleRepoSkills(target, repo)).toBe(true);
 
-    const remaining = await stat(target).catch(() => null);
-    expect(remaining).toBeNull();
+    expect(await stat(join(target, "ethan-huo.agents.cx")).catch(() => null)).toBeNull();
+    expect(await stat(join(target, "ethan-huo.agents.fp-thinking")).catch(() => null)).toBeNull();
   });
 
   test("links visible skills to hidden source skills", async () => {
     const root = join(tmpdir(), `skill-link-${crypto.randomUUID()}`);
     const repoDir = join(root, "repo");
     const sourceRoot = join(root, ".agents", ".skills", "ethan-huo", "agents");
-    const targetRoot = join(root, ".agents", "skills", "ethan-huo", "agents");
+    const targetRoot = join(root, ".agents", "skills");
     const selectedSkills = [
       {
         relativeDir: "cx",
@@ -65,42 +75,67 @@ describe("install helpers", () => {
     await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\n");
 
     await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
-    await linkInstalledSkills(sourceRoot, targetRoot, selectedSkills);
+    await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
 
-    expect((await lstat(join(targetRoot, "cx"))).isSymbolicLink()).toBe(true);
-    expect(await readFile(join(targetRoot, "cx", "SKILL.md"), "utf8")).toContain("name: cx");
+    expect((await lstat(join(targetRoot, "ethan-huo.agents.cx"))).isSymbolicLink()).toBe(true);
+    expect(await readFile(join(targetRoot, "ethan-huo.agents.cx", "SKILL.md"), "utf8")).toContain(
+      "name: cx",
+    );
+  });
+
+  test("lists one-level visible skill links by upstream IDs", async () => {
+    const root = join(tmpdir(), `skill-list-flat-${crypto.randomUUID()}`);
+    const repoDir = join(root, "repo");
+    const sourceRoot = join(root, ".agents", ".skills", "ethan-huo", "agents");
+    const targetRoot = join(root, ".agents", "skills");
+    const selectedSkills = [
+      {
+        relativeDir: "cx",
+        sourceDir: "skills/cx",
+        displayLabel: "cx",
+      },
+    ];
+
+    await mkdir(join(repoDir, "skills", "cx"), { recursive: true });
+    await writeFile(
+      join(repoDir, "skills", "cx", "SKILL.md"),
+      "---\nname: cx\ndescription: CX helper\n---\n",
+    );
+
+    await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
+    await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
+
+    expect(await listInstalledSkills(root)).toContainEqual({
+      id: "ethan-huo/agents/cx",
+      owner: "ethan-huo",
+      repo: "agents",
+      relativeDir: "cx",
+      description: "CX helper",
+      scope: "local",
+      installRoot: join(targetRoot, "ethan-huo.agents.cx"),
+    });
   });
 
   test("removes one installed skill without touching siblings", async () => {
     const root = join(tmpdir(), `skill-remove-one-${crypto.randomUUID()}`);
-    const target = join(root, "ethan-huo", "agents");
-    await mkdir(join(target, "cx"), { recursive: true });
-    await mkdir(join(target, "fp-thinking"), { recursive: true });
+    const target = join(root, "ethan-huo.agents.cx");
+    const sibling = join(root, "ethan-huo.agents.fp-thinking");
+    await mkdir(target, { recursive: true });
+    await mkdir(sibling, { recursive: true });
 
-    expect(await removeInstalledSkill(target, "cx")).toBe(true);
+    expect(await removeInstalledSkill(target)).toBe(true);
 
-    expect(await stat(join(target, "cx")).catch(() => null)).toBeNull();
-    expect((await stat(join(target, "fp-thinking"))).isDirectory()).toBe(true);
-  });
-
-  test("removes one installed skill from legacy nested layouts", async () => {
-    const root = join(tmpdir(), `skill-remove-legacy-${crypto.randomUUID()}`);
-    const target = join(root, "ethan-huo", "ghd");
-    await mkdir(join(target, "skills", "ghd"), { recursive: true });
-    await writeFile(join(target, "skills", "ghd", "SKILL.md"), "---\nname: ghd\n---\n");
-
-    expect(await removeInstalledSkill(target, "ghd")).toBe(true);
-
-    expect(await stat(join(target, "skills", "ghd")).catch(() => null)).toBeNull();
+    expect(await stat(target).catch(() => null)).toBeNull();
+    expect((await stat(sibling)).isDirectory()).toBe(true);
   });
 
   test("prunes empty owner directories", async () => {
     const root = join(tmpdir(), `skill-prune-${crypto.randomUUID()}`);
     const baseDir = join(root, ".agents", "skills");
-    const target = join(baseDir, "ethan-huo", "agents");
-    await mkdir(join(target, "skills", "cx"), { recursive: true });
+    const target = join(baseDir, "ethan-huo.agents.cx");
+    await mkdir(target, { recursive: true });
 
-    expect(await removeInstalledRepo(target)).toBe(true);
+    expect(await removeInstalledSkill(target)).toBe(true);
     await pruneEmptyParents(dirname(target), baseDir);
 
     const entries = await readdir(baseDir);

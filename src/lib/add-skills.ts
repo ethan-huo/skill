@@ -2,7 +2,7 @@ import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, upsertInstalledSkills } from "./install";
 import { listInstalledSkills } from "./installed-skills";
-import { getInstallRoot, getInstallScope, getSourceInstallRoot } from "./paths";
+import { getSkillsBaseDir, getInstallScope, getSourceInstallRoot } from "./paths";
 import { addProjectManifestSkills } from "./project-manifest";
 import { selectSkills } from "./select-skills";
 import type { RepoRef, SkillCandidate } from "../types";
@@ -17,7 +17,7 @@ export async function installRepoSkills(options: {
 }): Promise<{ installRoot: string; selectedSkills: SkillCandidate[] }> {
   const scope = getInstallScope(options.global);
   const { cloneDir, selectedSkills } = await selectRepoSkills(options);
-  const installRoot = getInstallRoot(scope, options.cwd, options.repo);
+  const installRoot = getSkillsBaseDir(scope, options.cwd);
 
   if (scope === "global") {
     await installGlobalSkills({
@@ -67,9 +67,9 @@ export async function installGlobalSkills(options: {
   selectedSkills: SkillCandidate[];
 }): Promise<{ installRoot: string }> {
   const sourceRoot = getSourceInstallRoot(options.repo);
-  const installRoot = getInstallRoot("global", options.cwd, options.repo);
+  const installRoot = getSkillsBaseDir("global", options.cwd);
   await upsertInstalledSkills(options.cloneDir, sourceRoot, options.selectedSkills);
-  await linkInstalledSkills(sourceRoot, installRoot, options.selectedSkills);
+  await linkInstalledSkills(sourceRoot, installRoot, options.repo, options.selectedSkills);
 
   return { installRoot };
 }
@@ -83,9 +83,9 @@ export async function installLocalProjectSkills(options: {
   await assertNoConflictingGlobalSkills(options.cwd, "local", options.repo, options.selectedSkills);
 
   const sourceRoot = getSourceInstallRoot(options.repo);
-  const installRoot = getInstallRoot("local", options.cwd, options.repo);
+  const installRoot = getSkillsBaseDir("local", options.cwd);
   await upsertInstalledSkills(options.cloneDir, sourceRoot, options.selectedSkills);
-  await linkInstalledSkills(sourceRoot, installRoot, options.selectedSkills);
+  await linkInstalledSkills(sourceRoot, installRoot, options.repo, options.selectedSkills);
   await addProjectManifestSkills(
     options.cwd,
     options.selectedSkills.map(

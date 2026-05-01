@@ -49,8 +49,8 @@ skill list
 ```
 
 Agents should prefer this path over broad search when the user's favorites already contain good candidates.
-Project installs keep the selected skill list in `.agents/skills/manifest.json` and link visible
-project skills from the hidden shared source root under `~/.agents/.skills`.
+Project installs keep upstream skill IDs in `.agents/skills/manifest.json` and expose one-level
+visible links from the hidden shared source root under `~/.agents/.skills`.
 
 ### 2. Interactive user workflow
 
@@ -99,7 +99,7 @@ skill favorite remove owner/repo owner/repo/skill
 | `skill add owner/repo --skill a --skill b` | Install multiple skills from one repo without prompts        |
 | `skill add owner/repo`                     | Interactive selection when the repo contains multiple skills |
 | `skill remove --global`                    | Interactively remove one or more global skills               |
-| `skill remove owner/repo`                  | Remove one installed repo root                               |
+| `skill remove owner/repo`                  | Remove all installed skills from one repo                    |
 | `skill remove owner/repo/skill`            | Remove one installed skill without touching siblings         |
 
 ### Project Links
@@ -138,16 +138,22 @@ skill favorite remove owner/repo owner/repo/skill
 - `owner/repo/skill` is shorthand for `skill add owner/repo --skill skill`
 - repeated installs reuse shallow clone caches keyed by the remote `HEAD` hash
 - local install is blocked only when the selected `{owner}/{repo}/{skill}` is already installed globally
-- project installs link selected skills from `~/.agents/.skills` and record them in `.agents/skills/manifest.json`
+- project installs link selected skills from `~/.agents/.skills` and record upstream IDs in `.agents/skills/manifest.json`
 - project-scope `skill add` and `skill install <ref>` share the same install effects
 - `skill update` updates `~/.agents/.skills/{owner}/{repo}` first; visible global and project roots are reconciled from that shared source cache
 
 Install roots:
 
-- local copy: `{cwd}/.agents/skills/{owner}/{repo}/`
-- global visible links: `~/.agents/skills/{owner}/{repo}/`
+- local visible links: `{cwd}/.agents/skills/{owner}.{repo}.{skill}/`
+- global visible links: `~/.agents/skills/{owner}.{repo}.{skill}/`
 - shared sources: `~/.agents/.skills/{owner}/{repo}/`
-- project visible links: `{cwd}/.agents/skills/{owner}/{repo}/`
+- project manifest: `{cwd}/.agents/skills/manifest.json` stores `{owner}/{repo}/{skill}` IDs, not visible link names
+
+To migrate an existing global install from the old nested visible layout to one-level links:
+
+```bash
+bun run migrate:global-skills
+```
 
 Favorites:
 

@@ -14,8 +14,9 @@ import { upsertInstalledSkills } from "../src/lib/install";
 import {
   getClaudeRoot,
   getClaudeSkillRoot,
-  getInstallRoot,
+  getSkillsBaseDir,
   getSourceInstallRoot,
+  getVisibleSkillRoot,
 } from "../src/lib/paths";
 import type { RepoRef, SkillCandidate } from "../src/types";
 
@@ -132,13 +133,18 @@ describe("add skills", () => {
         selectedSkills,
       });
 
-      expect(result.installRoot).toBe(getInstallRoot("global", root, isolatedRepo));
-      expect((await lstat(join(result.installRoot, "cx"))).isSymbolicLink()).toBe(true);
+      expect(result.installRoot).toBe(getSkillsBaseDir("global", root));
+      expect(
+        (await lstat(getVisibleSkillRoot("global", root, isolatedRepo, "cx"))).isSymbolicLink(),
+      ).toBe(true);
       expect(
         await stat(getClaudeSkillRoot(getClaudeRoot(), isolatedRepo, "cx")).catch(() => null),
       ).toBeNull();
     } finally {
-      await rm(getInstallRoot("global", root, isolatedRepo), { force: true, recursive: true });
+      await rm(getVisibleSkillRoot("global", root, isolatedRepo, "cx"), {
+        force: true,
+        recursive: true,
+      });
       await rm(getSourceInstallRoot(isolatedRepo), { force: true, recursive: true });
       await rm(dirname(getSourceInstallRoot(isolatedRepo)), { force: true, recursive: true });
     }
@@ -167,12 +173,10 @@ describe("add skills", () => {
         selectedSkills,
       });
 
-      expect(result.installRoot).toBe(
-        join(projectRoot, ".agents", "skills", isolatedRepo.owner, "agents"),
-      );
+      expect(result.installRoot).toBe(join(projectRoot, ".agents", "skills"));
       expect(
         (
-          await lstat(join(projectRoot, ".agents", "skills", isolatedRepo.owner, "agents", "cx"))
+          await lstat(getVisibleSkillRoot("local", projectRoot, isolatedRepo, "cx"))
         ).isSymbolicLink(),
       ).toBe(true);
       expect(

@@ -1,12 +1,17 @@
-import { dirname, join } from "node:path";
 import { rm, stat } from "node:fs/promises";
+import { dirname } from "node:path";
 
 import { fmt } from "argc/terminal";
 
 import { shallowCloneRepo } from "../lib/git";
-import { linkInstalledSkills, pruneEmptyParents } from "../lib/install";
+import { linkInstalledSkills } from "../lib/install";
 import { listInstalledSkills } from "../lib/installed-skills";
-import { getClaudeRoot, getClaudeSkillRoot, getInstallRoot, getSkillsBaseDir } from "../lib/paths";
+import {
+  getClaudeRoot,
+  getClaudeSkillRoot,
+  getSkillsBaseDir,
+  getVisibleSkillRoot,
+} from "../lib/paths";
 import {
   hasProjectManifest,
   pruneProjectManifestSkills,
@@ -42,10 +47,8 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
       cwd: process.cwd(),
       input,
       repo: repoRef,
-      globalInstalledIds:
-        installedByRepo.get(getInstallRoot("global", process.cwd(), repoRef)) ?? [],
-      projectInstalledIds:
-        installedByRepo.get(getInstallRoot("local", process.cwd(), repoRef)) ?? [],
+      globalInstalledIds: installedByRepo.get(getInstalledGroupKey("global", repoRef)) ?? [],
+      projectInstalledIds: installedByRepo.get(getInstalledGroupKey("local", repoRef)) ?? [],
       updated: diff.updated,
       removed: diff.removed,
       sourceRoot: sourceRepo.sourceRoot,
@@ -61,12 +64,16 @@ function groupInstalledSkills(
   const grouped = new Map<string, string[]>();
 
   for (const skill of skills) {
-    const current = grouped.get(skill.installRoot) ?? [];
+    const current = grouped.get(getInstalledGroupKey(skill.scope, skill)) ?? [];
     current.push(skill.relativeDir);
-    grouped.set(skill.installRoot, current);
+    grouped.set(getInstalledGroupKey(skill.scope, skill), current);
   }
 
   return grouped;
+}
+
+function getInstalledGroupKey(scope: "local" | "global", repo: Pick<RepoRef, "owner" | "repo">) {
+  return `${scope}:${repo.owner}/${repo.repo}`;
 }
 
 async function syncVisibleLinks(options: {
@@ -96,17 +103,12 @@ async function syncVisibleLinks(options: {
   }
 
   for (const skill of removed) {
-    await rm(join(getInstallRoot("global", cwd, repo), skill), {
+    await rm(getVisibleSkillRoot("global", cwd, repo, skill), {
       force: true,
       recursive: true,
     });
     await removeVisibleClaudeSkill(getClaudeRoot(), repo, skill);
   }
-
-  await pruneEmptyParents(
-    dirname(getInstallRoot("global", cwd, repo)),
-    getSkillsBaseDir("global", cwd),
-  );
 
   if (input.global || !hasProjectManifest(cwd)) {
     return;
@@ -139,7 +141,7 @@ async function relinkExistingSkills(
     return;
   }
 
-  await linkInstalledSkills(sourceRoot, getInstallRoot(scope, cwd, repo), selectedSkills);
+  await linkInstalledSkills(sourceRoot, getSkillsBaseDir(scope, cwd), repo, selectedSkills);
 }
 
 async function relinkClaudeSkills(
@@ -163,13 +165,8 @@ async function relinkClaudeSkills(
     await linkInstalledSkills(
       sourceRoot,
       dirname(getClaudeSkillRoot(claudeRoot, repo, skill.relativeDir)),
-      [
-        {
-          relativeDir: `${repo.owner}.${repo.repo}.${skill.relativeDir}`,
-          sourceDir: skill.relativeDir,
-          displayLabel: skill.displayLabel,
-        },
-      ],
+      repo,
+      [skill],
     );
   }
 }

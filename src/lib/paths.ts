@@ -15,8 +15,21 @@ export function getSkillsBaseDir(scope: InstallScope, cwd: string): string {
   return join(cwd, ".agents", "skills");
 }
 
-export function getInstallRoot(scope: InstallScope, cwd: string, repo: RepoRef): string {
-  return join(getSkillsBaseDir(scope, cwd), repo.owner, repo.repo);
+export function getVisibleSkillDirName(repo: RepoRef, skill: string): string {
+  return `${repo.owner}.${repo.repo}.${skill}`;
+}
+
+export function getVisibleRepoDirPrefix(repo: RepoRef): string {
+  return `${repo.owner}.${repo.repo}.`;
+}
+
+export function getVisibleSkillRoot(
+  scope: InstallScope,
+  cwd: string,
+  repo: RepoRef,
+  skill: string,
+): string {
+  return join(getSkillsBaseDir(scope, cwd), getVisibleSkillDirName(repo, skill));
 }
 
 export function getSourceSkillsBaseDir(): string {
@@ -36,7 +49,7 @@ export function getProjectClaudeRoot(cwd: string): string {
 }
 
 export function getClaudeSkillRoot(claudeRoot: string, repo: RepoRef, skill: string): string {
-  return join(claudeRoot, "skills", `${repo.owner}.${repo.repo}.${skill}`);
+  return join(claudeRoot, "skills", getVisibleSkillDirName(repo, skill));
 }
 
 export function getProjectManifestPath(cwd: string): string {
