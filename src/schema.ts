@@ -36,14 +36,7 @@ export const schema = {
       s(
         v.object({
           query: v.string(),
-          limit: v.optional(
-            v.pipe(
-              v.string(),
-              v.transform((value) => Number(value)),
-              v.number(),
-              v.minValue(1),
-            ),
-          ),
+          limit: v.optional(v.pipe(v.number(), v.minValue(1))),
         }),
       ),
     ),
