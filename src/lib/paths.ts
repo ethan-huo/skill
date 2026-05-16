@@ -36,7 +36,7 @@ export function getSourceSkillsBaseDir(): string {
   return join(homedir(), ".agents", ".skills");
 }
 
-export function getSourceInstallRoot(repo: RepoRef): string {
+export function getSourceInstallRoot(repo: Pick<RepoRef, "owner" | "repo">): string {
   return join(getSourceSkillsBaseDir(), repo.owner, repo.repo);
 }
 

@@ -128,6 +128,26 @@ export async function removeFavorites(
   return { removed, missing };
 }
 
+export async function removeFavoritesForRepo(
+  repo: Pick<FavoriteRef, "owner" | "repo">,
+  options: FavoriteStoreOptions = {},
+): Promise<FavoriteRef[]> {
+  const favorites = await listFavorites(options);
+  const removed = favorites.filter(
+    (favorite) => favorite.owner === repo.owner && favorite.repo === repo.repo,
+  );
+
+  if (removed.length === 0) {
+    return [];
+  }
+
+  const next = favorites
+    .filter((favorite) => favorite.owner !== repo.owner || favorite.repo !== repo.repo)
+    .sort((left, right) => left.id.localeCompare(right.id));
+  await writeFavoritesFile(next, options.filePath);
+  return removed;
+}
+
 export async function refreshFavorites(
   options: FavoriteStoreOptions = {},
   services: FavoriteServices = {},

@@ -1,10 +1,10 @@
-import { lstat, mkdir, readFile, stat, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { updateSourceRepo } from "../src/lib/source-skills";
+import { removeSourceRepo, updateSourceRepo } from "../src/lib/source-skills";
 
 describe("source skills", () => {
   test("updates hidden source cache without replacing visible links", async () => {
@@ -43,5 +43,26 @@ describe("source skills", () => {
     expect(await stat(join(sourceRoot, "old-skill")).catch(() => null)).toBeNull();
     expect(await stat(join(sourceRoot, "new-skill")).catch(() => null)).toBeNull();
     expect((await lstat(join(visibleRoot, "ethan-huo.agents.cx"))).isSymbolicLink()).toBe(true);
+  });
+
+  test("removes a hidden source repo and prunes empty owner directories", async () => {
+    const root = join(tmpdir(), `skill-source-remove-${crypto.randomUUID()}`);
+    const sourceBase = join(root, ".agents", ".skills");
+    const sourceRoot = join(sourceBase, "jackwener", "opencli");
+
+    await mkdir(join(sourceRoot, "opencli-browser"), { recursive: true });
+    await writeFile(
+      join(sourceRoot, "opencli-browser", "SKILL.md"),
+      "---\nname: opencli-browser\n---\n",
+    );
+
+    const removed = await removeSourceRepo(
+      { owner: "jackwener", repo: "opencli" },
+      { sourceBaseDir: sourceBase, sourceRoot },
+    );
+
+    expect(removed).toBe(true);
+    expect(await stat(sourceRoot).catch(() => null)).toBeNull();
+    expect(await readdir(sourceBase).catch(() => [])).toEqual([]);
   });
 });

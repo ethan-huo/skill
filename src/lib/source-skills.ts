@@ -1,11 +1,11 @@
-import { readdir, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir, rm, stat } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import { discoverSkills } from "./discover-skills";
 import { pruneEmptyParents, upsertInstalledSkills } from "./install";
-import { getSourceSkillsBaseDir } from "./paths";
+import { getSourceInstallRoot, getSourceSkillsBaseDir } from "./paths";
 import { diffSkillSets } from "./update-diff";
-import type { SkillCandidate, UpdateDiff } from "../types";
+import type { RepoRef, SkillCandidate, UpdateDiff } from "../types";
 
 export type SourceRepo = {
   owner: string;
@@ -65,6 +65,22 @@ export async function updateSourceRepo(options: {
 
   await pruneEmptyParents(sourceRoot, getSourceSkillsBaseDir());
   return diff;
+}
+
+export async function removeSourceRepo(
+  repo: Pick<RepoRef, "owner" | "repo">,
+  options: { sourceRoot?: string; sourceBaseDir?: string } = {},
+): Promise<boolean> {
+  const sourceRoot = options.sourceRoot ?? getSourceInstallRoot(repo);
+  const sourceBaseDir = options.sourceBaseDir ?? getSourceSkillsBaseDir();
+  const directory = await stat(sourceRoot).catch(() => null);
+  if (!directory?.isDirectory()) {
+    return false;
+  }
+
+  await rm(sourceRoot, { force: true, recursive: true });
+  await pruneEmptyParents(dirname(sourceRoot), sourceBaseDir);
+  return true;
 }
 
 function filterSkills(skills: SkillCandidate[], relativeDirs: string[]): SkillCandidate[] {

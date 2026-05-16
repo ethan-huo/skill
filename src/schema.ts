@@ -144,7 +144,8 @@ export const schema = {
 
   remove: c
     .meta({
-      description: "Remove an installed repository or a single installed skill.",
+      description:
+        "Remove an installed repository or a single installed skill. Global repo removal also purges shared source cache and favorites.",
       examples: [
         "skill remove --global",
         "skill remove ethan-huo/agents",

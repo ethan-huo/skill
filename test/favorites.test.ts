@@ -11,6 +11,7 @@ import {
   listFavorites,
   refreshFavorites,
   removeFavorite,
+  removeFavoritesForRepo,
   removeFavorites,
 } from "../src/lib/favorites";
 
@@ -137,6 +138,25 @@ describe("favorite store", () => {
       "ethan-huo/agents/cx",
     ]);
     expect(result.missing.map((favorite) => favorite.id)).toEqual(["missing/repo"]);
+    expect(await listFavorites({ filePath })).toEqual([]);
+  });
+
+  test("removes repo favorites including skill-level refs", async () => {
+    const filePath = join(tmpdir(), `skill-favorites-${crypto.randomUUID()}.json`);
+    await addFavorite("ethan-huo/agents", { filePath }, { loadMetadata });
+    await addFavorite("ethan-huo/agents/cx", { filePath }, { loadMetadata });
+    await addFavorite("ethan-huo/agents/fp-thinking", { filePath }, { loadMetadata });
+
+    const removed = await removeFavoritesForRepo(
+      { owner: "ethan-huo", repo: "agents" },
+      { filePath },
+    );
+
+    expect(removed.map((favorite) => favorite.id)).toEqual([
+      "ethan-huo/agents",
+      "ethan-huo/agents/cx",
+      "ethan-huo/agents/fp-thinking",
+    ]);
     expect(await listFavorites({ filePath })).toEqual([]);
   });
 

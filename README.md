@@ -101,6 +101,7 @@ skill favorite remove owner/repo owner/repo/skill
 | `skill remove --global`                    | Interactively remove one or more global skills               |
 | `skill remove owner/repo`                  | Remove all installed skills from one repo                    |
 | `skill remove owner/repo/skill`            | Remove one installed skill without touching siblings         |
+| `skill remove owner/repo --global`         | Purge global links, shared source cache, and repo favorites  |
 
 ### Project Links
 
@@ -141,6 +142,7 @@ skill favorite remove owner/repo owner/repo/skill
 - project installs link selected skills from `~/.agents/.skills` and record upstream IDs in `.agents/skills/manifest.json`
 - project-scope `skill add` and `skill install <ref>` share the same install effects
 - `skill update` updates `~/.agents/.skills/{owner}/{repo}` first; visible global and project roots are reconciled from that shared source cache
+- `skill remove owner/repo --global` removes that shared source cache and all matching favorite refs, so future `skill update` runs stop tracking the repo
 
 Install roots:
 

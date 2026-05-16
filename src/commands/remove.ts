@@ -2,6 +2,7 @@ import { dirname } from "node:path";
 
 import { fmt } from "argc/terminal";
 
+import { removeFavoritesForRepo } from "../lib/favorites";
 import { pruneEmptyParents, removeInstalledSkill, removeVisibleRepoSkills } from "../lib/install";
 import { listInstalledSkills } from "../lib/installed-skills";
 import {
@@ -12,6 +13,7 @@ import {
 } from "../lib/paths";
 import { searchableMultiselect } from "../lib/prompt";
 import { parseRepoSkillTarget } from "../lib/repo-ref";
+import { removeSourceRepo } from "../lib/source-skills";
 import type { RemoveInput } from "../types";
 
 export async function runRemove(args: { input: RemoveInput }): Promise<void> {
@@ -33,8 +35,10 @@ async function removeRef(ref: string, global: boolean): Promise<void> {
   const removed = target.skill
     ? await removeInstalledSkill(targetPath)
     : await removeVisibleRepoSkills(skillsBaseDir, repo);
+  const removedSource = global && !target.skill ? await removeSourceRepo(repo) : false;
+  const removedFavorites = global && !target.skill ? await removeFavoritesForRepo(repo) : [];
 
-  if (!removed) {
+  if (!removed && !removedSource && removedFavorites.length === 0) {
     throw new Error(`Nothing installed at ${targetPath}`);
   }
 
@@ -44,7 +48,12 @@ async function removeRef(ref: string, global: boolean): Promise<void> {
     return;
   }
 
-  console.log(`Removed ${repo.display} from ${skillsBaseDir}`);
+  const removedTargets = [
+    removed ? `${scope} skills` : null,
+    removedSource ? "shared source" : null,
+    removedFavorites.length > 0 ? "favorites" : null,
+  ].filter((target): target is string => target !== null);
+  console.log(`Removed ${repo.display} from ${removedTargets.join(", ")}`);
 }
 
 async function selectInstalledSkillRefs(global: boolean): Promise<string[]> {
