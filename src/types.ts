@@ -69,6 +69,7 @@ export type InstalledSkill = {
   owner: string;
   repo: string;
   relativeDir: string;
+  name: string;
   description: string;
   scope: SkillScopeLabel;
   installRoot: string;

@@ -125,12 +125,12 @@ skill favorite remove owner/repo owner/repo/skill
 
 ### Search And Inventory
 
-| Command                 | Purpose                                                          |
-| ----------------------- | ---------------------------------------------------------------- |
-| `skill find <query>`    | Search published skills on `skills.sh`                           |
-| `skill list`            | List installed local and global skills                           |
-| `skill update`          | Refresh shared source caches and reconcile current project links |
-| `skill update --global` | Refresh shared source caches and reconcile global links only     |
+| Command                 | Purpose                                                                |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `skill find <query>`    | Search published skills on `skills.sh`                                 |
+| `skill list`            | List installed skills and estimate frontmatter name/description tokens |
+| `skill update`          | Refresh shared source caches and reconcile current project links       |
+| `skill update --global` | Refresh shared source caches and reconcile global links only           |
 
 ## How Installation Works
 

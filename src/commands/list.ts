@@ -1,6 +1,7 @@
 import { fmt, printTable, type TableColumn, type TableRow } from "argc/terminal";
 
 import { listInstalledSkills } from "../lib/installed-skills";
+import { estimateSkillListTokens } from "../lib/skill-token-estimate";
 import { truncateText } from "../lib/truncate";
 
 const DESCRIPTION_WIDTH = 72;
@@ -25,4 +26,9 @@ export async function runList(): Promise<void> {
   }));
 
   printTable(columns, rows);
+  console.log(
+    fmt.info(
+      `Summary: ${skills.length} installed skill${skills.length === 1 ? "" : "s"}, ~${estimateSkillListTokens(skills)} tokens from frontmatter name + description.`,
+    ),
+  );
 }

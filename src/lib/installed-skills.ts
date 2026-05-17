@@ -2,7 +2,7 @@ import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { getSkillsBaseDir } from "./paths";
-import { readSkillDescription } from "./skill-frontmatter";
+import { readSkillFrontmatterMetadata } from "./skill-frontmatter";
 import type { InstallScope, InstalledSkill } from "../types";
 
 export async function listInstalledSkills(cwd: string): Promise<InstalledSkill[]> {
@@ -37,13 +37,16 @@ async function listSkillsForScope(scope: InstallScope, baseDir: string): Promise
       continue;
     }
 
-    const description = await readSkillDescription(join(installRoot, "SKILL.md")).catch(() => "");
+    const frontmatter = await readSkillFrontmatterMetadata(join(installRoot, "SKILL.md")).catch(
+      () => ({ name: "", description: "" }),
+    );
     skills.push({
       id: `${parsed.owner}/${parsed.repo}/${parsed.skill}`,
       owner: parsed.owner,
       repo: parsed.repo,
       relativeDir: parsed.skill,
-      description,
+      name: frontmatter.name,
+      description: frontmatter.description,
       scope,
       installRoot,
     });

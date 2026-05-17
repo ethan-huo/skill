@@ -110,6 +110,7 @@ describe("install helpers", () => {
       owner: "ethan-huo",
       repo: "agents",
       relativeDir: "cx",
+      name: "cx",
       description: "CX helper",
       scope: "local",
       installRoot: join(targetRoot, "ethan-huo.agents.cx"),
