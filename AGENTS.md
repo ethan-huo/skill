@@ -24,6 +24,10 @@
 - `src/lib/*` 放可复用逻辑；优先把纯决策和 effectful shell/file/network 操作拆开。
 - `test/*` 不是装饰。只改实现不补测试，通常说明你还没真正锁住行为。
 
+## References
+
+- 发布机制：`reference/release.md`
+
 ## Change Checklist
 
 涉及 CLI 契约的改动，默认一起检查这些面：
