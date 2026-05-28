@@ -13,9 +13,9 @@ describe("groupFavoritesForInstall", () => {
           description: "",
         },
         {
-          id: "ethan-huo/agents/cx",
-          owner: "ethan-huo",
-          repo: "agents",
+          id: "Ethan-Huo/Agents/cx",
+          owner: "Ethan-Huo",
+          repo: "Agents",
           skill: "cx",
           description: "",
         },

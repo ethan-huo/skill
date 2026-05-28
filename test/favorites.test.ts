@@ -94,6 +94,28 @@ describe("favorite store", () => {
     expect(await listFavorites({ filePath })).toHaveLength(3);
   });
 
+  test("treats repository owner and name case-insensitively", async () => {
+    const filePath = join(tmpdir(), `skill-favorites-${crypto.randomUUID()}.json`);
+    await addFavorite("ethan-huo/agents", { filePath }, { loadMetadata });
+    await addFavorite("ethan-huo/agents/cx", { filePath }, { loadMetadata });
+
+    const duplicateRepo = await addFavorite("Ethan-Huo/Agents", { filePath }, { loadMetadata });
+    const duplicateSkill = await addFavorite("ETHAN-HUO/AGENTS/cx", { filePath }, { loadMetadata });
+
+    expect(duplicateRepo).toEqual({
+      added: false,
+      favorite: {
+        id: "ethan-huo/agents",
+        owner: "ethan-huo",
+        repo: "agents",
+        description: "Agent skill collection",
+        updatedAt: "2026-04-23T00:00:00.000Z",
+      },
+    });
+    expect(duplicateSkill.added).toBe(false);
+    expect(await listFavorites({ filePath })).toHaveLength(2);
+  });
+
   test("removes favorites by canonical ref", async () => {
     const filePath = join(tmpdir(), `skill-favorites-${crypto.randomUUID()}.json`);
 
@@ -121,6 +143,23 @@ describe("favorite store", () => {
         updatedAt: "2026-04-23T00:00:02.000Z",
       },
     ]);
+  });
+
+  test("removes favorites case-insensitively by repository identity", async () => {
+    const filePath = join(tmpdir(), `skill-favorites-${crypto.randomUUID()}.json`);
+    await addFavorite("ethan-huo/agents", { filePath }, { loadMetadata });
+    await addFavorite("ethan-huo/agents/cx", { filePath }, { loadMetadata });
+
+    const removed = await removeFavorites(["ETHAN-HUO/AGENTS", "ETHAN-HUO/AGENTS/cx"], {
+      filePath,
+    });
+
+    expect(removed.removed.map((favorite) => favorite.id)).toEqual([
+      "ethan-huo/agents",
+      "ethan-huo/agents/cx",
+    ]);
+    expect(removed.missing).toEqual([]);
+    expect(await listFavorites({ filePath })).toEqual([]);
   });
 
   test("removes multiple favorites and reports missing refs separately", async () => {
@@ -160,6 +199,23 @@ describe("favorite store", () => {
     expect(await listFavorites({ filePath })).toEqual([]);
   });
 
+  test("removes repo favorites case-insensitively", async () => {
+    const filePath = join(tmpdir(), `skill-favorites-${crypto.randomUUID()}.json`);
+    await addFavorite("ethan-huo/agents", { filePath }, { loadMetadata });
+    await addFavorite("ethan-huo/agents/cx", { filePath }, { loadMetadata });
+
+    const removed = await removeFavoritesForRepo(
+      { owner: "ETHAN-HUO", repo: "AGENTS" },
+      { filePath },
+    );
+
+    expect(removed.map((favorite) => favorite.id)).toEqual([
+      "ethan-huo/agents",
+      "ethan-huo/agents/cx",
+    ]);
+    expect(await listFavorites({ filePath })).toEqual([]);
+  });
+
   test("ignores invalid and duplicate file entries while reading", async () => {
     const filePath = join(tmpdir(), `skill-favorites-${crypto.randomUUID()}.json`);
     await mkdir(dirname(filePath), { recursive: true });
@@ -172,7 +228,9 @@ describe("favorite store", () => {
           "ethan-huo/agents/cx",
           "invalid",
           "ethan-huo/agents",
+          "ETHAN-HUO/AGENTS",
           "ethan-huo/agents/cx",
+          "ETHAN-HUO/AGENTS/cx",
           "ethan-huo/agents/fp-thinking",
         ],
       }),

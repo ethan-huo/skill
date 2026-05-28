@@ -1,3 +1,4 @@
+import { repoIdentityKey } from "./favorite-key";
 import { parseRepoRef } from "./repo-ref";
 import type { FavoriteRef, RepoRef } from "../types";
 
@@ -17,9 +18,9 @@ export function groupFavoritesForInstall(favorites: FavoriteRef[]): FavoriteInst
   const grouped = new Map<string, MutableFavoriteInstallGroup>();
 
   for (const favorite of favorites) {
-    const repoId = `${favorite.owner}/${favorite.repo}`;
+    const repoId = repoIdentityKey(favorite);
     const current = grouped.get(repoId) ?? {
-      repo: parseRepoRef(repoId),
+      repo: parseRepoRef(`${favorite.owner}/${favorite.repo}`),
       selectors: new Set<string>(),
       promptForSelection: false,
     };

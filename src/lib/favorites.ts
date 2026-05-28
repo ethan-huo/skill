@@ -7,6 +7,7 @@ import {
   loadFavoriteMetadata,
   type FavoriteMetadata,
 } from "./favorite-metadata";
+import { favoriteIdentityKey, repoIdentityKey } from "./favorite-key";
 import { parseFavoriteRef } from "./repo-ref";
 import type { FavoriteRef } from "../types";
 
@@ -43,12 +44,16 @@ export async function addFavorite(
 ): Promise<{ added: boolean; favorite: FavoriteRef }> {
   const baseFavorite = parseFavoriteRef(id);
   const favorites = await listFavorites(options);
+  const existing = favorites.find(
+    (entry) => favoriteIdentityKey(entry) === favoriteIdentityKey(baseFavorite),
+  );
+  if (existing) {
+    return { added: false, favorite: existing };
+  }
+
   const metadataLoader = services.loadMetadata ?? loadFavoriteMetadata;
   const metadata = await metadataLoader(baseFavorite);
   const favorite = { ...baseFavorite, ...metadata };
-  if (favorites.some((entry) => entry.id === favorite.id)) {
-    return { added: false, favorite };
-  }
 
   const next = [...favorites, favorite].sort((left, right) => left.id.localeCompare(right.id));
   await writeFavoritesFile(next, options.filePath);
@@ -63,11 +68,15 @@ export async function addFavorites(
   const favorites = await listFavorites(options);
   const metadataLoader = services.loadMetadata ?? loadFavoriteMetadata;
   const requestedFavorites = dedupeFavorites(ids.map((id) => parseFavoriteRef(id)));
-  const existingById = new Map(favorites.map((favorite) => [favorite.id, favorite]));
+  const existingByKey = new Map(
+    favorites.map((favorite) => [favoriteIdentityKey(favorite), favorite]),
+  );
   const existing = requestedFavorites
-    .filter((favorite) => existingById.has(favorite.id))
-    .map((favorite) => existingById.get(favorite.id)!);
-  const toAdd = requestedFavorites.filter((favorite) => !existingById.has(favorite.id));
+    .filter((favorite) => existingByKey.has(favoriteIdentityKey(favorite)))
+    .map((favorite) => existingByKey.get(favoriteIdentityKey(favorite))!);
+  const toAdd = requestedFavorites.filter(
+    (favorite) => !existingByKey.has(favoriteIdentityKey(favorite)),
+  );
 
   const added = await Promise.all(
     toAdd.map(async (favorite) => ({
@@ -90,7 +99,8 @@ export async function removeFavorite(
 ): Promise<{ removed: boolean; favorite: FavoriteRef }> {
   const favorite = parseFavoriteRef(id);
   const favorites = await listFavorites(options);
-  const next = favorites.filter((entry) => entry.id !== favorite.id);
+  const key = favoriteIdentityKey(favorite);
+  const next = favorites.filter((entry) => favoriteIdentityKey(entry) !== key);
   if (next.length === favorites.length) {
     return { removed: false, favorite };
   }
@@ -105,15 +115,18 @@ export async function removeFavorites(
 ): Promise<{ removed: FavoriteRef[]; missing: FavoriteRef[] }> {
   const favorites = await listFavorites(options);
   const requestedFavorites = dedupeFavorites(ids.map((id) => parseFavoriteRef(id)));
-  const installedById = new Map(favorites.map((favorite) => [favorite.id, favorite]));
+  const installedByKey = new Map(
+    favorites.map((favorite) => [favoriteIdentityKey(favorite), favorite]),
+  );
   const removed: FavoriteRef[] = [];
   const missing: FavoriteRef[] = [];
 
   for (const favorite of requestedFavorites) {
-    const existing = installedById.get(favorite.id);
+    const key = favoriteIdentityKey(favorite);
+    const existing = installedByKey.get(key);
     if (existing) {
       removed.push(existing);
-      installedById.delete(favorite.id);
+      installedByKey.delete(key);
       continue;
     }
 
@@ -121,7 +134,9 @@ export async function removeFavorites(
   }
 
   if (removed.length > 0) {
-    const next = [...installedById.values()].sort((left, right) => left.id.localeCompare(right.id));
+    const next = [...installedByKey.values()].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    );
     await writeFavoritesFile(next, options.filePath);
   }
 
@@ -133,16 +148,15 @@ export async function removeFavoritesForRepo(
   options: FavoriteStoreOptions = {},
 ): Promise<FavoriteRef[]> {
   const favorites = await listFavorites(options);
-  const removed = favorites.filter(
-    (favorite) => favorite.owner === repo.owner && favorite.repo === repo.repo,
-  );
+  const key = repoIdentityKey(repo);
+  const removed = favorites.filter((favorite) => repoIdentityKey(favorite) === key);
 
   if (removed.length === 0) {
     return [];
   }
 
   const next = favorites
-    .filter((favorite) => favorite.owner !== repo.owner || favorite.repo !== repo.repo)
+    .filter((favorite) => repoIdentityKey(favorite) !== key)
     .sort((left, right) => left.id.localeCompare(right.id));
   await writeFavoritesFile(next, options.filePath);
   return removed;
@@ -246,11 +260,12 @@ function normalizeFavorites(favorites: Array<string | FavoriteFileEntry>): Favor
   return parsedFavorites
     .filter((favorite): favorite is FavoriteRef => favorite !== null)
     .filter((favorite) => {
-      if (seen.has(favorite.id)) {
+      const key = favoriteIdentityKey(favorite);
+      if (seen.has(key)) {
         return false;
       }
 
-      seen.add(favorite.id);
+      seen.add(key);
       return true;
     })
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -275,11 +290,12 @@ function normalizeOptionalString(value: unknown): string {
 function dedupeFavorites(favorites: FavoriteRef[]): FavoriteRef[] {
   const seen = new Set<string>();
   return favorites.filter((favorite) => {
-    if (seen.has(favorite.id)) {
+    const key = favoriteIdentityKey(favorite);
+    if (seen.has(key)) {
       return false;
     }
 
-    seen.add(favorite.id);
+    seen.add(key);
     return true;
   });
 }
