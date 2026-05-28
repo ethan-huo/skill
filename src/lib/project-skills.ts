@@ -91,11 +91,11 @@ export async function syncProjectSkillLinks(options: {
   cwd: string;
   repo: RepoRef;
   sourceRoot: string;
-  installedIds: string[];
+  installedIds?: string[];
   updated: string[];
   removed: string[];
 }): Promise<void> {
-  const { cwd, repo, sourceRoot, installedIds, updated, removed } = options;
+  const { cwd, repo, sourceRoot, installedIds = [], updated, removed } = options;
   const selectedSkills = toProjectCandidates(installedIds, updated);
 
   if (selectedSkills.length > 0) {
@@ -103,6 +103,14 @@ export async function syncProjectSkillLinks(options: {
     await linkProjectClaudeSkillsIfAvailable(cwd, repo, sourceRoot, selectedSkills);
   }
 
+  await removeProjectSkillLinks(cwd, repo, removed);
+}
+
+export async function removeProjectSkillLinks(
+  cwd: string,
+  repo: RepoRef,
+  removed: string[],
+): Promise<void> {
   for (const skill of removed) {
     await rm(getVisibleSkillRoot("local", cwd, repo, skill), { force: true, recursive: true });
     await rm(getClaudeSkillRoot(getProjectClaudeRoot(cwd), repo, skill), {

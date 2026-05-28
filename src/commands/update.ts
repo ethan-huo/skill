@@ -15,6 +15,7 @@ import {
 import {
   hasProjectManifest,
   pruneProjectManifestSkills,
+  removeProjectSkillLinks,
   syncProjectSkillLinks,
 } from "../lib/project-skills";
 import { parseRepoRef } from "../lib/repo-ref";
@@ -76,7 +77,7 @@ function getInstalledGroupKey(scope: "local" | "global", repo: Pick<RepoRef, "ow
   return `${scope}:${repo.owner}/${repo.repo}`;
 }
 
-async function syncVisibleLinks(options: {
+export async function syncVisibleLinks(options: {
   cwd: string;
   input: UpdateInput;
   repo: RepoRef;
@@ -110,7 +111,13 @@ async function syncVisibleLinks(options: {
     await removeVisibleClaudeSkill(getClaudeRoot(), repo, skill);
   }
 
-  if (input.global || !hasProjectManifest(cwd)) {
+  if (input.global) {
+    return;
+  }
+
+  await removeProjectSkillLinks(cwd, repo, removed);
+
+  if (!hasProjectManifest(cwd)) {
     return;
   }
 
@@ -120,7 +127,7 @@ async function syncVisibleLinks(options: {
     sourceRoot,
     installedIds: projectInstalledIds,
     updated,
-    removed,
+    removed: [],
   });
   await pruneProjectManifestSkills(
     cwd,

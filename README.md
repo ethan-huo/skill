@@ -142,6 +142,7 @@ skill favorite remove owner/repo owner/repo/skill
 - project installs link selected skills from `~/.agents/.skills` and record upstream IDs in `.agents/skills/manifest.json`
 - project-scope `skill add` and `skill install <ref>` share the same install effects
 - `skill update` updates `~/.agents/.skills/{owner}/{repo}` first; visible global and project roots are reconciled from that shared source cache
+- project-scope `skill update` removes visible links for upstream skills that disappeared, including stale symlinks whose source target is already gone
 - `skill remove owner/repo --global` removes that shared source cache and all matching favorite refs, so future `skill update` runs stop tracking the repo
 
 Install roots:
