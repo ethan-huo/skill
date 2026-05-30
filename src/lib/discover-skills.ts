@@ -4,6 +4,7 @@ import type { SkillCandidate } from "../types";
 
 const IGNORED_SEGMENTS = new Set([".git", "node_modules", "dist", "build", ".next", "target"]);
 const IGNORED_ROOTS = new Set([
+  ".agents",
   ".claude",
   ".claude-plugin",
   ".cursor",
@@ -82,17 +83,13 @@ function sourcePriority(sourceDir: string): number {
     return 0;
   }
 
-  if (sourceDir.startsWith(".agents/skills/")) {
+  if (sourceDir.startsWith("skills/")) {
     return 1;
   }
 
-  if (sourceDir.startsWith("skills/")) {
+  if (sourceDir.startsWith("source/skills/")) {
     return 2;
   }
 
-  if (sourceDir.startsWith("source/skills/")) {
-    return 3;
-  }
-
-  return 4;
+  return 3;
 }

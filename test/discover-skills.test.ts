@@ -12,6 +12,7 @@ describe("discoverSkills", () => {
     await writeSkill(root, "skills/cx");
     await writeSkill(root, "skills/group/fp-thinking");
     await writeSkill(root, ".agents/skills/local/demo");
+    await writeSkill(root, ".agents/skills/internal");
     await writeSkill(root, "node_modules/fake");
 
     const skills = await discoverSkills(root);
@@ -20,11 +21,6 @@ describe("discoverSkills", () => {
         relativeDir: "cx",
         sourceDir: "skills/cx",
         displayLabel: "cx",
-      },
-      {
-        relativeDir: "demo",
-        sourceDir: ".agents/skills/local/demo",
-        displayLabel: "demo",
       },
       {
         relativeDir: "fp-thinking",

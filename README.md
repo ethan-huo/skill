@@ -134,7 +134,7 @@ skill favorite remove owner/repo owner/repo/skill
 
 ## How Installation Works
 
-- `skill` scans a cloned repository for `SKILL.md`, including common hidden roots such as `.agents/skills` and `.codex/skills`
+- `skill` scans a cloned repository for `SKILL.md`, including `.codex/skills`, while ignoring repo-internal agent config roots such as `.agents`
 - discovered skill IDs are normalized to `{owner}/{repo}/{folder}`
 - `owner/repo/skill` is shorthand for `skill add owner/repo --skill skill`
 - repeated installs reuse shallow clone caches keyed by the remote `HEAD` hash
