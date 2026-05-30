@@ -13,6 +13,7 @@ export async function shallowCloneRepo(repo: RepoRef): Promise<string> {
   }
 
   await mkdir(ownerCacheDir, { recursive: true });
+  await rm(cloneDir, { recursive: true, force: true });
   const stagingDir = `${cloneDir}.tmp-${crypto.randomUUID()}`;
 
   try {
@@ -46,8 +47,30 @@ async function resolveRemoteHeadHash(repo: RepoRef): Promise<string> {
 }
 
 async function hasGitCheckout(directory: string): Promise<boolean> {
-  const gitDir = await stat(join(directory, ".git")).catch(() => null);
-  return gitDir?.isDirectory() ?? false;
+  const checkoutDir = await stat(directory).catch(() => null);
+  if (!checkoutDir?.isDirectory()) {
+    return false;
+  }
+
+  try {
+    const isWorkTree = await runGit(
+      ["-C", directory, "rev-parse", "--is-inside-work-tree"],
+      "git checkout validation failed",
+    );
+    if (isWorkTree.trim() !== "true") {
+      return false;
+    }
+
+    await runGit(
+      ["-C", directory, "rev-parse", "--verify", "HEAD"],
+      "git checkout validation failed",
+    );
+    return true;
+  } catch {
+    // A previous clone can leave a directory that looks cacheable but has no
+    // usable HEAD. Treat it as missing so the caller replaces it atomically.
+    return false;
+  }
 }
 
 async function pruneStaleRepoClones(
