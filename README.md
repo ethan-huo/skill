@@ -45,12 +45,13 @@ For most real usage, start from favorites and install only what the current proj
 ```bash
 skill install owner/repo/skill
 skill install owner/repo --skill skill-a --skill skill-b
+skill install owner/repo --map
 skill list
 ```
 
 Agents should prefer this path over broad search when the user's favorites already contain good candidates.
-Project installs keep upstream skill IDs in `.agents/skills/manifest.json` and expose one-level
-visible links from the hidden shared source root under `~/.agents/.skills`.
+Project installs keep repo-scoped skill and map items in `.agents/skills/manifest.json` and expose
+one-level visible links from the hidden shared source root under `~/.agents/.skills`.
 
 ### 2. Interactive user workflow
 
@@ -105,11 +106,12 @@ skill favorite remove owner/repo owner/repo/skill
 
 ### Project Links
 
-| Command                                        | Purpose                                                      |
-| ---------------------------------------------- | ------------------------------------------------------------ |
-| `skill install`                                | Rebuild project links from `.agents/skills/manifest.json`    |
-| `skill install owner/repo/skill`               | Install a shared source and link one skill into this project |
-| `skill install owner/repo --skill a --skill b` | Link multiple selected skills into this project              |
+| Command                                        | Purpose                                                            |
+| ---------------------------------------------- | ------------------------------------------------------------------ |
+| `skill install`                                | Rebuild project links and maps from `.agents/skills/manifest.json` |
+| `skill install owner/repo/skill`               | Install a shared source and link one skill into this project       |
+| `skill install owner/repo --skill a --skill b` | Link multiple selected skills into this project                    |
+| `skill install owner/repo --map`               | Generate one repo-level map skill with ctx-read routing rows       |
 
 ### Favorites
 
@@ -137,9 +139,11 @@ skill favorite remove owner/repo owner/repo/skill
 - `skill` scans a cloned repository for `SKILL.md`, including `.codex/skills`, while ignoring repo-internal agent config roots such as `.agents`
 - discovered skill IDs are normalized to `{owner}/{repo}/{folder}`
 - `owner/repo/skill` is shorthand for `skill add owner/repo --skill skill`
+- `skill install owner/repo --map` writes `.agents/skills/{owner}.{repo}.map/SKILL.md` with a `ctx read github://owner/repo/<path>` rule and `When ..., read path/SKILL.md` rows
+- versionless project manifests are treated as version 1 and rewritten as version 2 repo-scoped items on the next manifest write
 - repeated installs reuse shallow clone caches keyed by the remote `HEAD` hash
 - local install is blocked only when the selected `{owner}/{repo}/{skill}` is already installed globally
-- project installs link selected skills from `~/.agents/.skills` and record upstream IDs in `.agents/skills/manifest.json`
+- project installs link selected skills from `~/.agents/.skills` and record repo-scoped manifest items in `.agents/skills/manifest.json`
 - project-scope `skill add` and `skill install <ref>` share the same install effects
 - `skill update` updates `~/.agents/.skills/{owner}/{repo}` first; visible global and project roots are reconciled from that shared source cache
 - project-scope `skill update` removes visible links for upstream skills that disappeared, including stale symlinks whose source target is already gone
@@ -149,8 +153,9 @@ Install roots:
 
 - local visible links: `{cwd}/.agents/skills/{owner}.{repo}.{skill}/`
 - global visible links: `~/.agents/skills/{owner}.{repo}.{skill}/`
+- local map skills: `{cwd}/.agents/skills/{owner}.{repo}.map/`
 - shared sources: `~/.agents/.skills/{owner}/{repo}/`
-- project manifest: `{cwd}/.agents/skills/manifest.json` stores `{owner}/{repo}/{skill}` IDs, not visible link names
+- project manifest: `{cwd}/.agents/skills/manifest.json` stores versioned `skills` and `map` items, not visible link names
 
 To migrate an existing global install from the old nested visible layout to one-level links:
 

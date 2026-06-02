@@ -1,11 +1,19 @@
 import { fmt } from "argc/terminal";
 
-import { installProjectRepoSkills, restoreProjectSkills } from "../lib/project-skills";
+import {
+  installProjectRepoMap,
+  installProjectRepoSkills,
+  restoreProjectSkills,
+} from "../lib/project-skills";
 import { parseRepoSkillTarget } from "../lib/repo-ref";
 import type { InstallInput } from "../types";
 
 export async function runInstall(args: { input: InstallInput }): Promise<void> {
   const input = args.input;
+  if (input.map && input.repo.length === 0) {
+    throw new Error("Install --map requires a repository ref.");
+  }
+
   if (input.repo.length === 0) {
     await restoreProjectLinks();
     return;
@@ -16,6 +24,20 @@ export async function runInstall(args: { input: InstallInput }): Promise<void> {
   }
 
   const target = parseRepoSkillTarget(input.repo[0]!);
+  if (input.map) {
+    if (target.skill || normalizeSelectors(input.skill).length > 0) {
+      throw new Error("Install --map accepts a repository ref only; do not pass a skill selector.");
+    }
+
+    const { installRoot, mappedSkills } = await installProjectRepoMap({
+      cwd: process.cwd(),
+      repo: target.repo,
+    });
+    console.log(`Linked map for ${mappedSkills.length} skill(s) to ${installRoot}`);
+    console.log(`- ${target.repo.display} (map)`);
+    return;
+  }
+
   const repo = target.repo;
   const selectors = normalizeSelectors(input.skill, target.skill);
   const { installRoot, selectedSkills } = await installProjectRepoSkills({

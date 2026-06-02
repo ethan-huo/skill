@@ -130,6 +130,7 @@ export const schema = {
         "skill install",
         "skill install ethan-huo/agents/cx",
         "skill install ethan-huo/agents --skill cx --skill fp-thinking",
+        "skill install Owl-Listener/designer-skills --map",
       ],
     })
     .args("repo...")
@@ -138,6 +139,7 @@ export const schema = {
         v.object({
           repo: v.optional(v.array(v.string()), []),
           skill: v.optional(v.union([v.string(), v.array(v.string())]), []),
+          map: v.optional(v.boolean(), false),
         }),
       ),
     ),

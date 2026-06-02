@@ -189,7 +189,7 @@ describe("add skills", () => {
       ).toBeNull();
       expect(
         await readFile(join(projectRoot, ".agents", "skills", "manifest.json"), "utf8"),
-      ).toContain(`${isolatedRepo.owner}/agents/cx`);
+      ).toContain(`"repo": "${isolatedRepo.owner}/agents"`);
     } finally {
       await rm(getSourceInstallRoot(isolatedRepo), { force: true, recursive: true });
       await rm(dirname(getSourceInstallRoot(isolatedRepo)), { force: true, recursive: true });

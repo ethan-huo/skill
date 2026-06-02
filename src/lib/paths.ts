@@ -19,6 +19,10 @@ export function getVisibleSkillDirName(repo: RepoRef, skill: string): string {
   return `${repo.owner}.${repo.repo}.${skill}`;
 }
 
+export function getVisibleMapDirName(repo: RepoRef): string {
+  return `${repo.owner}.${repo.repo}.map`;
+}
+
 export function getVisibleRepoDirPrefix(repo: RepoRef): string {
   return `${repo.owner}.${repo.repo}.`;
 }
@@ -30,6 +34,10 @@ export function getVisibleSkillRoot(
   skill: string,
 ): string {
   return join(getSkillsBaseDir(scope, cwd), getVisibleSkillDirName(repo, skill));
+}
+
+export function getVisibleMapRoot(scope: InstallScope, cwd: string, repo: RepoRef): string {
+  return join(getSkillsBaseDir(scope, cwd), getVisibleMapDirName(repo));
 }
 
 export function getSourceSkillsBaseDir(): string {

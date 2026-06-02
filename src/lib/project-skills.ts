@@ -14,8 +14,16 @@ import {
   getSourceInstallRoot,
   getVisibleSkillRoot,
 } from "./paths";
-import { readProjectManifest, writeProjectManifest } from "./project-manifest";
+import {
+  addProjectManifestMap,
+  getProjectManifestMapRepos,
+  getProjectManifestSkillIds,
+  readProjectManifest,
+  removeProjectManifestSkillIds,
+  writeProjectManifest,
+} from "./project-manifest";
 import { parseFavoriteRef, parseRepoRef } from "./repo-ref";
+import { writeProjectSkillMap } from "./skill-map";
 import type { RepoRef, SkillCandidate } from "../types";
 
 export async function installProjectRepoSkills(options: {
@@ -37,15 +45,29 @@ export async function installProjectRepoSkills(options: {
   return { installRoot, selectedSkills };
 }
 
+export async function installProjectRepoMap(options: {
+  cwd: string;
+  repo: RepoRef;
+}): Promise<{ installRoot: string; mappedSkills: SkillCandidate[] }> {
+  const cloneDir = await shallowCloneRepo(options.repo);
+  const result = await writeProjectSkillMap({
+    cloneDir,
+    cwd: options.cwd,
+    repo: options.repo,
+  });
+  await addProjectManifestMap(options.cwd, `${options.repo.owner}/${options.repo.repo}`);
+  return result;
+}
+
 export async function restoreProjectSkills(cwd: string): Promise<{
   restored: string[];
   missing: string[];
 }> {
   const manifest = await readProjectManifest(cwd);
-  const groups = groupManifestSkills(manifest.skills);
+  const groups = groupManifestSkills(getProjectManifestSkillIds(manifest));
   const restored: string[] = [];
   const missing: string[] = [];
-  const nextManifestSkills: string[] = [];
+  let manifestWritten = false;
 
   for (const group of groups.values()) {
     const repo = parseRepoRef(`${group.owner}/${group.repo}`);
@@ -76,12 +98,23 @@ export async function restoreProjectSkills(cwd: string): Promise<{
     for (const skill of selectedSkills) {
       const skillId = `${group.owner}/${group.repo}/${skill.relativeDir}`;
       restored.push(skillId);
-      nextManifestSkills.push(skillId);
     }
   }
 
   if (missing.length > 0) {
-    await writeProjectManifest(cwd, { skills: nextManifestSkills });
+    await writeProjectManifest(cwd, removeProjectManifestSkillIds(manifest, missing));
+    manifestWritten = true;
+  }
+
+  for (const repoId of getProjectManifestMapRepos(manifest)) {
+    const repo = parseRepoRef(repoId);
+    const cloneDir = await shallowCloneRepo(repo);
+    const result = await writeProjectSkillMap({ cloneDir, cwd, repo });
+    restored.push(`${repoId} (map: ${result.mappedSkills.length} skills)`);
+  }
+
+  if (!manifestWritten && hasProjectManifest(cwd)) {
+    await writeProjectManifest(cwd, manifest);
   }
 
   return { restored: restored.sort(), missing: missing.sort() };
@@ -130,9 +163,7 @@ export async function pruneProjectManifestSkills(
 
   const missing = new Set(missingSkillIds);
   const manifest = await readProjectManifest(cwd);
-  await writeProjectManifest(cwd, {
-    skills: manifest.skills.filter((skill) => !missing.has(skill)),
-  });
+  await writeProjectManifest(cwd, removeProjectManifestSkillIds(manifest, [...missing]));
 }
 
 export function hasProjectManifest(cwd: string): boolean {
