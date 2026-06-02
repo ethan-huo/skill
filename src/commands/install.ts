@@ -1,10 +1,7 @@
 import { fmt } from "argc/terminal";
 
-import {
-  installProjectRepoMap,
-  installProjectRepoSkills,
-  restoreProjectSkills,
-} from "../lib/project-skills";
+import { installRepoSkills } from "../lib/add-skills";
+import { installProjectRepoMap, restoreProjectSkills } from "../lib/project-skills";
 import { parseRepoSkillTarget } from "../lib/repo-ref";
 import type { InstallInput } from "../types";
 
@@ -40,14 +37,21 @@ export async function runInstall(args: { input: InstallInput }): Promise<void> {
 
   const repo = target.repo;
   const selectors = normalizeSelectors(input.skill, target.skill);
-  const { installRoot, selectedSkills } = await installProjectRepoSkills({
+  const result = await installRepoSkills({
     cwd: process.cwd(),
+    global: false,
     repo,
     selectors,
   });
 
-  console.log(`Linked ${selectedSkills.length} skill(s) to ${installRoot}`);
-  for (const skill of selectedSkills) {
+  if (result.kind === "map") {
+    console.log(`Linked map for ${result.mappedSkills.length} skill(s) to ${result.installRoot}`);
+    console.log(`- ${repo.display} (map)`);
+    return;
+  }
+
+  console.log(`Linked ${result.selectedSkills.length} skill(s) to ${result.installRoot}`);
+  for (const skill of result.selectedSkills) {
     console.log(`- ${repo.display}/${skill.relativeDir}`);
   }
 }

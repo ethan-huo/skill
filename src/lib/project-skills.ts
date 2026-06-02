@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import { installLocalProjectSkills, selectRepoSkills } from "./add-skills";
+import { installLocalProjectSkills, type RepoInstallResult, selectRepoSkills } from "./add-skills";
 import { linkClaudeSkillsIfAvailable } from "./claude-skills";
 import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
@@ -30,11 +30,22 @@ export async function installProjectRepoSkills(options: {
   cwd: string;
   repo: RepoRef;
   selectors: string[];
-}): Promise<{ installRoot: string; selectedSkills: SkillCandidate[] }> {
-  const { cloneDir, selectedSkills } = await selectRepoSkills({
+}): Promise<RepoInstallResult> {
+  const { cloneDir, selectedSkills, selectedMode } = await selectRepoSkills({
     repo: options.repo,
     selectors: options.selectors,
+    global: false,
   });
+  if (selectedMode === "map") {
+    const result = await writeProjectSkillMap({
+      cloneDir,
+      cwd: options.cwd,
+      repo: options.repo,
+    });
+    await addProjectManifestMap(options.cwd, `${options.repo.owner}/${options.repo.repo}`);
+    return { kind: "map", installRoot: result.installRoot, mappedSkills: result.mappedSkills };
+  }
+
   const { installRoot } = await installLocalProjectSkills({
     cloneDir,
     cwd: options.cwd,
@@ -42,7 +53,7 @@ export async function installProjectRepoSkills(options: {
     selectedSkills,
   });
 
-  return { installRoot, selectedSkills };
+  return { kind: "skills", installRoot, selectedSkills };
 }
 
 export async function installProjectRepoMap(options: {

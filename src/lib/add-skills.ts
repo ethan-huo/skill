@@ -3,9 +3,25 @@ import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, upsertInstalledSkills } from "./install";
 import { listInstalledSkills } from "./installed-skills";
 import { getSkillsBaseDir, getInstallScope, getSourceInstallRoot } from "./paths";
-import { addProjectManifestSkills } from "./project-manifest";
+import { addProjectManifestMap, addProjectManifestSkills } from "./project-manifest";
+import { selectOne } from "./prompt";
 import { selectSkills } from "./select-skills";
+import { isFlatSkillCatalog, writeProjectSkillMap } from "./skill-map";
 import type { RepoRef, SkillCandidate } from "../types";
+
+export type RepoSkillsInstallResult = {
+  kind: "skills";
+  installRoot: string;
+  selectedSkills: SkillCandidate[];
+};
+
+export type RepoMapInstallResult = {
+  kind: "map";
+  installRoot: string;
+  mappedSkills: SkillCandidate[];
+};
+
+export type RepoInstallResult = RepoSkillsInstallResult | RepoMapInstallResult;
 
 export async function installRepoSkills(options: {
   cwd: string;
@@ -14,10 +30,23 @@ export async function installRepoSkills(options: {
   selectors: string[];
   initialSelectors?: string[];
   promptForSelection?: boolean;
-}): Promise<{ installRoot: string; selectedSkills: SkillCandidate[] }> {
+}): Promise<RepoInstallResult> {
   const scope = getInstallScope(options.global);
-  const { cloneDir, selectedSkills } = await selectRepoSkills(options);
+  const { cloneDir, selectedSkills, selectedMode } = await selectRepoSkills({
+    ...options,
+    global: options.global,
+  });
   const installRoot = getSkillsBaseDir(scope, options.cwd);
+
+  if (selectedMode === "map") {
+    const result = await writeProjectSkillMap({
+      cloneDir,
+      cwd: options.cwd,
+      repo: options.repo,
+    });
+    await addProjectManifestMap(options.cwd, `${options.repo.owner}/${options.repo.repo}`);
+    return { kind: "map", installRoot: result.installRoot, mappedSkills: result.mappedSkills };
+  }
 
   if (scope === "global") {
     await installGlobalSkills({
@@ -26,7 +55,7 @@ export async function installRepoSkills(options: {
       repo: options.repo,
       selectedSkills,
     });
-    return { installRoot, selectedSkills };
+    return { kind: "skills", installRoot, selectedSkills };
   }
 
   await installLocalProjectSkills({
@@ -35,7 +64,7 @@ export async function installRepoSkills(options: {
     repo: options.repo,
     selectedSkills,
   });
-  return { installRoot, selectedSkills };
+  return { kind: "skills", installRoot, selectedSkills };
 }
 
 export async function selectRepoSkills(options: {
@@ -43,12 +72,32 @@ export async function selectRepoSkills(options: {
   selectors: string[];
   initialSelectors?: string[];
   promptForSelection?: boolean;
-}): Promise<{ cloneDir: string; selectedSkills: SkillCandidate[] }> {
+  global?: boolean;
+}): Promise<{
+  cloneDir: string;
+  selectedSkills: SkillCandidate[];
+  selectedMode: "skills" | "map";
+}> {
   const cloneDir = await shallowCloneRepo(options.repo);
 
   const discoveredSkills = await discoverSkills(cloneDir);
   if (discoveredSkills.length === 0) {
     throw new Error(`No SKILL.md files found in ${options.repo.display}.`);
+  }
+
+  if (
+    !options.global &&
+    options.selectors.length === 0 &&
+    (options.initialSelectors ?? []).length === 0 &&
+    (await isFlatSkillCatalog(cloneDir, discoveredSkills))
+  ) {
+    const selectedMode = await selectFlatCatalogInstallMode(
+      options.repo.display,
+      discoveredSkills.length,
+    );
+    if (selectedMode === "map") {
+      return { cloneDir, selectedSkills: [], selectedMode };
+    }
   }
 
   const selectedSkills = await selectSkills(options.repo.display, discoveredSkills, {
@@ -57,7 +106,7 @@ export async function selectRepoSkills(options: {
     promptForSelection: options.promptForSelection,
   });
 
-  return { cloneDir, selectedSkills };
+  return { cloneDir, selectedSkills, selectedMode: "skills" };
 }
 
 export async function installGlobalSkills(options: {
@@ -137,4 +186,28 @@ async function assertNoConflictingGlobalSkills(
   throw new Error(
     `Global install already contains selected skill(s): ${conflicts.join(", ")}. Remove them before installing the same skill locally.`,
   );
+}
+
+async function selectFlatCatalogInstallMode(
+  repoDisplay: string,
+  skillCount: number,
+): Promise<"map" | "skills"> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    return "map";
+  }
+
+  return selectOne({
+    message: `${repoDisplay} contains ${skillCount} single-file skills.`,
+    options: [
+      {
+        label: "Install repo map (recommended)",
+        value: "map",
+      },
+      {
+        label: "Select individual skills",
+        value: "skills",
+      },
+    ],
+    initialValue: "map",
+  });
 }

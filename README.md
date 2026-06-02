@@ -140,6 +140,7 @@ skill favorite remove owner/repo owner/repo/skill
 - discovered skill IDs are normalized to `{owner}/{repo}/{folder}`
 - `owner/repo/skill` is shorthand for `skill add owner/repo --skill skill`
 - `skill install owner/repo --map` writes `.agents/skills/{owner}.{repo}.map/SKILL.md` with a `ctx read github://owner/repo/<path>` rule and `When ..., read path/SKILL.md` rows
+- repo-level project installs recommend a map before individual selection when a repo has at least six skills and every skill folder is only a single `SKILL.md`
 - versionless project manifests are treated as version 1 and rewritten as version 2 repo-scoped items on the next manifest write
 - repeated installs reuse shallow clone caches keyed by the remote `HEAD` hash
 - local install is blocked only when the selected `{owner}/{repo}/{skill}` is already installed globally

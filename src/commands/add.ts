@@ -7,15 +7,23 @@ export async function runAdd(args: { input: AddInput }): Promise<void> {
   const target = parseRepoSkillTarget(input.repo);
   const repo = target.repo;
   const selectors = normalizeSelectors(input.skill, target.skill);
-  const { installRoot, selectedSkills } = await installRepoSkills({
+  const result = await installRepoSkills({
     cwd: process.cwd(),
     global: input.global,
     repo,
     selectors,
   });
 
-  console.log(`Installed ${selectedSkills.length} skill(s) to ${installRoot}`);
-  for (const skill of selectedSkills) {
+  if (result.kind === "map") {
+    console.log(
+      `Installed map for ${result.mappedSkills.length} skill(s) to ${result.installRoot}`,
+    );
+    console.log(`- ${repo.display} (map)`);
+    return;
+  }
+
+  console.log(`Installed ${result.selectedSkills.length} skill(s) to ${result.installRoot}`);
+  for (const skill of result.selectedSkills) {
     console.log(`- ${repo.display}/${skill.relativeDir}`);
   }
 }

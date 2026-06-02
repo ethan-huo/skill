@@ -40,7 +40,7 @@ export async function runFavoritePick(args: { input: FavoritePickInput }): Promi
   }
 
   for (const group of groupFavoritesForInstall(selectedFavorites)) {
-    const { installRoot, selectedSkills } = await installRepoSkills({
+    const result = await installRepoSkills({
       cwd: process.cwd(),
       global: input.global,
       repo: group.repo,
@@ -49,8 +49,16 @@ export async function runFavoritePick(args: { input: FavoritePickInput }): Promi
       promptForSelection: group.promptForSelection,
     });
 
-    console.log(`Installed ${selectedSkills.length} skill(s) to ${installRoot}`);
-    for (const skill of selectedSkills) {
+    if (result.kind === "map") {
+      console.log(
+        `Installed map for ${result.mappedSkills.length} skill(s) to ${result.installRoot}`,
+      );
+      console.log(`- ${group.repo.display} (map)`);
+      continue;
+    }
+
+    console.log(`Installed ${result.selectedSkills.length} skill(s) to ${result.installRoot}`);
+    for (const skill of result.selectedSkills) {
       console.log(`- ${group.repo.display}/${skill.relativeDir}`);
     }
   }
