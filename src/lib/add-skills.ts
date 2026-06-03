@@ -6,7 +6,7 @@ import { getSkillsBaseDir, getInstallScope, getSourceInstallRoot } from "./paths
 import { addProjectManifestMap, addProjectManifestSkills } from "./project-manifest";
 import { selectOne } from "./prompt";
 import { selectSkills } from "./select-skills";
-import { isFlatSkillCatalog, writeProjectSkillMap } from "./skill-map";
+import { shouldRecommendRepoMap, writeProjectSkillMap } from "./skill-map";
 import type { RepoRef, SkillCandidate } from "../types";
 
 export type RepoSkillsInstallResult = {
@@ -89,7 +89,7 @@ export async function selectRepoSkills(options: {
     !options.global &&
     options.selectors.length === 0 &&
     (options.initialSelectors ?? []).length === 0 &&
-    (await isFlatSkillCatalog(cloneDir, discoveredSkills))
+    (await shouldRecommendRepoMap(cloneDir, discoveredSkills))
   ) {
     const selectedMode = await selectFlatCatalogInstallMode(
       options.repo.display,
@@ -197,7 +197,7 @@ async function selectFlatCatalogInstallMode(
   }
 
   return selectOne({
-    message: `${repoDisplay} contains ${skillCount} single-file skills.`,
+    message: `${repoDisplay} contains ${skillCount} skills.`,
     options: [
       {
         label: "Install repo map (recommended)",

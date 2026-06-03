@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { isFlatSkillCatalog, renderSkillMap } from "../src/lib/skill-map";
+import { renderSkillMap, shouldRecommendRepoMap } from "../src/lib/skill-map";
 import type { RepoRef, SkillCandidate } from "../src/types";
 
 const repo = {
@@ -15,26 +15,27 @@ const repo = {
 } satisfies RepoRef;
 
 describe("skill map", () => {
-  test("detects repositories made of six or more single-file skills", async () => {
+  test("recommends maps for repositories with four or more skills", async () => {
     const root = join(tmpdir(), `skill-flat-catalog-${crypto.randomUUID()}`);
     const skills: SkillCandidate[] = [];
 
-    for (let index = 0; index < 6; index += 1) {
+    for (let index = 0; index < 4; index += 1) {
       const relativeDir = `skill-${index}`;
       const sourceDir = `skills/${relativeDir}`;
       await mkdir(join(root, sourceDir), { recursive: true });
       await writeFile(join(root, sourceDir, "SKILL.md"), "---\nname: test\n---\n");
-      await writeFile(join(root, sourceDir, "README.md"), "ignored metadata\n");
+      await mkdir(join(root, sourceDir, "references"), { recursive: true });
+      await writeFile(join(root, sourceDir, "references", "api.md"), "details\n");
       skills.push({ relativeDir, sourceDir, displayLabel: relativeDir });
     }
 
-    expect(await isFlatSkillCatalog(root, skills)).toBe(true);
+    expect(await shouldRecommendRepoMap(root, skills)).toBe(true);
   });
 
-  test("does not detect small or bundled skill collections as flat catalogs", async () => {
+  test("does not recommend maps for repositories with three or fewer skills", async () => {
     const smallRoot = join(tmpdir(), `skill-small-catalog-${crypto.randomUUID()}`);
     const smallSkills: SkillCandidate[] = [];
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 3; index += 1) {
       const relativeDir = `skill-${index}`;
       const sourceDir = `skills/${relativeDir}`;
       await mkdir(join(smallRoot, sourceDir), { recursive: true });
@@ -42,20 +43,7 @@ describe("skill map", () => {
       smallSkills.push({ relativeDir, sourceDir, displayLabel: relativeDir });
     }
 
-    const bundledRoot = join(tmpdir(), `skill-bundled-catalog-${crypto.randomUUID()}`);
-    const bundledSkills: SkillCandidate[] = [];
-    for (let index = 0; index < 6; index += 1) {
-      const relativeDir = `skill-${index}`;
-      const sourceDir = `skills/${relativeDir}`;
-      await mkdir(join(bundledRoot, sourceDir), { recursive: true });
-      await writeFile(join(bundledRoot, sourceDir, "SKILL.md"), "---\nname: test\n---\n");
-      bundledSkills.push({ relativeDir, sourceDir, displayLabel: relativeDir });
-    }
-    await mkdir(join(bundledRoot, "skills", "skill-3", "references"), { recursive: true });
-    await writeFile(join(bundledRoot, "skills", "skill-3", "references", "api.md"), "details\n");
-
-    expect(await isFlatSkillCatalog(smallRoot, smallSkills)).toBe(false);
-    expect(await isFlatSkillCatalog(bundledRoot, bundledSkills)).toBe(false);
+    expect(await shouldRecommendRepoMap(smallRoot, smallSkills)).toBe(false);
   });
 
   test("renders a single source line and path-only intent rows", async () => {

@@ -58,14 +58,14 @@ If repo-level and skill-level favorites for the same repo are both selected, tre
 
 Repo maps are project-local synthetic skills for broad catalogs. They keep one visible skill folder and route to upstream source files with `ctx read github://owner/repo/<path>`.
 
-Use a map when the user wants coverage from a repo that has many small skills and no obvious single target. Do not install dozens of single-file skills just because the repo exposes them separately.
+Use a map when the user wants coverage from a repo that has multiple skills and no obvious single target. Do not install a pile of separate skills just because the repo exposes them separately.
 
-The CLI automatically treats a repo as a flat catalog when it has at least six skills and every discovered skill folder is only a single `SKILL.md` after ignoring trivial files such as `README.md`, `LICENSE`, and `.DS_Store`.
+The CLI recommends a repo map when a repo-level project install discovers more than three skills.
 
 When that detector matches:
 
 - project-local `skill add owner/repo` and `skill install owner/repo` recommend a map before individual selection in TTY sessions
-- non-interactive project installs default to a map instead of failing on a long multiselect
+- non-interactive project installs default to a map instead of failing on a multiselect
 - explicit selectors such as `owner/repo/skill` or `--skill skill-a` still install concrete skills
 - `--global` does not auto-recommend maps
 
@@ -85,7 +85,7 @@ Do not start with `find` if the favorites already contain a good match.
 - Start from `skill --schema` for command discovery, then use normal CLI commands directly.
 - `skill favorite list --json` is optional. Use it only when structured output is genuinely useful for piping or external processing.
 - `skill favorite pick` is an interactive flow. Use it only when prompt-driven selection is acceptable in the current session.
-- `skill add owner/repo` without explicit `--skill` may prompt, but flat catalogs auto-map in non-interactive project-local installs.
+- `skill add owner/repo` without explicit `--skill` may prompt, but repos with more than three skills auto-map in non-interactive project-local installs.
 
 ## Maintenance Commands
 
