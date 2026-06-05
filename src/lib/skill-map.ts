@@ -22,6 +22,19 @@ export async function writeProjectSkillMap(options: {
   cwd: string;
   repo: RepoRef;
 }): Promise<{ installRoot: string; mappedSkills: SkillCandidate[] }> {
+  const repoDescription = await fetchRepoDescription(options.repo).catch(() => "");
+  return writeProjectSkillMapFromClone({
+    ...options,
+    repoDescription,
+  });
+}
+
+export async function writeProjectSkillMapFromClone(options: {
+  cloneDir: string;
+  cwd: string;
+  repo: RepoRef;
+  repoDescription: string;
+}): Promise<{ installRoot: string; mappedSkills: SkillCandidate[] }> {
   const cloneDir = options.cloneDir;
   const repo = options.repo;
   const mappedSkills = await discoverSkills(cloneDir);
@@ -29,12 +42,11 @@ export async function writeProjectSkillMap(options: {
     throw new Error(`No SKILL.md files found in ${repo.display}.`);
   }
 
-  const repoDescription = await fetchRepoDescription(repo).catch(() => "");
   const installRoot = getVisibleMapRoot("local", options.cwd, repo);
   const contents = await renderSkillMap({
     cloneDir,
     repo,
-    repoDescription,
+    repoDescription: options.repoDescription,
     skills: mappedSkills,
   });
 

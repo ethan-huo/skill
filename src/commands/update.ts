@@ -16,6 +16,7 @@ import {
   hasProjectManifest,
   pruneProjectManifestSkills,
   removeProjectSkillLinks,
+  syncProjectMaps,
   syncProjectSkillLinks,
 } from "../lib/project-skills";
 import { parseRepoRef } from "../lib/repo-ref";
@@ -28,7 +29,13 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
   const sourceRepos = await listSourceRepos();
 
   if (sourceRepos.length === 0) {
-    console.log(fmt.info("No shared source skills are cached."));
+    const syncedMaps = input.global ? [] : await syncProjectMaps(process.cwd());
+    if (syncedMaps.length === 0) {
+      console.log(fmt.info("No shared source skills are cached."));
+      return;
+    }
+
+    printSyncedMaps(syncedMaps);
     return;
   }
 
@@ -56,6 +63,10 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
     });
 
     printDiff(diff);
+  }
+
+  if (!input.global) {
+    printSyncedMaps(await syncProjectMaps(process.cwd()));
   }
 }
 
@@ -218,5 +229,12 @@ function printDiff(diff: ReturnType<typeof diffSkillSets>): void {
 
   for (const skill of diff.added) {
     console.log(fmt.green(`  + ${skill} (available, not installed)`));
+  }
+}
+
+function printSyncedMaps(maps: { repoId: string; mappedSkills: number }[]): void {
+  for (const map of maps) {
+    console.log(fmt.info(`${map.repoId} (map)`));
+    console.log(fmt.yellow(`  ~ regenerated ${map.mappedSkills} skill(s)`));
   }
 }

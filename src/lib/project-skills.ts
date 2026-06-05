@@ -23,7 +23,7 @@ import {
   writeProjectManifest,
 } from "./project-manifest";
 import { parseFavoriteRef, parseRepoRef } from "./repo-ref";
-import { writeProjectSkillMap } from "./skill-map";
+import { writeProjectSkillMap, writeProjectSkillMapFromClone } from "./skill-map";
 import type { RepoRef, SkillCandidate } from "../types";
 
 export async function installProjectRepoSkills(options: {
@@ -129,6 +129,51 @@ export async function restoreProjectSkills(cwd: string): Promise<{
   }
 
   return { restored: restored.sort(), missing: missing.sort() };
+}
+
+export async function syncProjectMaps(cwd: string): Promise<
+  {
+    repoId: string;
+    mappedSkills: number;
+  }[]
+> {
+  if (!hasProjectManifest(cwd)) {
+    return [];
+  }
+
+  const manifest = await readProjectManifest(cwd);
+  const syncedMaps: { repoId: string; mappedSkills: number }[] = [];
+
+  for (const repoId of getProjectManifestMapRepos(manifest)) {
+    const repo = parseRepoRef(repoId);
+    const cloneDir = await shallowCloneRepo(repo);
+    const result = await writeProjectSkillMap({ cloneDir, cwd, repo });
+    syncedMaps.push({ repoId, mappedSkills: result.mappedSkills.length });
+  }
+
+  if (syncedMaps.length > 0) {
+    await writeProjectManifest(cwd, manifest);
+  }
+
+  return syncedMaps.sort((left, right) => left.repoId.localeCompare(right.repoId));
+}
+
+export async function syncProjectMapFromClone(options: {
+  cwd: string;
+  repo: RepoRef;
+  cloneDir: string;
+  repoDescription?: string;
+}): Promise<{ repoId: string; mappedSkills: number }> {
+  const result = await writeProjectSkillMapFromClone({
+    cloneDir: options.cloneDir,
+    cwd: options.cwd,
+    repo: options.repo,
+    repoDescription: options.repoDescription ?? "",
+  });
+  return {
+    repoId: `${options.repo.owner}/${options.repo.repo}`,
+    mappedSkills: result.mappedSkills.length,
+  };
 }
 
 export async function syncProjectSkillLinks(options: {

@@ -66,6 +66,7 @@ When that detector matches:
 
 - project-local `skill add owner/repo` and `skill install owner/repo` recommend a map before individual selection in TTY sessions
 - non-interactive project installs default to a map instead of failing on a multiselect
+- project-scope `skill update` regenerates maps recorded in `.agents/skills/manifest.json`
 - explicit selectors such as `owner/repo/skill` or `--skill skill-a` still install concrete skills
 - `--global` does not auto-recommend maps
 

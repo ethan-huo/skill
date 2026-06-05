@@ -1,10 +1,11 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
 import { renderSkillMap, shouldRecommendRepoMap } from "../src/lib/skill-map";
+import { syncProjectMapFromClone } from "../src/lib/project-skills";
 import type { RepoRef, SkillCandidate } from "../src/types";
 
 const repo = {
@@ -15,6 +16,39 @@ const repo = {
 } satisfies RepoRef;
 
 describe("skill map", () => {
+  test("syncs project maps by regenerating the visible map skill", async () => {
+    const root = join(tmpdir(), `skill-map-sync-${crypto.randomUUID()}`);
+    const cloneDir = join(root, "repo");
+    const cwd = join(root, "project");
+    await mkdir(join(cloneDir, "skills", "taste"), { recursive: true });
+    await mkdir(join(cwd, ".agents", "skills", "Owl-Listener.designer-skills.map"), {
+      recursive: true,
+    });
+    await writeFile(
+      join(cloneDir, "skills", "taste", "SKILL.md"),
+      "---\nname: taste\ndescription: Improve visual taste\n---\n",
+    );
+    await writeFile(
+      join(cwd, ".agents", "skills", "Owl-Listener.designer-skills.map", "SKILL.md"),
+      "stale map\n",
+    );
+
+    await syncProjectMapFromClone({
+      cloneDir,
+      cwd,
+      repo,
+      repoDescription: "Design skill collection",
+    });
+
+    const mapContents = await readFile(
+      join(cwd, ".agents", "skills", "Owl-Listener.designer-skills.map", "SKILL.md"),
+      "utf8",
+    );
+    expect(mapContents).toContain("Source: `github://Owl-Listener/designer-skills`");
+    expect(mapContents).toContain("- When Improve visual taste, read `skills/taste/SKILL.md`.");
+    expect(mapContents).not.toContain("stale map");
+  });
+
   test("recommends maps for repositories with four or more skills", async () => {
     const root = join(tmpdir(), `skill-flat-catalog-${crypto.randomUUID()}`);
     const skills: SkillCandidate[] = [];
