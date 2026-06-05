@@ -152,6 +152,7 @@ skill favorite remove owner/repo owner/repo/skill
 - `skill update` updates `~/.agents/.skills/{owner}/{repo}` first; visible global and project roots are reconciled from that shared source cache
 - `skill update` migrates legacy visible aliases such as `{owner}.{repo}.{skill}` and `{owner}.{repo}.map` to the current skill-first aliases
 - project-scope `skill update` removes visible links for upstream skills that disappeared, including stale symlinks whose source target is already gone
+- project-scope `skill remove` removes matching visible aliases and manifest entries; empty repo skill items are pruned
 - `skill remove owner/repo --global` removes that shared source cache and all matching favorite refs, so future `skill update` runs stop tracking the repo
 
 Install roots:

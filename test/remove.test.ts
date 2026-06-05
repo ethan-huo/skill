@@ -1,0 +1,100 @@
+import { lstat, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+
+import { runRemove } from "../src/commands/remove";
+
+const originalCwd = process.cwd();
+
+describe("remove command", () => {
+  beforeEach(() => {
+    process.chdir(originalCwd);
+  });
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+  });
+
+  test("removes a selected project skill from visible links and manifest", async () => {
+    const root = join(tmpdir(), `skill-remove-manifest-${crypto.randomUUID()}`);
+    const sourceRoot = join(root, ".agents", ".skills", "repo", "abc");
+    const visibleRoot = join(root, ".agents", "skills");
+    const firstLink = join(visibleRoot, "a.abc.repo");
+    const secondLink = join(visibleRoot, "b.abc.repo");
+
+    await mkdir(join(sourceRoot, "a"), { recursive: true });
+    await mkdir(join(sourceRoot, "b"), { recursive: true });
+    await mkdir(visibleRoot, { recursive: true });
+    await symlink(join(sourceRoot, "a"), firstLink, "dir");
+    await symlink(join(sourceRoot, "b"), secondLink, "dir");
+    await writeManifest(root, [{ type: "skills", repo: "repo/abc", skills: ["a", "b"] }]);
+
+    process.chdir(root);
+    await runRemove({ input: { repo: ["repo/abc/a"], global: false } });
+
+    expect(await lstat(firstLink).catch(() => null)).toBeNull();
+    expect((await lstat(secondLink)).isSymbolicLink()).toBe(true);
+    expect(await readManifest(root)).toEqual({
+      version: 2,
+      items: [{ type: "skills", repo: "repo/abc", skills: ["b"] }],
+    });
+  });
+
+  test("removes the manifest skills item when the last selected skill is removed", async () => {
+    const root = join(tmpdir(), `skill-remove-last-manifest-${crypto.randomUUID()}`);
+    const sourceRoot = join(root, ".agents", ".skills", "repo", "abc");
+    const visibleRoot = join(root, ".agents", "skills");
+    const skillLink = join(visibleRoot, "a.abc.repo");
+
+    await mkdir(join(sourceRoot, "a"), { recursive: true });
+    await mkdir(visibleRoot, { recursive: true });
+    await symlink(join(sourceRoot, "a"), skillLink, "dir");
+    await writeManifest(root, [{ type: "skills", repo: "repo/abc", skills: ["a"] }]);
+
+    process.chdir(root);
+    await runRemove({ input: { repo: ["repo/abc/a"], global: false } });
+
+    expect(await lstat(skillLink).catch(() => null)).toBeNull();
+    expect(await readManifest(root)).toEqual({ version: 2, items: [] });
+  });
+
+  test("removes repo-level project skill and map manifest items", async () => {
+    const root = join(tmpdir(), `skill-remove-repo-manifest-${crypto.randomUUID()}`);
+    const visibleRoot = join(root, ".agents", "skills");
+
+    await mkdir(join(root, ".agents", ".skills", "repo", "abc", "a"), { recursive: true });
+    await mkdir(visibleRoot, { recursive: true });
+    await symlink(
+      join(root, ".agents", ".skills", "repo", "abc", "a"),
+      join(visibleRoot, "a.abc.repo"),
+      "dir",
+    );
+    await writeManifest(root, [
+      { type: "skills", repo: "repo/abc", skills: ["a"] },
+      { type: "map", repo: "repo/abc" },
+      { type: "skills", repo: "other/repo", skills: ["x"] },
+    ]);
+
+    process.chdir(root);
+    await runRemove({ input: { repo: ["repo/abc"], global: false } });
+
+    expect(await readManifest(root)).toEqual({
+      version: 2,
+      items: [{ type: "skills", repo: "other/repo", skills: ["x"] }],
+    });
+  });
+});
+
+async function writeManifest(root: string, items: unknown[]): Promise<void> {
+  await mkdir(join(root, ".agents", "skills"), { recursive: true });
+  await writeFile(
+    join(root, ".agents", "skills", "manifest.json"),
+    `${JSON.stringify({ version: 2, items }, null, 2)}\n`,
+  );
+}
+
+async function readManifest(root: string): Promise<unknown> {
+  return JSON.parse(await readFile(join(root, ".agents", "skills", "manifest.json"), "utf8"));
+}

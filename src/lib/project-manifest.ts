@@ -121,6 +121,16 @@ export function removeProjectManifestSkillIds(
   return normalizeProjectManifest({ version: 2, items: nextItems });
 }
 
+export function removeProjectManifestRepo(
+  manifest: ProjectManifest,
+  repoId: string,
+): ProjectManifest {
+  return normalizeProjectManifest({
+    version: 2,
+    items: manifest.items.filter((item) => item.repo !== repoId),
+  });
+}
+
 function addSkillIdsToManifest(manifest: ProjectManifest, skillIds: string[]): ProjectManifest {
   const skillRepos = new Set<string>();
   for (const skillId of skillIds) {
