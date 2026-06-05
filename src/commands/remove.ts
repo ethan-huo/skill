@@ -7,6 +7,7 @@ import { pruneEmptyParents, removeInstalledSkill, removeVisibleRepoSkills } from
 import { listInstalledSkills } from "../lib/installed-skills";
 import {
   getInstallScope,
+  getLegacyVisibleSkillRoot,
   getSkillsBaseDir,
   getVisibleRepoDirPrefix,
   getVisibleSkillRoot,
@@ -32,8 +33,12 @@ async function removeRef(ref: string, global: boolean): Promise<void> {
   const targetPath = target.skill
     ? getVisibleSkillRoot(scope, process.cwd(), repo, target.skill)
     : `${skillsBaseDir}/${getVisibleRepoDirPrefix(repo)}*`;
+  const legacyTargetPath = target.skill
+    ? getLegacyVisibleSkillRoot(scope, process.cwd(), repo, target.skill)
+    : null;
   const removed = target.skill
-    ? await removeInstalledSkill(targetPath)
+    ? (await removeInstalledSkill(targetPath)) ||
+      (legacyTargetPath !== null && (await removeInstalledSkill(legacyTargetPath)))
     : await removeVisibleRepoSkills(skillsBaseDir, repo);
   const removedSource = global && !target.skill ? await removeSourceRepo(repo) : false;
   const removedFavorites = global && !target.skill ? await removeFavoritesForRepo(repo) : [];
@@ -44,7 +49,7 @@ async function removeRef(ref: string, global: boolean): Promise<void> {
 
   await pruneEmptyParents(dirname(targetPath), skillsBaseDir);
   if (target.skill) {
-    console.log(`Removed ${repo.display}/${target.skill} from ${targetPath}`);
+    console.log(`Removed ${repo.display}/${target.skill} from ${skillsBaseDir}`);
     return;
   }
 

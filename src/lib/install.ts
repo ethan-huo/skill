@@ -2,7 +2,12 @@ import { cp, mkdir, mkdtemp, readdir, rename, rm, stat, symlink } from "node:fs/
 import { dirname, join } from "node:path";
 
 import { discoverSkills } from "./discover-skills";
-import { getVisibleRepoDirPrefix, getVisibleSkillDirName } from "./paths";
+import {
+  getLegacyVisibleSkillDirName,
+  getVisibleMapDirName,
+  getVisibleRepoDirPrefix,
+  getVisibleSkillDirName,
+} from "./paths";
 import type { RepoRef, SkillCandidate } from "../types";
 
 export async function replaceInstalledSkills(
@@ -59,6 +64,8 @@ export async function linkInstalledSkills(
   for (const skill of selectedSkills) {
     const sourceDir = join(sourceRoot, skill.relativeDir);
     const destDir = join(targetRoot, getVisibleSkillDirName(repo, skill.relativeDir));
+    const legacyDestDir = join(targetRoot, getLegacyVisibleSkillDirName(repo, skill.relativeDir));
+    await rm(legacyDestDir, { force: true, recursive: true });
     await rm(destDir, { force: true, recursive: true });
     await symlink(sourceDir, destDir, "dir");
   }
@@ -66,11 +73,12 @@ export async function linkInstalledSkills(
 
 export async function removeVisibleRepoSkills(targetRoot: string, repo: RepoRef): Promise<boolean> {
   const entries = await readdir(targetRoot, { withFileTypes: true }).catch(() => []);
-  const prefix = getVisibleRepoDirPrefix(repo);
+  const visibleRepo = getVisibleRepoDirPrefix(repo);
+  const legacyPrefix = `${repo.owner}.${repo.repo}.`;
   let removed = false;
 
   for (const entry of entries) {
-    if (!entry.name.startsWith(prefix)) {
+    if (!isVisibleRepoEntry(entry.name, repo, visibleRepo, legacyPrefix)) {
       continue;
     }
 
@@ -79,6 +87,23 @@ export async function removeVisibleRepoSkills(targetRoot: string, repo: RepoRef)
   }
 
   return removed;
+}
+
+function isVisibleRepoEntry(
+  name: string,
+  repo: RepoRef,
+  visibleRepo: string,
+  legacyPrefix: string,
+): boolean {
+  if (name.startsWith(legacyPrefix)) {
+    return true;
+  }
+
+  if (name === getVisibleMapDirName(repo)) {
+    return true;
+  }
+
+  return name.endsWith(`.${visibleRepo}`);
 }
 
 export async function removeInstalledSkill(targetRoot: string): Promise<boolean> {

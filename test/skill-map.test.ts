@@ -21,17 +21,14 @@ describe("skill map", () => {
     const cloneDir = join(root, "repo");
     const cwd = join(root, "project");
     await mkdir(join(cloneDir, "skills", "taste"), { recursive: true });
-    await mkdir(join(cwd, ".agents", "skills", "Owl-Listener.designer-skills.map"), {
-      recursive: true,
-    });
+    const legacyMapRoot = join(cwd, ".agents", "skills", "Owl-Listener.designer-skills.map");
+    const mapRoot = join(cwd, ".agents", "skills", "map.designer-skills.owl-listener");
+    await mkdir(legacyMapRoot, { recursive: true });
     await writeFile(
       join(cloneDir, "skills", "taste", "SKILL.md"),
       "---\nname: taste\ndescription: Improve visual taste\n---\n",
     );
-    await writeFile(
-      join(cwd, ".agents", "skills", "Owl-Listener.designer-skills.map", "SKILL.md"),
-      "stale map\n",
-    );
+    await writeFile(join(legacyMapRoot, "SKILL.md"), "stale map\n");
 
     await syncProjectMapFromClone({
       cloneDir,
@@ -40,13 +37,11 @@ describe("skill map", () => {
       repoDescription: "Design skill collection",
     });
 
-    const mapContents = await readFile(
-      join(cwd, ".agents", "skills", "Owl-Listener.designer-skills.map", "SKILL.md"),
-      "utf8",
-    );
+    const mapContents = await readFile(join(mapRoot, "SKILL.md"), "utf8");
     expect(mapContents).toContain("Source: `github://Owl-Listener/designer-skills`");
     expect(mapContents).toContain("- When Improve visual taste, read `skills/taste/SKILL.md`.");
     expect(mapContents).not.toContain("stale map");
+    expect(await readFile(join(legacyMapRoot, "SKILL.md"), "utf8").catch(() => null)).toBeNull();
   });
 
   test("recommends maps for repositories with four or more skills", async () => {
@@ -114,7 +109,7 @@ describe("skill map", () => {
     ).toBe(
       [
         "---",
-        'name: "Owl-Listener.designer-skills"',
+        'name: "map.designer-skills.owl-listener"',
         'description: "Design skill collection"',
         "---",
         "",

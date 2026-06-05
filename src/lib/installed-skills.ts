@@ -1,4 +1,4 @@
-import { readdir, stat } from "node:fs/promises";
+import { readdir, readlink, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { getSkillsBaseDir } from "./paths";
@@ -26,12 +26,14 @@ async function listSkillsForScope(scope: InstallScope, baseDir: string): Promise
       continue;
     }
 
-    const parsed = parseVisibleSkillDirName(entry.name);
+    const installRoot = join(baseDir, entry.name);
+    const parsed =
+      parseSourceSkillLinkTarget(await readlink(installRoot).catch(() => "")) ??
+      parseVisibleSkillDirName(entry.name);
     if (parsed === null) {
       continue;
     }
 
-    const installRoot = join(baseDir, entry.name);
     const skillFile = await stat(join(installRoot, "SKILL.md")).catch(() => null);
     if (!skillFile?.isFile()) {
       continue;
@@ -55,7 +57,49 @@ async function listSkillsForScope(scope: InstallScope, baseDir: string): Promise
   return skills;
 }
 
+function parseSourceSkillLinkTarget(
+  target: string,
+): { owner: string; repo: string; skill: string } | null {
+  const segments = target.split(/[\\/]+/).filter(Boolean);
+  const sourceRootIndex = segments.lastIndexOf(".skills");
+  if (sourceRootIndex < 0 || segments.length < sourceRootIndex + 4) {
+    return null;
+  }
+
+  return {
+    owner: segments[sourceRootIndex + 1]!,
+    repo: segments[sourceRootIndex + 2]!,
+    skill: segments.slice(sourceRootIndex + 3).join("/"),
+  };
+}
+
 function parseVisibleSkillDirName(
+  name: string,
+): { owner: string; repo: string; skill: string } | null {
+  const skillFirst = parseSkillFirstVisibleSkillDirName(name);
+  if (skillFirst !== null) {
+    return skillFirst;
+  }
+
+  return parseLegacyVisibleSkillDirName(name);
+}
+
+function parseSkillFirstVisibleSkillDirName(
+  name: string,
+): { owner: string; repo: string; skill: string } | null {
+  const segments = name.split(".");
+  if (segments.length < 3 || segments.some((segment) => segment.length === 0)) {
+    return null;
+  }
+
+  return {
+    owner: segments.at(-1)!,
+    repo: segments.at(-2)!,
+    skill: segments.slice(0, -2).join("/"),
+  };
+}
+
+function parseLegacyVisibleSkillDirName(
   name: string,
 ): { owner: string; repo: string; skill: string } | null {
   const firstDot = name.indexOf(".");

@@ -9,6 +9,8 @@ import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, upsertInstalledSkills } from "./install";
 import {
   getClaudeSkillRoot,
+  getLegacyVisibleSkillDirName,
+  getLegacyVisibleSkillRoot,
   getSkillsBaseDir,
   getProjectClaudeRoot,
   getSourceInstallRoot,
@@ -202,7 +204,15 @@ export async function removeProjectSkillLinks(
 ): Promise<void> {
   for (const skill of removed) {
     await rm(getVisibleSkillRoot("local", cwd, repo, skill), { force: true, recursive: true });
+    await rm(getLegacyVisibleSkillRoot("local", cwd, repo, skill), {
+      force: true,
+      recursive: true,
+    });
     await rm(getClaudeSkillRoot(getProjectClaudeRoot(cwd), repo, skill), {
+      force: true,
+      recursive: true,
+    });
+    await rm(join(getProjectClaudeRoot(cwd), "skills", getLegacyVisibleSkillDirName(repo, skill)), {
       force: true,
       recursive: true,
     });
@@ -252,7 +262,15 @@ function groupManifestSkills(
 
 async function removeProjectSkill(repo: RepoRef, cwd: string, skill: string): Promise<void> {
   await rm(getVisibleSkillRoot("local", cwd, repo, skill), { force: true, recursive: true });
+  await rm(getLegacyVisibleSkillRoot("local", cwd, repo, skill), {
+    force: true,
+    recursive: true,
+  });
   await rm(getClaudeSkillRoot(getProjectClaudeRoot(cwd), repo, skill), {
+    force: true,
+    recursive: true,
+  });
+  await rm(join(getProjectClaudeRoot(cwd), "skills", getLegacyVisibleSkillDirName(repo, skill)), {
     force: true,
     recursive: true,
   });

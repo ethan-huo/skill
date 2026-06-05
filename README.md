@@ -139,7 +139,8 @@ skill favorite remove owner/repo owner/repo/skill
 - `skill` scans a cloned repository for `SKILL.md`, including `.codex/skills`, while ignoring repo-internal agent config roots such as `.agents`
 - discovered skill IDs are normalized to `{owner}/{repo}/{folder}`
 - `owner/repo/skill` is shorthand for `skill add owner/repo --skill skill`
-- `skill install owner/repo --map` writes `.agents/skills/{owner}.{repo}.map/SKILL.md` with a `ctx read github://owner/repo/<path>` rule and `When ..., read path/SKILL.md` rows
+- visible skill folders use lowercase skill-first aliases: `{skill.path}.{repo}.{owner}` while source IDs remain `{owner}/{repo}/{folder}`
+- `skill install owner/repo --map` writes `.agents/skills/map.{repo}.{owner}/SKILL.md` with a `ctx read github://owner/repo/<path>` rule and `When ..., read path/SKILL.md` rows
 - repo-level project installs recommend a map before individual selection when a repo has more than three discovered skills
 - project-scope `skill update` regenerates map items recorded in `.agents/skills/manifest.json`
 - versionless project manifests are treated as version 1 and rewritten as version 2 repo-scoped items on the next manifest write
@@ -148,14 +149,15 @@ skill favorite remove owner/repo owner/repo/skill
 - project installs link selected skills from `~/.agents/.skills` and record repo-scoped manifest items in `.agents/skills/manifest.json`
 - project-scope `skill add` and `skill install <ref>` share the same install effects
 - `skill update` updates `~/.agents/.skills/{owner}/{repo}` first; visible global and project roots are reconciled from that shared source cache
+- `skill update` migrates legacy visible aliases such as `{owner}.{repo}.{skill}` and `{owner}.{repo}.map` to the current skill-first aliases
 - project-scope `skill update` removes visible links for upstream skills that disappeared, including stale symlinks whose source target is already gone
 - `skill remove owner/repo --global` removes that shared source cache and all matching favorite refs, so future `skill update` runs stop tracking the repo
 
 Install roots:
 
-- local visible links: `{cwd}/.agents/skills/{owner}.{repo}.{skill}/`
-- global visible links: `~/.agents/skills/{owner}.{repo}.{skill}/`
-- local map skills: `{cwd}/.agents/skills/{owner}.{repo}.map/`
+- local visible links: `{cwd}/.agents/skills/{skill.path}.{repo}.{owner}/`
+- global visible links: `~/.agents/skills/{skill.path}.{repo}.{owner}/`
+- local map skills: `{cwd}/.agents/skills/map.{repo}.{owner}/`
 - shared sources: `~/.agents/.skills/{owner}/{repo}/`
 - project manifest: `{cwd}/.agents/skills/manifest.json` stores versioned `skills` and `map` items, not visible link names
 

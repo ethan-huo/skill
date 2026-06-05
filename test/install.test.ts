@@ -49,13 +49,15 @@ describe("install helpers", () => {
   test("removes installed directory trees", async () => {
     const root = join(tmpdir(), `skill-remove-${crypto.randomUUID()}`);
     const target = join(root, ".agents", "skills");
-    await mkdir(join(target, "ethan-huo.agents.cx"), { recursive: true });
-    await mkdir(join(target, "ethan-huo.agents.fp-thinking"), { recursive: true });
+    await mkdir(join(target, "cx.agents.ethan-huo"), { recursive: true });
+    await mkdir(join(target, "fp-thinking.agents.ethan-huo"), { recursive: true });
+    await mkdir(join(target, "ethan-huo.agents.legacy"), { recursive: true });
 
     expect(await removeVisibleRepoSkills(target, repo)).toBe(true);
 
-    expect(await stat(join(target, "ethan-huo.agents.cx")).catch(() => null)).toBeNull();
-    expect(await stat(join(target, "ethan-huo.agents.fp-thinking")).catch(() => null)).toBeNull();
+    expect(await stat(join(target, "cx.agents.ethan-huo")).catch(() => null)).toBeNull();
+    expect(await stat(join(target, "fp-thinking.agents.ethan-huo")).catch(() => null)).toBeNull();
+    expect(await stat(join(target, "ethan-huo.agents.legacy")).catch(() => null)).toBeNull();
   });
 
   test("links visible skills to hidden source skills", async () => {
@@ -77,10 +79,41 @@ describe("install helpers", () => {
     await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
     await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
 
-    expect((await lstat(join(targetRoot, "ethan-huo.agents.cx"))).isSymbolicLink()).toBe(true);
-    expect(await readFile(join(targetRoot, "ethan-huo.agents.cx", "SKILL.md"), "utf8")).toContain(
+    expect((await lstat(join(targetRoot, "cx.agents.ethan-huo"))).isSymbolicLink()).toBe(true);
+    expect(await readFile(join(targetRoot, "cx.agents.ethan-huo", "SKILL.md"), "utf8")).toContain(
       "name: cx",
     );
+  });
+
+  test("links nested skill paths with skill-first package names and removes legacy aliases", async () => {
+    const root = join(tmpdir(), `skill-link-nested-${crypto.randomUUID()}`);
+    const repoDir = join(root, "repo");
+    const sourceRoot = join(root, ".agents", ".skills", "ethan-huo", "agents");
+    const targetRoot = join(root, ".agents", "skills");
+    const selectedSkills = [
+      {
+        relativeDir: "design/taste",
+        sourceDir: "skills/design/taste",
+        displayLabel: "design/taste",
+      },
+    ];
+
+    await mkdir(join(repoDir, "skills", "design", "taste"), { recursive: true });
+    await mkdir(join(targetRoot, "ethan-huo.agents.design/taste"), { recursive: true });
+    await writeFile(
+      join(repoDir, "skills", "design", "taste", "SKILL.md"),
+      "---\nname: taste\n---\n",
+    );
+
+    await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
+    await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
+
+    expect((await lstat(join(targetRoot, "design.taste.agents.ethan-huo"))).isSymbolicLink()).toBe(
+      true,
+    );
+    expect(
+      await stat(join(targetRoot, "ethan-huo.agents.design", "taste")).catch(() => null),
+    ).toBeNull();
   });
 
   test("lists one-level visible skill links by upstream IDs", async () => {
@@ -113,14 +146,14 @@ describe("install helpers", () => {
       name: "cx",
       description: "CX helper",
       scope: "local",
-      installRoot: join(targetRoot, "ethan-huo.agents.cx"),
+      installRoot: join(targetRoot, "cx.agents.ethan-huo"),
     });
   });
 
   test("removes one installed skill without touching siblings", async () => {
     const root = join(tmpdir(), `skill-remove-one-${crypto.randomUUID()}`);
-    const target = join(root, "ethan-huo.agents.cx");
-    const sibling = join(root, "ethan-huo.agents.fp-thinking");
+    const target = join(root, "cx.agents.ethan-huo");
+    const sibling = join(root, "fp-thinking.agents.ethan-huo");
     await mkdir(target, { recursive: true });
     await mkdir(sibling, { recursive: true });
 
@@ -133,7 +166,7 @@ describe("install helpers", () => {
   test("prunes empty owner directories", async () => {
     const root = join(tmpdir(), `skill-prune-${crypto.randomUUID()}`);
     const baseDir = join(root, ".agents", "skills");
-    const target = join(baseDir, "ethan-huo.agents.cx");
+    const target = join(baseDir, "cx.agents.ethan-huo");
     await mkdir(target, { recursive: true });
 
     expect(await removeInstalledSkill(target)).toBe(true);

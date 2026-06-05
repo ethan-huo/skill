@@ -16,15 +16,23 @@ export function getSkillsBaseDir(scope: InstallScope, cwd: string): string {
 }
 
 export function getVisibleSkillDirName(repo: RepoRef, skill: string): string {
-  return `${repo.owner}.${repo.repo}.${skill}`;
+  return `${normalizeSkillPath(skill)}.${normalizeSegment(repo.repo)}.${normalizeSegment(repo.owner)}`;
 }
 
 export function getVisibleMapDirName(repo: RepoRef): string {
+  return `map.${normalizeSegment(repo.repo)}.${normalizeSegment(repo.owner)}`;
+}
+
+export function getLegacyVisibleSkillDirName(repo: RepoRef, skill: string): string {
+  return `${repo.owner}.${repo.repo}.${skill}`;
+}
+
+export function getLegacyVisibleMapDirName(repo: RepoRef): string {
   return `${repo.owner}.${repo.repo}.map`;
 }
 
 export function getVisibleRepoDirPrefix(repo: RepoRef): string {
-  return `${repo.owner}.${repo.repo}.`;
+  return `${normalizeSegment(repo.repo)}.${normalizeSegment(repo.owner)}`;
 }
 
 export function getVisibleSkillRoot(
@@ -38,6 +46,19 @@ export function getVisibleSkillRoot(
 
 export function getVisibleMapRoot(scope: InstallScope, cwd: string, repo: RepoRef): string {
   return join(getSkillsBaseDir(scope, cwd), getVisibleMapDirName(repo));
+}
+
+export function getLegacyVisibleSkillRoot(
+  scope: InstallScope,
+  cwd: string,
+  repo: RepoRef,
+  skill: string,
+): string {
+  return join(getSkillsBaseDir(scope, cwd), getLegacyVisibleSkillDirName(repo, skill));
+}
+
+export function getLegacyVisibleMapRoot(scope: InstallScope, cwd: string, repo: RepoRef): string {
+  return join(getSkillsBaseDir(scope, cwd), getLegacyVisibleMapDirName(repo));
 }
 
 export function getSourceSkillsBaseDir(): string {
@@ -62,4 +83,15 @@ export function getClaudeSkillRoot(claudeRoot: string, repo: RepoRef, skill: str
 
 export function getProjectManifestPath(cwd: string): string {
   return join(cwd, ".agents", "skills", "manifest.json");
+}
+
+function normalizeSkillPath(skill: string): string {
+  return skill
+    .split("/")
+    .map((segment) => normalizeSegment(segment))
+    .join(".");
+}
+
+function normalizeSegment(segment: string): string {
+  return segment.toLowerCase();
 }

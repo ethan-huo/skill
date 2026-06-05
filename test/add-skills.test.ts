@@ -110,7 +110,7 @@ describe("add skills", () => {
       sourceRoot,
     });
 
-    expect(installRoots).toEqual([join(claudeRoot, "skills", "ethan-huo.agents.cx")]);
+    expect(installRoots).toEqual([join(claudeRoot, "skills", "cx.agents.ethan-huo")]);
     expect((await lstat(installRoots![0]!)).isSymbolicLink()).toBe(true);
     expect(await readFile(join(installRoots![0]!, "SKILL.md"), "utf8")).toContain("name: cx");
   });
@@ -140,11 +140,12 @@ describe("add skills", () => {
       expect(
         (await lstat(getVisibleSkillRoot("global", root, isolatedRepo, "cx"))).isSymbolicLink(),
       ).toBe(true);
-      expect(
-        await stat(getClaudeSkillRoot(getClaudeRoot(), isolatedRepo, "cx")).catch(() => null),
-      ).toBeNull();
     } finally {
       await rm(getVisibleSkillRoot("global", root, isolatedRepo, "cx"), {
+        force: true,
+        recursive: true,
+      });
+      await rm(getClaudeSkillRoot(getClaudeRoot(), isolatedRepo, "cx"), {
         force: true,
         recursive: true,
       });
@@ -183,7 +184,7 @@ describe("add skills", () => {
         ).isSymbolicLink(),
       ).toBe(true);
       expect(
-        await stat(join(projectRoot, ".claude", "skills", `${isolatedRepo.owner}.agents.cx`)).catch(
+        await stat(join(projectRoot, ".claude", "skills", `cx.agents.${isolatedRepo.owner}`)).catch(
           () => null,
         ),
       ).toBeNull();
@@ -231,7 +232,7 @@ describe("add skills", () => {
       sourceRoot,
     });
 
-    expect(installRoots).toEqual([join(projectRoot, ".claude", "skills", "ethan-huo.agents.cx")]);
+    expect(installRoots).toEqual([join(projectRoot, ".claude", "skills", "cx.agents.ethan-huo")]);
     expect((await lstat(installRoots![0]!)).isSymbolicLink()).toBe(true);
     expect(await readFile(join(installRoots![0]!, "SKILL.md"), "utf8")).toContain("name: cx");
   });

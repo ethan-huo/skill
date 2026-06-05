@@ -27,7 +27,7 @@ describe("source skills", () => {
     await writeFile(join(sourceRoot, "old-skill", "SKILL.md"), "---\nname: old-skill\n---\n");
 
     await mkdir(visibleRoot, { recursive: true });
-    await symlink(join(sourceRoot, "cx"), join(visibleRoot, "ethan-huo.agents.cx"), "dir");
+    await symlink(join(sourceRoot, "cx"), join(visibleRoot, "cx.agents.ethan-huo"), "dir");
 
     const diff = await updateSourceRepo({
       cloneDir,
@@ -42,7 +42,7 @@ describe("source skills", () => {
     expect(await readFile(join(sourceRoot, "cx", "SKILL.md"), "utf8")).toContain("new");
     expect(await stat(join(sourceRoot, "old-skill")).catch(() => null)).toBeNull();
     expect(await stat(join(sourceRoot, "new-skill")).catch(() => null)).toBeNull();
-    expect((await lstat(join(visibleRoot, "ethan-huo.agents.cx"))).isSymbolicLink()).toBe(true);
+    expect((await lstat(join(visibleRoot, "cx.agents.ethan-huo"))).isSymbolicLink()).toBe(true);
   });
 
   test("removes a hidden source repo and prunes empty owner directories", async () => {

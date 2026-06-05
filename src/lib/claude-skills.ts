@@ -1,7 +1,7 @@
 import { mkdir, rm, stat, symlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { getClaudeSkillRoot } from "./paths";
+import { getClaudeSkillRoot, getLegacyVisibleSkillDirName } from "./paths";
 import type { RepoRef, SkillCandidate } from "../types";
 
 export async function linkClaudeSkillsIfAvailable(options: {
@@ -18,7 +18,13 @@ export async function linkClaudeSkillsIfAvailable(options: {
   const installRoots: string[] = [];
   for (const skill of options.selectedSkills) {
     const installRoot = getClaudeSkillRoot(options.claudeRoot, options.repo, skill.relativeDir);
+    const legacyInstallRoot = join(
+      options.claudeRoot,
+      "skills",
+      getLegacyVisibleSkillDirName(options.repo, skill.relativeDir),
+    );
     await mkdir(dirname(installRoot), { recursive: true });
+    await rm(legacyInstallRoot, { force: true, recursive: true });
     await rm(installRoot, { force: true, recursive: true });
     await symlink(join(options.sourceRoot, skill.relativeDir), installRoot, "dir");
     installRoots.push(installRoot);
