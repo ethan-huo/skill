@@ -122,7 +122,19 @@ export function removeProjectManifestSkillIds(
 }
 
 function addSkillIdsToManifest(manifest: ProjectManifest, skillIds: string[]): ProjectManifest {
-  const nextItems = [...manifest.items];
+  const skillRepos = new Set<string>();
+  for (const skillId of skillIds) {
+    const favorite = parseFavoriteRef(skillId);
+    if (!favorite.skill) {
+      throw new Error(`Project skill manifest entry must use owner/repo/skill: ${skillId}`);
+    }
+
+    skillRepos.add(`${favorite.owner}/${favorite.repo}`);
+  }
+
+  const nextItems = manifest.items.filter(
+    (item) => item.type !== "map" || !skillRepos.has(item.repo),
+  );
   for (const skillId of skillIds) {
     const favorite = parseFavoriteRef(skillId);
     if (!favorite.skill) {
@@ -145,13 +157,11 @@ function addSkillIdsToManifest(manifest: ProjectManifest, skillIds: string[]): P
 }
 
 function addMapToManifest(manifest: ProjectManifest, repoId: string): ProjectManifest {
-  if (manifest.items.some((item) => item.type === "map" && item.repo === repoId)) {
-    return normalizeProjectManifest(manifest);
-  }
+  const nextItems = manifest.items.filter((item) => item.repo !== repoId);
 
   return normalizeProjectManifest({
     version: 2,
-    items: [...manifest.items, { type: "map", repo: repoId }],
+    items: [...nextItems, { type: "map", repo: repoId }],
   });
 }
 
@@ -166,6 +176,11 @@ function normalizeProjectManifest(manifest: ProjectManifest): ProjectManifest {
   for (const item of manifest.items) {
     if (item.type === "map") {
       maps.add(item.repo);
+      skillsByRepo.delete(item.repo);
+      continue;
+    }
+
+    if (maps.has(item.repo)) {
       continue;
     }
 

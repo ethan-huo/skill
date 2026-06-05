@@ -1,8 +1,18 @@
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
+
 import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
-import { linkInstalledSkills, upsertInstalledSkills } from "./install";
+import { linkInstalledSkills, removeVisibleRepoSkills, upsertInstalledSkills } from "./install";
 import { listInstalledSkills } from "./installed-skills";
-import { getSkillsBaseDir, getInstallScope, getSourceInstallRoot } from "./paths";
+import {
+  getLegacyVisibleMapRoot,
+  getSkillsBaseDir,
+  getInstallScope,
+  getProjectClaudeRoot,
+  getSourceInstallRoot,
+  getVisibleMapRoot,
+} from "./paths";
 import { addProjectManifestMap, addProjectManifestSkills } from "./project-manifest";
 import { selectOne } from "./prompt";
 import { selectSkills } from "./select-skills";
@@ -39,6 +49,8 @@ export async function installRepoSkills(options: {
   const installRoot = getSkillsBaseDir(scope, options.cwd);
 
   if (selectedMode === "map") {
+    await removeVisibleRepoSkills(installRoot, options.repo);
+    await removeVisibleRepoSkills(join(getProjectClaudeRoot(options.cwd), "skills"), options.repo);
     const result = await writeProjectSkillMap({
       cloneDir,
       cwd: options.cwd,
@@ -134,6 +146,7 @@ export async function installLocalProjectSkills(options: {
   const sourceRoot = getSourceInstallRoot(options.repo);
   const installRoot = getSkillsBaseDir("local", options.cwd);
   await upsertInstalledSkills(options.cloneDir, sourceRoot, options.selectedSkills);
+  await removeProjectMapAliases(options.cwd, options.repo);
   await linkInstalledSkills(sourceRoot, installRoot, options.repo, options.selectedSkills);
   await addProjectManifestSkills(
     options.cwd,
@@ -143,6 +156,11 @@ export async function installLocalProjectSkills(options: {
   );
 
   return { installRoot };
+}
+
+async function removeProjectMapAliases(cwd: string, repo: RepoRef): Promise<void> {
+  await rm(getVisibleMapRoot("local", cwd, repo), { force: true, recursive: true });
+  await rm(getLegacyVisibleMapRoot("local", cwd, repo), { force: true, recursive: true });
 }
 
 export function getConflictingGlobalSkillIds(

@@ -6,7 +6,7 @@ import { installLocalProjectSkills, type RepoInstallResult, selectRepoSkills } f
 import { linkClaudeSkillsIfAvailable } from "./claude-skills";
 import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
-import { linkInstalledSkills, upsertInstalledSkills } from "./install";
+import { linkInstalledSkills, removeVisibleRepoSkills, upsertInstalledSkills } from "./install";
 import {
   getClaudeSkillRoot,
   getLegacyVisibleSkillDirName,
@@ -39,6 +39,7 @@ export async function installProjectRepoSkills(options: {
     global: false,
   });
   if (selectedMode === "map") {
+    await removeProjectRepoSkillAliases(options.cwd, options.repo);
     const result = await writeProjectSkillMap({
       cloneDir,
       cwd: options.cwd,
@@ -63,6 +64,7 @@ export async function installProjectRepoMap(options: {
   repo: RepoRef;
 }): Promise<{ installRoot: string; mappedSkills: SkillCandidate[] }> {
   const cloneDir = await shallowCloneRepo(options.repo);
+  await removeProjectRepoSkillAliases(options.cwd, options.repo);
   const result = await writeProjectSkillMap({
     cloneDir,
     cwd: options.cwd,
@@ -275,6 +277,11 @@ async function removeProjectSkill(repo: RepoRef, cwd: string, skill: string): Pr
     recursive: true,
   });
   await rm(join(getSourceInstallRoot(repo), skill), { force: true, recursive: true });
+}
+
+async function removeProjectRepoSkillAliases(cwd: string, repo: RepoRef): Promise<void> {
+  await removeVisibleRepoSkills(getSkillsBaseDir("local", cwd), repo);
+  await removeVisibleRepoSkills(join(getProjectClaudeRoot(cwd), "skills"), repo);
 }
 
 async function linkProjectClaudeSkillsIfAvailable(

@@ -49,4 +49,32 @@ describe("project manifest", () => {
     expect(raw).toContain('"version": 2');
     expect(raw).toContain('"items"');
   });
+
+  test("keeps repo skill installs and map installs mutually exclusive", async () => {
+    const root = join(tmpdir(), `skill-project-manifest-exclusive-${crypto.randomUUID()}`);
+
+    await addProjectManifestSkills(root, [
+      "Owl-Listener/designer-skills/color-system",
+      "Owl-Listener/designer-skills/design-brief",
+    ]);
+    await addProjectManifestMap(root, "Owl-Listener/designer-skills");
+
+    expect(await readProjectManifest(root)).toEqual({
+      version: 2,
+      items: [{ type: "map", repo: "Owl-Listener/designer-skills" }],
+    });
+
+    await addProjectManifestSkills(root, ["Owl-Listener/designer-skills/color-system"]);
+
+    expect(await readProjectManifest(root)).toEqual({
+      version: 2,
+      items: [
+        {
+          type: "skills",
+          repo: "Owl-Listener/designer-skills",
+          skills: ["color-system"],
+        },
+      ],
+    });
+  });
 });

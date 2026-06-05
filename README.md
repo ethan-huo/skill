@@ -142,6 +142,7 @@ skill favorite remove owner/repo owner/repo/skill
 - visible skill folders use lowercase skill-first aliases: `{skill.path}.{repo}.{owner}` while source IDs remain `{owner}/{repo}/{folder}`
 - `skill install owner/repo --map` writes `.agents/skills/map.{repo}.{owner}/SKILL.md` with a `ctx read github://owner/repo/<path>` rule and `When ..., read path/SKILL.md` rows
 - repo-level project installs recommend a map before individual selection when a repo has more than three discovered skills
+- repo maps and selected skill installs are mutually exclusive per repo; installing one mode removes the other mode from the manifest and visible aliases
 - project-scope `skill update` regenerates map items recorded in `.agents/skills/manifest.json`
 - versionless project manifests are treated as version 1 and rewritten as version 2 repo-scoped items on the next manifest write
 - repeated installs reuse shallow clone caches keyed by the remote `HEAD` hash
