@@ -1,34 +1,21 @@
 import { mkdir, rm, stat, symlink } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import { getClaudeSkillRoot, getLegacyVisibleSkillDirName } from "./paths";
-import type { RepoRef, SkillCandidate } from "../types";
+import { getSkillsBaseDir, getProjectClaudeRoot } from "./paths";
 
-export async function linkClaudeSkillsIfAvailable(options: {
-  claudeRoot: string;
-  repo: RepoRef;
-  sourceRoot: string;
-  selectedSkills: SkillCandidate[];
-}): Promise<string[] | null> {
-  const claudeRoot = await stat(options.claudeRoot).catch(() => null);
-  if (!claudeRoot?.isDirectory()) {
-    return null;
+export async function ensureProjectClaudeSkillsLink(cwd: string): Promise<string> {
+  const agentsSkillsRoot = getSkillsBaseDir("local", cwd);
+  const claudeRoot = getProjectClaudeRoot(cwd);
+  const claudeSkillsRoot = join(claudeRoot, "skills");
+  const existingTarget = await stat(claudeSkillsRoot).catch(() => null);
+  if (existingTarget?.isDirectory()) {
+    return claudeSkillsRoot;
   }
 
-  const installRoots: string[] = [];
-  for (const skill of options.selectedSkills) {
-    const installRoot = getClaudeSkillRoot(options.claudeRoot, options.repo, skill.relativeDir);
-    const legacyInstallRoot = join(
-      options.claudeRoot,
-      "skills",
-      getLegacyVisibleSkillDirName(options.repo, skill.relativeDir),
-    );
-    await mkdir(dirname(installRoot), { recursive: true });
-    await rm(legacyInstallRoot, { force: true, recursive: true });
-    await rm(installRoot, { force: true, recursive: true });
-    await symlink(join(options.sourceRoot, skill.relativeDir), installRoot, "dir");
-    installRoots.push(installRoot);
-  }
-
-  return installRoots;
+  await mkdir(agentsSkillsRoot, { recursive: true });
+  await mkdir(claudeRoot, { recursive: true });
+  await rm(claudeSkillsRoot, { force: true, recursive: true });
+  // Keep project checkouts relocatable; .claude/skills should be an entrypoint, not a second root.
+  await symlink("../.agents/skills", claudeSkillsRoot, "dir");
+  return claudeSkillsRoot;
 }

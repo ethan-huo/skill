@@ -1,6 +1,6 @@
 import { rm } from "node:fs/promises";
-import { join } from "node:path";
 
+import { ensureProjectClaudeSkillsLink } from "./claude-skills";
 import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, removeVisibleRepoSkills, upsertInstalledSkills } from "./install";
@@ -9,7 +9,6 @@ import {
   getLegacyVisibleMapRoot,
   getSkillsBaseDir,
   getInstallScope,
-  getProjectClaudeRoot,
   getSourceInstallRoot,
   getVisibleMapRoot,
 } from "./paths";
@@ -50,12 +49,12 @@ export async function installRepoSkills(options: {
 
   if (selectedMode === "map") {
     await removeVisibleRepoSkills(installRoot, options.repo);
-    await removeVisibleRepoSkills(join(getProjectClaudeRoot(options.cwd), "skills"), options.repo);
     const result = await writeProjectSkillMap({
       cloneDir,
       cwd: options.cwd,
       repo: options.repo,
     });
+    await ensureProjectClaudeSkillsLink(options.cwd);
     await addProjectManifestMap(options.cwd, `${options.repo.owner}/${options.repo.repo}`);
     return { kind: "map", installRoot: result.installRoot, mappedSkills: result.mappedSkills };
   }
@@ -148,6 +147,7 @@ export async function installLocalProjectSkills(options: {
   await upsertInstalledSkills(options.cloneDir, sourceRoot, options.selectedSkills);
   await removeProjectMapAliases(options.cwd, options.repo);
   await linkInstalledSkills(sourceRoot, installRoot, options.repo, options.selectedSkills);
+  await ensureProjectClaudeSkillsLink(options.cwd);
   await addProjectManifestSkills(
     options.cwd,
     options.selectedSkills.map(

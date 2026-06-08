@@ -69,16 +69,8 @@ export function getSourceInstallRoot(repo: Pick<RepoRef, "owner" | "repo">): str
   return join(getSourceSkillsBaseDir(), repo.owner, repo.repo);
 }
 
-export function getClaudeRoot(): string {
-  return join(homedir(), ".claude");
-}
-
 export function getProjectClaudeRoot(cwd: string): string {
   return join(cwd, ".claude");
-}
-
-export function getClaudeSkillRoot(claudeRoot: string, repo: RepoRef, skill: string): string {
-  return join(claudeRoot, "skills", getVisibleSkillDirName(repo, skill));
 }
 
 export function getProjectManifestPath(cwd: string): string {

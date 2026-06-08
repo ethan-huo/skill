@@ -3,16 +3,13 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { installLocalProjectSkills, type RepoInstallResult, selectRepoSkills } from "./add-skills";
-import { linkClaudeSkillsIfAvailable } from "./claude-skills";
+import { ensureProjectClaudeSkillsLink } from "./claude-skills";
 import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, removeVisibleRepoSkills, upsertInstalledSkills } from "./install";
 import {
-  getClaudeSkillRoot,
-  getLegacyVisibleSkillDirName,
   getLegacyVisibleSkillRoot,
   getSkillsBaseDir,
-  getProjectClaudeRoot,
   getSourceInstallRoot,
   getVisibleSkillRoot,
 } from "./paths";
@@ -45,6 +42,7 @@ export async function installProjectRepoSkills(options: {
       cwd: options.cwd,
       repo: options.repo,
     });
+    await ensureProjectClaudeSkillsLink(options.cwd);
     await addProjectManifestMap(options.cwd, `${options.repo.owner}/${options.repo.repo}`);
     return { kind: "map", installRoot: result.installRoot, mappedSkills: result.mappedSkills };
   }
@@ -70,6 +68,7 @@ export async function installProjectRepoMap(options: {
     cwd: options.cwd,
     repo: options.repo,
   });
+  await ensureProjectClaudeSkillsLink(options.cwd);
   await addProjectManifestMap(options.cwd, `${options.repo.owner}/${options.repo.repo}`);
   return result;
 }
@@ -83,6 +82,7 @@ export async function restoreProjectSkills(cwd: string): Promise<{
   const restored: string[] = [];
   const missing: string[] = [];
   let manifestWritten = false;
+  await ensureProjectClaudeSkillsLink(cwd);
 
   for (const group of groups.values()) {
     const repo = parseRepoRef(`${group.owner}/${group.repo}`);
@@ -108,7 +108,7 @@ export async function restoreProjectSkills(cwd: string): Promise<{
     const installRoot = getSkillsBaseDir("local", cwd);
     await upsertInstalledSkills(cloneDir, sourceRoot, selectedSkills);
     await linkInstalledSkills(sourceRoot, installRoot, repo, selectedSkills);
-    await linkProjectClaudeSkillsIfAvailable(cwd, repo, sourceRoot, selectedSkills);
+    await ensureProjectClaudeSkillsLink(cwd);
 
     for (const skill of selectedSkills) {
       const skillId = `${group.owner}/${group.repo}/${skill.relativeDir}`;
@@ -125,6 +125,7 @@ export async function restoreProjectSkills(cwd: string): Promise<{
     const repo = parseRepoRef(repoId);
     const cloneDir = await shallowCloneRepo(repo);
     const result = await writeProjectSkillMap({ cloneDir, cwd, repo });
+    await ensureProjectClaudeSkillsLink(cwd);
     restored.push(`${repoId} (map: ${result.mappedSkills.length} skills)`);
   }
 
@@ -193,7 +194,7 @@ export async function syncProjectSkillLinks(options: {
 
   if (selectedSkills.length > 0) {
     await linkInstalledSkills(sourceRoot, getSkillsBaseDir("local", cwd), repo, selectedSkills);
-    await linkProjectClaudeSkillsIfAvailable(cwd, repo, sourceRoot, selectedSkills);
+    await ensureProjectClaudeSkillsLink(cwd);
   }
 
   await removeProjectSkillLinks(cwd, repo, removed);
@@ -207,14 +208,6 @@ export async function removeProjectSkillLinks(
   for (const skill of removed) {
     await rm(getVisibleSkillRoot("local", cwd, repo, skill), { force: true, recursive: true });
     await rm(getLegacyVisibleSkillRoot("local", cwd, repo, skill), {
-      force: true,
-      recursive: true,
-    });
-    await rm(getClaudeSkillRoot(getProjectClaudeRoot(cwd), repo, skill), {
-      force: true,
-      recursive: true,
-    });
-    await rm(join(getProjectClaudeRoot(cwd), "skills", getLegacyVisibleSkillDirName(repo, skill)), {
       force: true,
       recursive: true,
     });
@@ -268,34 +261,11 @@ async function removeProjectSkill(repo: RepoRef, cwd: string, skill: string): Pr
     force: true,
     recursive: true,
   });
-  await rm(getClaudeSkillRoot(getProjectClaudeRoot(cwd), repo, skill), {
-    force: true,
-    recursive: true,
-  });
-  await rm(join(getProjectClaudeRoot(cwd), "skills", getLegacyVisibleSkillDirName(repo, skill)), {
-    force: true,
-    recursive: true,
-  });
   await rm(join(getSourceInstallRoot(repo), skill), { force: true, recursive: true });
 }
 
 async function removeProjectRepoSkillAliases(cwd: string, repo: RepoRef): Promise<void> {
   await removeVisibleRepoSkills(getSkillsBaseDir("local", cwd), repo);
-  await removeVisibleRepoSkills(join(getProjectClaudeRoot(cwd), "skills"), repo);
-}
-
-async function linkProjectClaudeSkillsIfAvailable(
-  cwd: string,
-  repo: RepoRef,
-  sourceRoot: string,
-  selectedSkills: SkillCandidate[],
-): Promise<void> {
-  await linkClaudeSkillsIfAvailable({
-    claudeRoot: getProjectClaudeRoot(cwd),
-    repo,
-    selectedSkills,
-    sourceRoot,
-  });
 }
 
 function toProjectCandidates(installedIds: string[], updated: string[]): SkillCandidate[] {

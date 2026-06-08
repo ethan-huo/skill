@@ -1,17 +1,12 @@
-import { rm, stat } from "node:fs/promises";
-import { dirname } from "node:path";
+import { rm } from "node:fs/promises";
 
 import { fmt } from "argc/terminal";
 
+import { ensureProjectClaudeSkillsLink } from "../lib/claude-skills";
 import { shallowCloneRepo } from "../lib/git";
 import { linkInstalledSkills } from "../lib/install";
 import { listInstalledSkills } from "../lib/installed-skills";
-import {
-  getClaudeRoot,
-  getClaudeSkillRoot,
-  getSkillsBaseDir,
-  getVisibleSkillRoot,
-} from "../lib/paths";
+import { getSkillsBaseDir, getVisibleSkillRoot } from "../lib/paths";
 import {
   hasProjectManifest,
   pruneProjectManifestSkills,
@@ -111,7 +106,6 @@ export async function syncVisibleLinks(options: {
 
   if (updated.length > 0) {
     await relinkExistingSkills(repo, "global", cwd, sourceRoot, globalInstalledIds, updated);
-    await relinkClaudeSkills(repo, getClaudeRoot(), sourceRoot, globalInstalledIds, updated);
   }
 
   for (const skill of removed) {
@@ -119,13 +113,13 @@ export async function syncVisibleLinks(options: {
       force: true,
       recursive: true,
     });
-    await removeVisibleClaudeSkill(getClaudeRoot(), repo, skill);
   }
 
   if (input.global) {
     return;
   }
 
+  await ensureProjectClaudeSkillsLink(cwd);
   await removeProjectSkillLinks(cwd, repo, removed);
 
   if (!hasProjectManifest(cwd)) {
@@ -160,46 +154,6 @@ async function relinkExistingSkills(
   }
 
   await linkInstalledSkills(sourceRoot, getSkillsBaseDir(scope, cwd), repo, selectedSkills);
-}
-
-async function relinkClaudeSkills(
-  repo: RepoRef,
-  claudeRoot: string,
-  sourceRoot: string,
-  installedIds: string[],
-  updated: string[],
-): Promise<void> {
-  const existingClaudeRoot = await stat(claudeRoot).catch(() => null);
-  if (!existingClaudeRoot?.isDirectory()) {
-    return;
-  }
-
-  const selectedSkills = toInstalledCandidates(installedIds, updated);
-  if (selectedSkills.length === 0) {
-    return;
-  }
-
-  for (const skill of selectedSkills) {
-    await linkInstalledSkills(
-      sourceRoot,
-      dirname(getClaudeSkillRoot(claudeRoot, repo, skill.relativeDir)),
-      repo,
-      [skill],
-    );
-  }
-}
-
-async function removeVisibleClaudeSkill(
-  claudeRoot: string,
-  repo: RepoRef,
-  skill: string,
-): Promise<void> {
-  const existingClaudeRoot = await stat(claudeRoot).catch(() => null);
-  if (!existingClaudeRoot?.isDirectory()) {
-    return;
-  }
-
-  await rm(getClaudeSkillRoot(claudeRoot, repo, skill), { force: true, recursive: true });
 }
 
 function toInstalledCandidates(installedIds: string[], updated: string[]): SkillCandidate[] {

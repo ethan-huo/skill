@@ -149,6 +149,7 @@ skill favorite remove owner/repo owner/repo/skill
 - local install is blocked only when the selected `{owner}/{repo}/{skill}` is already installed globally
 - project installs link selected skills from `~/.agents/.skills` and record repo-scoped manifest items in `.agents/skills/manifest.json`
 - project-scope `skill add` and `skill install <ref>` share the same install effects
+- project installs ensure `{cwd}/.claude/skills -> ../.agents/skills` unless `{cwd}/.claude/skills` already resolves to a valid directory
 - `skill update` updates `~/.agents/.skills/{owner}/{repo}` first; visible global and project roots are reconciled from that shared source cache
 - `skill update` migrates legacy visible aliases such as `{owner}.{repo}.{skill}` and `{owner}.{repo}.map` to the current skill-first aliases
 - project-scope `skill update` removes visible links for upstream skills that disappeared, including stale symlinks whose source target is already gone

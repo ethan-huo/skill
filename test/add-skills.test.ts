@@ -1,4 +1,4 @@
-import { lstat, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, readlink, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -9,15 +9,8 @@ import {
   installGlobalSkills,
   installLocalProjectSkills,
 } from "../src/lib/add-skills";
-import { linkClaudeSkillsIfAvailable } from "../src/lib/claude-skills";
-import { upsertInstalledSkills } from "../src/lib/install";
-import {
-  getClaudeRoot,
-  getClaudeSkillRoot,
-  getSkillsBaseDir,
-  getSourceInstallRoot,
-  getVisibleSkillRoot,
-} from "../src/lib/paths";
+import { ensureProjectClaudeSkillsLink } from "../src/lib/claude-skills";
+import { getSkillsBaseDir, getSourceInstallRoot, getVisibleSkillRoot } from "../src/lib/paths";
 import type { RepoRef, SkillCandidate } from "../src/types";
 
 const repo = {
@@ -92,27 +85,48 @@ describe("add skills", () => {
     ).toEqual(["ethan-huo/agents/cx"]);
   });
 
-  test("links global installs into claude skills when claude root exists", async () => {
+  test("creates the project claude skills root link when it is absent", async () => {
     const root = join(tmpdir(), `skill-claude-link-${crypto.randomUUID()}`);
-    const repoDir = join(root, "repo");
-    const sourceRoot = join(root, ".agents", ".skills", "ethan-huo", "agents");
-    const claudeRoot = join(root, ".claude");
 
-    await mkdir(join(repoDir, "skills", "cx"), { recursive: true });
-    await mkdir(claudeRoot, { recursive: true });
-    await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\n");
-    await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
+    const claudeSkillsRoot = await ensureProjectClaudeSkillsLink(root);
 
-    const installRoots = await linkClaudeSkillsIfAvailable({
-      claudeRoot,
-      repo,
-      selectedSkills,
-      sourceRoot,
-    });
+    expect(claudeSkillsRoot).toBe(join(root, ".claude", "skills"));
+    expect((await lstat(claudeSkillsRoot)).isSymbolicLink()).toBe(true);
+    expect(await readlink(claudeSkillsRoot)).toBe("../.agents/skills");
+  });
 
-    expect(installRoots).toEqual([join(claudeRoot, "skills", "cx.agents.ethan-huo")]);
-    expect((await lstat(installRoots![0]!)).isSymbolicLink()).toBe(true);
-    expect(await readFile(join(installRoots![0]!, "SKILL.md"), "utf8")).toContain("name: cx");
+  test("skips an existing claude skills directory with a valid real path", async () => {
+    const root = join(tmpdir(), `skill-claude-valid-dir-${crypto.randomUUID()}`);
+    const claudeSkillsRoot = join(root, ".claude", "skills");
+    await mkdir(claudeSkillsRoot, { recursive: true });
+    await writeFile(join(claudeSkillsRoot, "owned.txt"), "keep");
+
+    expect(await ensureProjectClaudeSkillsLink(root)).toBe(claudeSkillsRoot);
+    expect((await lstat(claudeSkillsRoot)).isDirectory()).toBe(true);
+    expect(await readFile(join(claudeSkillsRoot, "owned.txt"), "utf8")).toBe("keep");
+  });
+
+  test("skips an existing claude skills symlink with a valid real path", async () => {
+    const root = join(tmpdir(), `skill-claude-valid-link-${crypto.randomUUID()}`);
+    const target = join(root, "custom-skills");
+    const claudeSkillsRoot = join(root, ".claude", "skills");
+    await mkdir(target, { recursive: true });
+    await mkdir(dirname(claudeSkillsRoot), { recursive: true });
+    await symlink(target, claudeSkillsRoot, "dir");
+
+    expect(await ensureProjectClaudeSkillsLink(root)).toBe(claudeSkillsRoot);
+    expect(await readlink(claudeSkillsRoot)).toBe(target);
+  });
+
+  test("repairs an invalid claude skills symlink to the agents skills root", async () => {
+    const root = join(tmpdir(), `skill-claude-broken-link-${crypto.randomUUID()}`);
+    const claudeSkillsRoot = join(root, ".claude", "skills");
+    await mkdir(dirname(claudeSkillsRoot), { recursive: true });
+    await symlink(join(root, "missing"), claudeSkillsRoot, "dir");
+
+    expect(await ensureProjectClaudeSkillsLink(root)).toBe(claudeSkillsRoot);
+    expect((await lstat(claudeSkillsRoot)).isSymbolicLink()).toBe(true);
+    expect(await readlink(claudeSkillsRoot)).toBe("../.agents/skills");
   });
 
   test("global install effects write hidden source and visible agents links without claude links", async () => {
@@ -145,16 +159,12 @@ describe("add skills", () => {
         force: true,
         recursive: true,
       });
-      await rm(getClaudeSkillRoot(getClaudeRoot(), isolatedRepo, "cx"), {
-        force: true,
-        recursive: true,
-      });
       await rm(getSourceInstallRoot(isolatedRepo), { force: true, recursive: true });
       await rm(dirname(getSourceInstallRoot(isolatedRepo)), { force: true, recursive: true });
     }
   });
 
-  test("project install effects write hidden source links and manifest without claude links", async () => {
+  test("project install effects write hidden source links, manifest, and claude root link", async () => {
     const root = join(tmpdir(), `skill-project-effects-${crypto.randomUUID()}`);
     const repoDir = join(root, "repo");
     const projectRoot = join(root, "project");
@@ -183,11 +193,8 @@ describe("add skills", () => {
           await lstat(getVisibleSkillRoot("local", projectRoot, isolatedRepo, "cx"))
         ).isSymbolicLink(),
       ).toBe(true);
-      expect(
-        await stat(join(projectRoot, ".claude", "skills", `cx.agents.${isolatedRepo.owner}`)).catch(
-          () => null,
-        ),
-      ).toBeNull();
+      expect((await lstat(join(projectRoot, ".claude", "skills"))).isSymbolicLink()).toBe(true);
+      expect(await readlink(join(projectRoot, ".claude", "skills"))).toBe("../.agents/skills");
       expect(
         await readFile(join(projectRoot, ".agents", "skills", "manifest.json"), "utf8"),
       ).toContain(`"repo": "${isolatedRepo.owner}/agents"`);
@@ -195,45 +202,5 @@ describe("add skills", () => {
       await rm(getSourceInstallRoot(isolatedRepo), { force: true, recursive: true });
       await rm(dirname(getSourceInstallRoot(isolatedRepo)), { force: true, recursive: true });
     }
-  });
-
-  test("skips claude links when claude root is absent", async () => {
-    const root = join(tmpdir(), `skill-no-claude-link-${crypto.randomUUID()}`);
-    const sourceRoot = join(root, ".agents", ".skills", "ethan-huo", "agents");
-    const claudeRoot = join(root, ".claude");
-
-    const installRoots = await linkClaudeSkillsIfAvailable({
-      claudeRoot,
-      repo,
-      selectedSkills,
-      sourceRoot,
-    });
-
-    expect(installRoots).toBeNull();
-    expect(await stat(join(claudeRoot, "skills")).catch(() => null)).toBeNull();
-  });
-
-  test("links project installs into project claude skills when project claude root exists", async () => {
-    const root = join(tmpdir(), `skill-project-claude-link-${crypto.randomUUID()}`);
-    const repoDir = join(root, "repo");
-    const sourceRoot = join(root, ".agents", ".skills", "ethan-huo", "agents");
-    const projectRoot = join(root, "project");
-    const claudeRoot = join(projectRoot, ".claude");
-
-    await mkdir(join(repoDir, "skills", "cx"), { recursive: true });
-    await mkdir(claudeRoot, { recursive: true });
-    await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\n");
-    await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
-
-    const installRoots = await linkClaudeSkillsIfAvailable({
-      claudeRoot,
-      repo,
-      selectedSkills,
-      sourceRoot,
-    });
-
-    expect(installRoots).toEqual([join(projectRoot, ".claude", "skills", "cx.agents.ethan-huo")]);
-    expect((await lstat(installRoots![0]!)).isSymbolicLink()).toBe(true);
-    expect(await readFile(join(installRoots![0]!, "SKILL.md"), "utf8")).toContain("name: cx");
   });
 });
