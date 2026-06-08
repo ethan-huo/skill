@@ -2,7 +2,7 @@ import { rm } from "node:fs/promises";
 
 import { fmt } from "argc/terminal";
 
-import { ensureProjectClaudeSkillsLink } from "../lib/claude-skills";
+import { ensureGlobalClaudeSkillsLink, ensureProjectClaudeSkillsLink } from "../lib/claude-skills";
 import { shallowCloneRepo } from "../lib/git";
 import { linkInstalledSkills } from "../lib/install";
 import { listInstalledSkills } from "../lib/installed-skills";
@@ -113,6 +113,10 @@ export async function syncVisibleLinks(options: {
       force: true,
       recursive: true,
     });
+  }
+
+  if (globalInstalledIds.length > 0) {
+    await ensureGlobalClaudeSkillsLink(cwd);
   }
 
   if (input.global) {

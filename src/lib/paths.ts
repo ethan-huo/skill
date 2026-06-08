@@ -73,6 +73,10 @@ export function getProjectClaudeRoot(cwd: string): string {
   return join(cwd, ".claude");
 }
 
+export function getGlobalClaudeRoot(): string {
+  return join(homedir(), ".claude");
+}
+
 export function getProjectManifestPath(cwd: string): string {
   return join(cwd, ".agents", "skills", "manifest.json");
 }

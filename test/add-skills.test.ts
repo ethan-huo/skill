@@ -9,7 +9,7 @@ import {
   installGlobalSkills,
   installLocalProjectSkills,
 } from "../src/lib/add-skills";
-import { ensureProjectClaudeSkillsLink } from "../src/lib/claude-skills";
+import { ensureClaudeSkillsLink, ensureProjectClaudeSkillsLink } from "../src/lib/claude-skills";
 import { getSkillsBaseDir, getSourceInstallRoot, getVisibleSkillRoot } from "../src/lib/paths";
 import type { RepoRef, SkillCandidate } from "../src/types";
 
@@ -129,6 +129,18 @@ describe("add skills", () => {
     expect(await readlink(claudeSkillsRoot)).toBe("../.agents/skills");
   });
 
+  test("uses the same root-link rule for global-style agents and claude roots", async () => {
+    const root = join(tmpdir(), `skill-global-claude-link-${crypto.randomUUID()}`);
+    const claudeSkillsRoot = await ensureClaudeSkillsLink({
+      agentsSkillsRoot: join(root, ".agents", "skills"),
+      claudeRoot: join(root, ".claude"),
+    });
+
+    expect(claudeSkillsRoot).toBe(join(root, ".claude", "skills"));
+    expect((await lstat(claudeSkillsRoot)).isSymbolicLink()).toBe(true);
+    expect(await readlink(claudeSkillsRoot)).toBe("../.agents/skills");
+  });
+
   test("global install effects write hidden source and visible agents links without claude links", async () => {
     const root = join(tmpdir(), `skill-global-effects-${crypto.randomUUID()}`);
     const repoDir = join(root, "repo");
@@ -141,11 +153,16 @@ describe("add skills", () => {
 
     await mkdir(join(repoDir, "skills", "cx"), { recursive: true });
     await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\n");
+    const ensuredClaudeLinks: string[] = [];
 
     try {
       const result = await installGlobalSkills({
         cloneDir: repoDir,
         cwd: root,
+        ensureClaudeSkillsLink: async (cwd) => {
+          ensuredClaudeLinks.push(cwd);
+          return join(root, ".claude", "skills");
+        },
         repo: isolatedRepo,
         selectedSkills,
       });
@@ -154,6 +171,7 @@ describe("add skills", () => {
       expect(
         (await lstat(getVisibleSkillRoot("global", root, isolatedRepo, "cx"))).isSymbolicLink(),
       ).toBe(true);
+      expect(ensuredClaudeLinks).toEqual([root]);
     } finally {
       await rm(getVisibleSkillRoot("global", root, isolatedRepo, "cx"), {
         force: true,

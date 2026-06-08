@@ -1,6 +1,6 @@
 import { rm } from "node:fs/promises";
 
-import { ensureProjectClaudeSkillsLink } from "./claude-skills";
+import { ensureGlobalClaudeSkillsLink, ensureProjectClaudeSkillsLink } from "./claude-skills";
 import { discoverSkills } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, removeVisibleRepoSkills, upsertInstalledSkills } from "./install";
@@ -123,6 +123,7 @@ export async function selectRepoSkills(options: {
 export async function installGlobalSkills(options: {
   cloneDir: string;
   cwd: string;
+  ensureClaudeSkillsLink?: (cwd: string) => Promise<string>;
   repo: RepoRef;
   selectedSkills: SkillCandidate[];
 }): Promise<{ installRoot: string }> {
@@ -130,6 +131,7 @@ export async function installGlobalSkills(options: {
   const installRoot = getSkillsBaseDir("global", options.cwd);
   await upsertInstalledSkills(options.cloneDir, sourceRoot, options.selectedSkills);
   await linkInstalledSkills(sourceRoot, installRoot, options.repo, options.selectedSkills);
+  await (options.ensureClaudeSkillsLink ?? ensureGlobalClaudeSkillsLink)(options.cwd);
 
   return { installRoot };
 }
