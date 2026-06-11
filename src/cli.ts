@@ -5,7 +5,7 @@ import packageJson from "../package.json" with { type: "json" };
 import { runAdd } from "./commands/add";
 import { runFavoriteAdd } from "./commands/favorite/add";
 import { runFavoriteList } from "./commands/favorite/list";
-import { runFavoritePick } from "./commands/favorite/pick";
+import { runFavoriteInstall } from "./commands/favorite/install";
 import { runFavoriteRefresh } from "./commands/favorite/refresh";
 import { runFavoriteRemove } from "./commands/favorite/remove";
 import { runFind } from "./commands/find";
@@ -30,7 +30,7 @@ app.run(
       favorite: {
         add: runFavoriteAdd,
         list: runFavoriteList,
-        pick: runFavoritePick,
+        install: runFavoriteInstall,
         refresh: runFavoriteRefresh,
         remove: runFavoriteRemove,
       },

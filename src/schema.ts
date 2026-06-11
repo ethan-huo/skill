@@ -102,19 +102,20 @@ export const schema = {
         })
         .input(s(v.object({}))),
 
-      pick: c
+      install: c
         .meta({
-          description: "Interactively pick favorite skills and optionally install them.",
+          description: "Install favorites. Without ids, opens an interactive selector (TTY only).",
           examples: [
-            "skill favorite pick",
-            "skill favorite pick --add",
-            "skill favorite pick --add --global",
+            "skill favorite install",
+            "skill favorite install ethan-huo/agents/cx",
+            "skill favorite install ethan-huo/agents --global",
           ],
         })
+        .args("ids...")
         .input(
           s(
             v.object({
-              add: v.optional(v.boolean(), false),
+              ids: v.optional(v.array(v.string()), []),
               global: v.optional(v.boolean(), false),
             }),
           ),

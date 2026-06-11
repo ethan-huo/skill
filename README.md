@@ -53,16 +53,17 @@ Agents should prefer this path over broad search when the user's favorites alrea
 Project installs keep repo-scoped skill and map items in `.agents/skills/manifest.json` and expose
 one-level visible links from the hidden shared source root under `~/.agents/.skills`.
 
-### 2. Interactive user workflow
+### 2. Install from favorites
 
-When a user wants prompt-driven selection instead of explicit install refs:
+Install specific favorites by id, or open an interactive selector when no ids are given:
 
 ```bash
-skill favorite pick
-skill favorite pick --add
+skill favorite install
+skill favorite install ethan-huo/agents/cx
+skill favorite install ethan-huo/agents --global
 ```
 
-`favorite pick --add` merges same-repo selections into one install flow. Repo-level favorites may trigger a second skill-selection prompt when the repo contains multiple skills.
+`favorite install` merges same-repo selections into one install flow. Repo-level favorites may trigger a second skill-selection prompt when the repo contains multiple skills.
 
 ### 3. Search and discovery
 
@@ -122,8 +123,8 @@ skill favorite remove owner/repo owner/repo/skill
 | `skill favorite list`             | Show favorite refs with cached descriptions                        |
 | `skill favorite list --json`      | Machine-readable favorite list                                     |
 | `skill favorite refresh`          | Refresh descriptions and remove upstream refs that no longer exist |
-| `skill favorite pick`             | Interactive favorite selection                                     |
-| `skill favorite pick --add`       | Interactive favorite selection followed by install                 |
+| `skill favorite install`          | Install favorites (interactive selector in TTY, or pass ids)       |
+| `skill favorite install <ids...>` | Install specific favorites by id non-interactively                 |
 
 ### Search And Inventory
 
@@ -202,8 +203,8 @@ If you want an agent to use this tool in new projects, install this skill into t
 ## Operational Notes
 
 - non-interactive installs that match multiple skills must pass explicit `--skill <folder>` selectors
-- `favorite pick` requires a TTY
-- `favorite pick --global` is only valid together with `--add`
+- `favorite install` without ids requires a TTY; in non-TTY environments pass ids explicitly
+- `favorite install --global` installs into the global skill root
 - `favorite add` validates upstream repo existence before writing the favorite
 - `favorite refresh` depends on authenticated `gh` access
 - only `github.com` repositories are supported right now

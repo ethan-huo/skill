@@ -49,8 +49,8 @@ export type FavoriteListInput = {
 
 export type FavoriteRefreshInput = {};
 
-export type FavoritePickInput = {
-  add: boolean;
+export type FavoriteInstallInput = {
+  ids: string[];
   global: boolean;
 };
 
