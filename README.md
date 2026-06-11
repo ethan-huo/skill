@@ -88,6 +88,7 @@ skill remove owner/repo
 skill remove owner/repo/skill
 
 skill favorite refresh
+skill favorite remove
 skill favorite remove owner/repo owner/repo/skill
 ```
 
@@ -119,7 +120,8 @@ skill favorite remove owner/repo owner/repo/skill
 | Command                           | Purpose                                                            |
 | --------------------------------- | ------------------------------------------------------------------ |
 | `skill favorite add <refs...>`    | Save one or more favorite refs                                     |
-| `skill favorite remove <refs...>` | Remove one or more favorite refs                                   |
+| `skill favorite remove`           | Remove favorites with an interactive selector in TTY               |
+| `skill favorite remove <refs...>` | Remove one or more favorite refs non-interactively                 |
 | `skill favorite list`             | Show favorite refs with cached descriptions                        |
 | `skill favorite list --json`      | Machine-readable favorite list                                     |
 | `skill favorite refresh`          | Refresh descriptions and remove upstream refs that no longer exist |
@@ -204,6 +206,7 @@ If you want an agent to use this tool in new projects, install this skill into t
 
 - non-interactive installs that match multiple skills must pass explicit `--skill <folder>` selectors
 - `favorite install` without ids requires a TTY; in non-TTY environments pass ids explicitly
+- `favorite remove` without ids requires a TTY; in non-TTY environments pass ids explicitly
 - `favorite install --global` installs into the global skill root
 - `favorite add` validates upstream repo existence before writing the favorite
 - `favorite refresh` depends on authenticated `gh` access

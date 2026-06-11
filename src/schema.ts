@@ -68,6 +68,7 @@ export const schema = {
         .meta({
           description: "Remove a favorite repository or skill ref.",
           examples: [
+            "skill favorite remove",
             "skill favorite remove ethan-huo/agents",
             "skill favorite remove ethan-huo/agents/cx",
             "skill favorite remove ethan-huo/agents ethan-huo/agents/cx",

@@ -85,7 +85,7 @@ Do not start with `find` if the favorites already contain a good match.
 - Prefer non-interactive commands for agent work.
 - Start from `skill --schema` for command discovery, then use normal CLI commands directly.
 - `skill favorite list --json` is optional. Use it only when structured output is genuinely useful for piping or external processing.
-- `skill favorite pick` is an interactive flow. Use it only when prompt-driven selection is acceptable in the current session.
+- `skill favorite install` and `skill favorite remove` without refs are interactive flows. Use them only when prompt-driven selection is acceptable in the current session.
 - `skill add owner/repo` without explicit `--skill` may prompt, but repos with more than three skills auto-map in non-interactive project-local installs.
 
 ## Maintenance Commands
