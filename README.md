@@ -138,6 +138,7 @@ skill favorite remove owner/repo owner/repo/skill
 
 - `skill` scans a cloned repository for `SKILL.md`, including `.codex/skills`, while ignoring repo-internal agent config roots such as `.agents`
 - discovered skill IDs are normalized to `{owner}/{repo}/{folder}`
+- copied `SKILL.md` files with repairable malformed YAML frontmatter are rewritten with Bun's YAML serializer before entering the shared source cache
 - `owner/repo/skill` is shorthand for `skill add owner/repo --skill skill`
 - visible skill folders use lowercase skill-first aliases: `{skill.path}.{repo}.{owner}` while source IDs remain `{owner}/{repo}/{folder}`
 - `skill install owner/repo --map` writes `.agents/skills/map.{repo}.{owner}/SKILL.md` with a `ctx read github://owner/repo/<path>` rule and `When ..., read path/SKILL.md` rows

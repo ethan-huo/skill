@@ -85,6 +85,47 @@ describe("install helpers", () => {
     );
   });
 
+  test("repairs malformed skill frontmatter while installing source copies", async () => {
+    const root = join(tmpdir(), `skill-repair-${crypto.randomUUID()}`);
+    const repoDir = join(root, "repo");
+    const sourceRoot = join(root, ".agents", ".skills", "builderio", "skills");
+    const selectedSkills = [
+      {
+        relativeDir: "efficient-frontier",
+        sourceDir: "skills/efficient-frontier",
+        displayLabel: "efficient-frontier",
+      },
+    ];
+
+    await mkdir(join(repoDir, "skills", "efficient-frontier"), { recursive: true });
+    await writeFile(
+      join(repoDir, "skills", "efficient-frontier", "SKILL.md"),
+      [
+        "---",
+        "name: efficient-frontier",
+        "description: Apply the same orchestration as `/efficient-fable` to any high-cost frontier model: delegate research",
+        "allowed-tools:",
+        "  - Read",
+        "  - Bash",
+        "---",
+        "",
+        "# Efficient Frontier",
+      ].join("\n"),
+    );
+
+    await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
+
+    const contents = await readFile(join(sourceRoot, "efficient-frontier", "SKILL.md"), "utf8");
+    const frontmatter = /^---\n([\s\S]*?)\n---/.exec(contents)?.[1] ?? "";
+    const parsed = Bun.YAML.parse(frontmatter) as {
+      description?: string;
+      "allowed-tools"?: string[];
+    };
+    expect(parsed.description).toContain("model: delegate research");
+    expect(parsed["allowed-tools"]).toEqual(["Read", "Bash"]);
+    expect(contents).toContain("# Efficient Frontier");
+  });
+
   test("links nested skill paths with skill-first package names and removes legacy aliases", async () => {
     const root = join(tmpdir(), `skill-link-nested-${crypto.randomUUID()}`);
     const repoDir = join(root, "repo");

@@ -45,6 +45,41 @@ describe("source skills", () => {
     expect((await lstat(join(visibleRoot, "cx.agents.ethan-huo"))).isSymbolicLink()).toBe(true);
   });
 
+  test("repairs malformed frontmatter during source updates", async () => {
+    const root = join(tmpdir(), `skill-source-repair-${crypto.randomUUID()}`);
+    const cloneDir = join(root, "clone");
+    const sourceRoot = join(root, ".agents", ".skills", "builderio", "skills");
+
+    await mkdir(join(cloneDir, "skills", "efficient-frontier"), { recursive: true });
+    await writeFile(
+      join(cloneDir, "skills", "efficient-frontier", "SKILL.md"),
+      [
+        "---",
+        "name: efficient-frontier",
+        "description: Use the frontier model only where it matters: delegate bounded work",
+        "---",
+        "",
+        "# Efficient Frontier",
+      ].join("\n"),
+    );
+
+    await mkdir(join(sourceRoot, "efficient-frontier"), { recursive: true });
+    await writeFile(
+      join(sourceRoot, "efficient-frontier", "SKILL.md"),
+      "---\nname: efficient-frontier\n---\nold",
+    );
+
+    await updateSourceRepo({
+      cloneDir,
+      sourceRoot,
+    });
+
+    const contents = await readFile(join(sourceRoot, "efficient-frontier", "SKILL.md"), "utf8");
+    const frontmatter = /^---\n([\s\S]*?)\n---/.exec(contents)?.[1] ?? "";
+    expect(() => Bun.YAML.parse(frontmatter)).not.toThrow();
+    expect(contents).toContain("# Efficient Frontier");
+  });
+
   test("removes a hidden source repo and prunes empty owner directories", async () => {
     const root = join(tmpdir(), `skill-source-remove-${crypto.randomUUID()}`);
     const sourceBase = join(root, ".agents", ".skills");

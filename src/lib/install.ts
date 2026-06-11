@@ -8,6 +8,7 @@ import {
   getVisibleRepoDirPrefix,
   getVisibleSkillDirName,
 } from "./paths";
+import { repairSkillFrontmatterFile } from "./skill-frontmatter-repair";
 import type { RepoRef, SkillCandidate } from "../types";
 
 export async function replaceInstalledSkills(
@@ -27,6 +28,7 @@ export async function replaceInstalledSkills(
       const destDir = join(stagingRoot, skill.relativeDir);
       await mkdir(dirname(destDir), { recursive: true });
       await cp(sourceDir, destDir, { recursive: true });
+      await repairSkillFrontmatterFile(join(destDir, "SKILL.md"));
     }
 
     await rm(targetRoot, { force: true, recursive: true });
@@ -50,6 +52,7 @@ export async function upsertInstalledSkills(
     await mkdir(dirname(destDir), { recursive: true });
     await rm(destDir, { force: true, recursive: true });
     await cp(sourceDir, destDir, { recursive: true });
+    await repairSkillFrontmatterFile(join(destDir, "SKILL.md"));
   }
 }
 
