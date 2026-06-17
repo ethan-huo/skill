@@ -16,7 +16,7 @@ import { addProjectManifestMap, addProjectManifestSkills } from "./project-manif
 import { selectOne } from "./prompt";
 import { selectSkills } from "./select-skills";
 import { shouldRecommendRepoMap, writeProjectSkillMap } from "./skill-map";
-import type { RepoRef, SkillCandidate } from "../types";
+import type { InstallScope, InstalledSkill, RepoRef, SkillCandidate } from "../types";
 
 export type RepoSkillsInstallResult = {
   kind: "skills";
@@ -79,6 +79,7 @@ export async function installRepoSkills(options: {
 }
 
 export async function selectRepoSkills(options: {
+  cwd: string;
   repo: RepoRef;
   selectors: string[];
   initialSelectors?: string[];
@@ -96,10 +97,22 @@ export async function selectRepoSkills(options: {
     throw new Error(`No SKILL.md files found in ${options.repo.display}.`);
   }
 
+  const initialSelectors =
+    options.selectors.length === 0
+      ? mergeInitialSelectors(
+          await getInstalledInitialSelectorsForScope(
+            options.cwd,
+            options.global ?? false,
+            options.repo,
+          ),
+          options.initialSelectors ?? [],
+        )
+      : (options.initialSelectors ?? []);
+
   if (
     !options.global &&
     options.selectors.length === 0 &&
-    (options.initialSelectors ?? []).length === 0 &&
+    initialSelectors.length === 0 &&
     (await shouldRecommendRepoMap(cloneDir, discoveredSkills))
   ) {
     const selectedMode = await selectFlatCatalogInstallMode(
@@ -113,7 +126,7 @@ export async function selectRepoSkills(options: {
 
   const selectedSkills = await selectSkills(options.repo.display, discoveredSkills, {
     selectors: options.selectors,
-    initialSelectors: options.initialSelectors,
+    initialSelectors,
     promptForSelection: options.promptForSelection,
   });
 
@@ -182,6 +195,37 @@ export function getConflictingGlobalSkillIds(
     )
     .map((skill) => skill.id)
     .sort();
+}
+
+export function getInstalledInitialSelectors(
+  installedSkills: InstalledSkill[],
+  scope: InstallScope,
+  repo: RepoRef,
+): string[] {
+  return installedSkills
+    .filter(
+      (skill) => skill.scope === scope && skill.owner === repo.owner && skill.repo === repo.repo,
+    )
+    .map((skill) => skill.relativeDir)
+    .sort();
+}
+
+async function getInstalledInitialSelectorsForScope(
+  cwd: string,
+  global: boolean,
+  repo: RepoRef,
+): Promise<string[]> {
+  return getInstalledInitialSelectors(
+    await listInstalledSkills(cwd),
+    getInstallScope(global),
+    repo,
+  );
+}
+
+function mergeInitialSelectors(left: string[], right: string[]): string[] {
+  return [
+    ...new Set([...left, ...right].map((selector) => selector.trim()).filter(Boolean)),
+  ].sort();
 }
 
 async function assertNoConflictingGlobalSkills(

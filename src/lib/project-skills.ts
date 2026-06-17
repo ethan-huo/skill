@@ -31,6 +31,7 @@ export async function installProjectRepoSkills(options: {
   selectors: string[];
 }): Promise<RepoInstallResult> {
   const { cloneDir, selectedSkills, selectedMode } = await selectRepoSkills({
+    cwd: options.cwd,
     repo: options.repo,
     selectors: options.selectors,
     global: false,

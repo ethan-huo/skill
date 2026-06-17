@@ -6,12 +6,13 @@ import { describe, expect, test } from "bun:test";
 
 import {
   getConflictingGlobalSkillIds,
+  getInstalledInitialSelectors,
   installGlobalSkills,
   installLocalProjectSkills,
 } from "../src/lib/add-skills";
 import { ensureClaudeSkillsLink, ensureProjectClaudeSkillsLink } from "../src/lib/claude-skills";
 import { getSkillsBaseDir, getSourceInstallRoot, getVisibleSkillRoot } from "../src/lib/paths";
-import type { RepoRef, SkillCandidate } from "../src/types";
+import type { InstalledSkill, RepoRef, SkillCandidate } from "../src/types";
 
 const repo = {
   owner: "ethan-huo",
@@ -29,6 +30,16 @@ const selectedSkills = [
 ] satisfies SkillCandidate[];
 
 describe("add skills", () => {
+  test("uses only same-repo project installs as local prompt defaults", () => {
+    expect(getInstalledInitialSelectors(makeInstalledSkills(), "local", repo)).toEqual(["cx"]);
+  });
+
+  test("uses only same-repo global installs as global prompt defaults", () => {
+    expect(getInstalledInitialSelectors(makeInstalledSkills(), "global", repo)).toEqual([
+      "fp-thinking",
+    ]);
+  });
+
   test("detects only overlapping global skills for the same repo", () => {
     expect(
       getConflictingGlobalSkillIds(
@@ -222,3 +233,38 @@ describe("add skills", () => {
     }
   });
 });
+
+function makeInstalledSkills(): InstalledSkill[] {
+  return [
+    {
+      id: "ethan-huo/agents/cx",
+      owner: "ethan-huo",
+      repo: "agents",
+      relativeDir: "cx",
+      name: "",
+      description: "",
+      scope: "local",
+      installRoot: "/tmp/local/cx.agents.ethan-huo",
+    },
+    {
+      id: "ethan-huo/agents/fp-thinking",
+      owner: "ethan-huo",
+      repo: "agents",
+      relativeDir: "fp-thinking",
+      name: "",
+      description: "",
+      scope: "global",
+      installRoot: "/tmp/global/fp-thinking.agents.ethan-huo",
+    },
+    {
+      id: "other/agents/audit",
+      owner: "other",
+      repo: "agents",
+      relativeDir: "audit",
+      name: "",
+      description: "",
+      scope: "local",
+      installRoot: "/tmp/local/audit.agents.other",
+    },
+  ];
+}
