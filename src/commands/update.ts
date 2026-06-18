@@ -3,49 +3,173 @@ import { rm } from "node:fs/promises";
 import { fmt } from "argc/terminal";
 
 import { ensureGlobalClaudeSkillsLink, ensureProjectClaudeSkillsLink } from "../lib/claude-skills";
+import { pMapLimit } from "../lib/concurrency";
 import { shallowCloneRepo } from "../lib/git";
 import { linkInstalledSkills } from "../lib/install";
 import { listInstalledSkills } from "../lib/installed-skills";
+import { createLiveGrid, type GridStage, type LiveGrid } from "../lib/live-grid";
 import { getSkillsBaseDir, getVisibleSkillRoot } from "../lib/paths";
+import { readProjectManifest, writeProjectManifest } from "../lib/project-manifest";
 import {
   hasProjectManifest,
+  listProjectMapRepoIds,
   pruneProjectManifestSkills,
   removeProjectSkillLinks,
-  syncProjectMaps,
+  syncProjectMapRepo,
   syncProjectSkillLinks,
 } from "../lib/project-skills";
 import { parseRepoRef } from "../lib/repo-ref";
 import { listSourceRepos, updateSourceRepo } from "../lib/source-skills";
 import { diffSkillSets } from "../lib/update-diff";
-import type { RepoRef, SkillCandidate, UpdateInput } from "../types";
+import type { RepoRef, SkillCandidate, UpdateDiff, UpdateInput } from "../types";
+
+type RepoOutcome = {
+  kind: "repo";
+  repo: { owner: string; repo: string };
+  diff: UpdateDiff;
+};
+
+type MapOutcome = {
+  kind: "map";
+  repoId: string;
+  mappedSkills: number;
+};
+
+type FailOutcome = {
+  kind: "error";
+  id: string;
+  title: string;
+  error: unknown;
+};
+
+type Outcome = RepoOutcome | MapOutcome | FailOutcome;
+
+const REPO_ID = (repo: { owner: string; repo: string }) => `repo:${repo.owner}/${repo.repo}`;
+const MAP_ID = (repoId: string) => `map:${repoId}`;
 
 export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
   const input = args.input;
+  const concurrency = Math.max(1, input.concurrency ?? 8);
+
   const sourceRepos = await listSourceRepos();
+  const mapRepoIds = input.global ? [] : await listProjectMapRepoIds(process.cwd());
 
-  if (sourceRepos.length === 0) {
-    const syncedMaps = input.global ? [] : await syncProjectMaps(process.cwd());
-    if (syncedMaps.length === 0) {
-      console.log(fmt.info("No shared source skills are cached."));
-      return;
-    }
-
-    printSyncedMaps(syncedMaps);
+  if (sourceRepos.length === 0 && mapRepoIds.length === 0) {
+    console.log(fmt.info("No shared source skills are cached."));
     return;
   }
 
   const installedSkills = await listInstalledSkills(process.cwd());
   const installedByRepo = groupInstalledSkills(installedSkills);
 
-  for (const sourceRepo of sourceRepos) {
-    const repoRef = parseRepoRef(`${sourceRepo.owner}/${sourceRepo.repo}`);
+  const rows = [
+    ...sourceRepos.map((repo) => ({
+      id: REPO_ID(repo),
+      title: `${repo.owner}/${repo.repo}`,
+    })),
+    ...mapRepoIds.map((repoId) => ({
+      id: MAP_ID(repoId),
+      title: `${repoId} (map)`,
+    })),
+  ];
+
+  const grid = createLiveGrid({
+    rows,
+    enabled: input.progress === false ? false : undefined,
+  });
+
+  const tasks: Array<() => Promise<Outcome>> = [
+    ...sourceRepos.map((repo) => () => updateRepo({ repo, input, grid, installedByRepo })),
+    ...mapRepoIds.map((repoId) => () => updateMap({ repoId, grid })),
+  ];
+
+  const settled = await pMapLimit(tasks, concurrency, (task) => task());
+  grid.stop();
+
+  const repoOutcomes: RepoOutcome[] = [];
+  const mapOutcomes: MapOutcome[] = [];
+  const failures: FailOutcome[] = [];
+  for (const result of settled) {
+    if (result.status !== "fulfilled") {
+      // pMapLimit captures fn rejections, but our task wrappers also catch and
+      // return FailOutcome; this branch only fires on bugs in our own code.
+      failures.push({
+        kind: "error",
+        id: `task#${result.index}`,
+        title: `task #${result.index}`,
+        error: result.reason,
+      });
+      continue;
+    }
+    const value = result.value;
+    if (value.kind === "repo") {
+      repoOutcomes.push(value);
+    } else if (value.kind === "map") {
+      mapOutcomes.push(value);
+    } else {
+      failures.push(value);
+    }
+  }
+
+  // The plan promises stable ordering on stdout regardless of completion
+  // order — keep it sorted by owner/repo (and repoId for maps) so output stays
+  // grep-friendly across runs.
+  repoOutcomes.sort((left, right) =>
+    `${left.repo.owner}/${left.repo.repo}`.localeCompare(`${right.repo.owner}/${right.repo.repo}`),
+  );
+  mapOutcomes.sort((left, right) => left.repoId.localeCompare(right.repoId));
+
+  for (const outcome of repoOutcomes) {
+    console.log(fmt.info(`${outcome.repo.owner}/${outcome.repo.repo} (source)`));
+    printDiff(outcome.diff);
+  }
+
+  for (const outcome of mapOutcomes) {
+    console.log(fmt.info(`${outcome.repoId} (map)`));
+    console.log(fmt.yellow(`  ~ regenerated ${outcome.mappedSkills} skill(s)`));
+  }
+
+  // Match the old syncProjectMaps no-op manifest rewrite so any in-tree
+  // touch-on-update consumers (timestamps, formatters) keep firing.
+  if (mapOutcomes.length > 0 && hasProjectManifest(process.cwd())) {
+    const manifest = await readProjectManifest(process.cwd());
+    await writeProjectManifest(process.cwd(), manifest);
+  }
+
+  for (const failure of failures) {
+    const detail = failure.error instanceof Error ? failure.error.message : String(failure.error);
+    console.log(fmt.error(`${failure.title}: ${detail}`));
+  }
+
+  printSummary({ repoOutcomes, mapOutcomes, failures });
+
+  if (failures.length > 0) {
+    process.exitCode = 1;
+  }
+}
+
+async function updateRepo(options: {
+  repo: { owner: string; repo: string; sourceRoot: string };
+  input: UpdateInput;
+  grid: LiveGrid;
+  installedByRepo: Map<string, string[]>;
+}): Promise<Outcome> {
+  const { repo, input, grid, installedByRepo } = options;
+  const id = REPO_ID(repo);
+  const setStage = (stage: GridStage) => grid.set(id, stage);
+
+  try {
+    setStage({ kind: "running", label: "cloning" });
+    const repoRef = parseRepoRef(`${repo.owner}/${repo.repo}`);
     const cloneDir = await shallowCloneRepo(repoRef);
+
+    setStage({ kind: "running", label: "diffing" });
     const diff = await updateSourceRepo({
       cloneDir,
-      sourceRoot: sourceRepo.sourceRoot,
+      sourceRoot: repo.sourceRoot,
     });
-    console.log(fmt.info(`${sourceRepo.owner}/${sourceRepo.repo} (source)`));
 
+    setStage({ kind: "running", label: "linking" });
     await syncVisibleLinks({
       cwd: process.cwd(),
       input,
@@ -54,15 +178,71 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
       projectInstalledIds: installedByRepo.get(getInstalledGroupKey("local", repoRef)) ?? [],
       updated: diff.updated,
       removed: diff.removed,
-      sourceRoot: sourceRepo.sourceRoot,
+      sourceRoot: repo.sourceRoot,
     });
 
-    printDiff(diff);
+    setStage({ kind: "done", label: summarizeDiff(diff) });
+    return { kind: "repo", repo, diff };
+  } catch (error) {
+    setStage({ kind: "error", label: error instanceof Error ? error.message : String(error) });
+    return {
+      kind: "error",
+      id,
+      title: `${repo.owner}/${repo.repo}`,
+      error,
+    };
   }
+}
 
-  if (!input.global) {
-    printSyncedMaps(await syncProjectMaps(process.cwd()));
+async function updateMap(options: { repoId: string; grid: LiveGrid }): Promise<Outcome> {
+  const { repoId, grid } = options;
+  const id = MAP_ID(repoId);
+  const setStage = (stage: GridStage) => grid.set(id, stage);
+
+  try {
+    setStage({ kind: "running", label: "cloning" });
+    const result = await syncProjectMapRepo({ cwd: process.cwd(), repoId });
+    setStage({ kind: "done", label: `${result.mappedSkills} skill(s)` });
+    return { kind: "map", repoId, mappedSkills: result.mappedSkills };
+  } catch (error) {
+    setStage({ kind: "error", label: error instanceof Error ? error.message : String(error) });
+    return {
+      kind: "error",
+      id,
+      title: `${repoId} (map)`,
+      error,
+    };
   }
+}
+
+function summarizeDiff(diff: UpdateDiff): string {
+  const parts: string[] = [];
+  if (diff.updated.length > 0) parts.push(`~${diff.updated.length}`);
+  if (diff.removed.length > 0) parts.push(`-${diff.removed.length}`);
+  if (diff.added.length > 0) parts.push(`+${diff.added.length}`);
+  return parts.length === 0 ? "no changes" : parts.join(" ");
+}
+
+function printSummary(options: {
+  repoOutcomes: RepoOutcome[];
+  mapOutcomes: MapOutcome[];
+  failures: FailOutcome[];
+}): void {
+  const { repoOutcomes, mapOutcomes, failures } = options;
+  const totalUpdated = repoOutcomes.reduce((sum, outcome) => sum + outcome.diff.updated.length, 0);
+  const totalRemoved = repoOutcomes.reduce((sum, outcome) => sum + outcome.diff.removed.length, 0);
+  const totalAdded = repoOutcomes.reduce((sum, outcome) => sum + outcome.diff.added.length, 0);
+  const repoCount = repoOutcomes.length;
+  const mapCount = mapOutcomes.length;
+
+  const segments = [
+    `${repoCount} repo${repoCount === 1 ? "" : "s"}`,
+    mapCount > 0 ? `${mapCount} map${mapCount === 1 ? "" : "s"}` : null,
+    `~${totalUpdated} -${totalRemoved} +${totalAdded}`,
+    failures.length > 0 ? fmt.red(`✗${failures.length}`) : null,
+  ].filter(Boolean);
+
+  console.log(fmt.dim(`updated ${segments.join(" · ")}`));
 }
 
 function groupInstalledSkills(
@@ -187,12 +367,5 @@ function printDiff(diff: ReturnType<typeof diffSkillSets>): void {
 
   for (const skill of diff.added) {
     console.log(fmt.green(`  + ${skill} (available, not installed)`));
-  }
-}
-
-function printSyncedMaps(maps: { repoId: string; mappedSkills: number }[]): void {
-  for (const map of maps) {
-    console.log(fmt.info(`${map.repoId} (map)`));
-    console.log(fmt.yellow(`  ~ regenerated ${map.mappedSkills} skill(s)`));
   }
 }

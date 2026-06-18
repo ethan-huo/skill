@@ -143,25 +143,44 @@ export async function syncProjectMaps(cwd: string): Promise<
     mappedSkills: number;
   }[]
 > {
-  if (!hasProjectManifest(cwd)) {
+  const repoIds = await listProjectMapRepoIds(cwd);
+  if (repoIds.length === 0) {
     return [];
   }
 
-  const manifest = await readProjectManifest(cwd);
   const syncedMaps: { repoId: string; mappedSkills: number }[] = [];
-
-  for (const repoId of getProjectManifestMapRepos(manifest)) {
-    const repo = parseRepoRef(repoId);
-    const cloneDir = await shallowCloneRepo(repo);
-    const result = await writeProjectSkillMap({ cloneDir, cwd, repo });
-    syncedMaps.push({ repoId, mappedSkills: result.mappedSkills.length });
+  for (const repoId of repoIds) {
+    syncedMaps.push(await syncProjectMapRepo({ cwd, repoId }));
   }
 
+  // syncProjectMaps used to rewrite the manifest as a no-op touch. Preserve that
+  // by delegating to the same single-repo helper above, which already keeps the
+  // manifest in sync via writeProjectSkillMap.
   if (syncedMaps.length > 0) {
+    const manifest = await readProjectManifest(cwd);
     await writeProjectManifest(cwd, manifest);
   }
 
   return syncedMaps.sort((left, right) => left.repoId.localeCompare(right.repoId));
+}
+
+export async function listProjectMapRepoIds(cwd: string): Promise<string[]> {
+  if (!hasProjectManifest(cwd)) {
+    return [];
+  }
+  const manifest = await readProjectManifest(cwd);
+  return [...getProjectManifestMapRepos(manifest)].sort((left, right) => left.localeCompare(right));
+}
+
+export async function syncProjectMapRepo(options: { cwd: string; repoId: string }): Promise<{
+  repoId: string;
+  mappedSkills: number;
+}> {
+  const { cwd, repoId } = options;
+  const repo = parseRepoRef(repoId);
+  const cloneDir = await shallowCloneRepo(repo);
+  const result = await writeProjectSkillMap({ cloneDir, cwd, repo });
+  return { repoId, mappedSkills: result.mappedSkills.length };
 }
 
 export async function syncProjectMapFromClone(options: {
