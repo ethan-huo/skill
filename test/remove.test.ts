@@ -1,4 +1,4 @@
-import { lstat, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -84,6 +84,35 @@ describe("remove command", () => {
       version: 2,
       items: [{ type: "skills", repo: "other/repo", skills: ["x"] }],
     });
+  });
+
+  test("removes a selected global skill from visible links and manifest", async () => {
+    const root = join(tmpdir(), `skill-remove-global-manifest-${crypto.randomUUID()}`);
+    const previousHome = process.env.HOME;
+    const sourceRoot = join(root, ".agents", ".skills", "repo", "abc");
+    const visibleRoot = join(root, ".agents", "skills");
+    const skillLink = join(visibleRoot, "a.abc.repo");
+    process.env.HOME = root;
+
+    try {
+      await mkdir(join(sourceRoot, "a"), { recursive: true });
+      await mkdir(visibleRoot, { recursive: true });
+      await symlink(join(sourceRoot, "a"), skillLink, "dir");
+      await writeManifest(root, [{ type: "skills", repo: "repo/abc", skills: ["a"] }]);
+
+      process.chdir(root);
+      await runRemove({ input: { repo: ["repo/abc/a"], global: true } });
+
+      expect(await lstat(skillLink).catch(() => null)).toBeNull();
+      expect(await readManifest(root)).toEqual({ version: 2, items: [] });
+    } finally {
+      await rm(root, { force: true, recursive: true });
+      if (previousHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = previousHome;
+      }
+    }
   });
 });
 

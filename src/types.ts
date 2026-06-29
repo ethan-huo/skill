@@ -28,6 +28,7 @@ export type InstallInput = {
   repo: string[];
   skill: string | string[];
   map: boolean;
+  global: boolean;
 };
 
 export type FindInput = {

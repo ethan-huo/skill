@@ -1,7 +1,11 @@
 import { fmt } from "argc/terminal";
 
 import { installRepoSkills } from "../lib/add-skills";
-import { installProjectRepoMap, restoreProjectSkills } from "../lib/project-skills";
+import {
+  installProjectRepoMap,
+  restoreGlobalSkills,
+  restoreProjectSkills,
+} from "../lib/project-skills";
 import { parseRepoSkillTarget } from "../lib/repo-ref";
 import type { InstallInput } from "../types";
 
@@ -11,8 +15,12 @@ export async function runInstall(args: { input: InstallInput }): Promise<void> {
     throw new Error("Install --map requires a repository ref.");
   }
 
+  if (input.global && input.map) {
+    throw new Error("Install --global does not support --map.");
+  }
+
   if (input.repo.length === 0) {
-    await restoreProjectLinks();
+    await restoreLinks(input.global);
     return;
   }
 
@@ -39,7 +47,7 @@ export async function runInstall(args: { input: InstallInput }): Promise<void> {
   const selectors = normalizeSelectors(input.skill, target.skill);
   const result = await installRepoSkills({
     cwd: process.cwd(),
-    global: false,
+    global: input.global,
     repo,
     selectors,
   });
@@ -56,11 +64,15 @@ export async function runInstall(args: { input: InstallInput }): Promise<void> {
   }
 }
 
-async function restoreProjectLinks(): Promise<void> {
-  const result = await restoreProjectSkills(process.cwd());
+async function restoreLinks(global: boolean): Promise<void> {
+  const result = global
+    ? await restoreGlobalSkills(process.cwd())
+    : await restoreProjectSkills(process.cwd());
 
   if (result.restored.length === 0 && result.missing.length === 0) {
-    console.log(fmt.info("No project skills are recorded in .agents/skills/manifest.json."));
+    const scope = global ? "global" : "project";
+    const manifest = global ? "~/.agents/skills/manifest.json" : ".agents/skills/manifest.json";
+    console.log(fmt.info(`No ${scope} skills are recorded in ${manifest}.`));
     return;
   }
 

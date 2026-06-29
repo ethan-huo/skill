@@ -12,7 +12,7 @@ import {
   getSourceInstallRoot,
   getVisibleMapRoot,
 } from "./paths";
-import { addProjectManifestMap, addProjectManifestSkills } from "./project-manifest";
+import { addScopeManifestMap, addScopeManifestSkills } from "./project-manifest";
 import { selectOne } from "./prompt";
 import { selectSkills } from "./select-skills";
 import { shouldRecommendRepoMap, writeProjectSkillMap } from "./skill-map";
@@ -55,7 +55,7 @@ export async function installRepoSkills(options: {
       repo: options.repo,
     });
     await ensureProjectClaudeSkillsLink(options.cwd);
-    await addProjectManifestMap(options.cwd, `${options.repo.owner}/${options.repo.repo}`);
+    await addScopeManifestMap("local", options.cwd, `${options.repo.owner}/${options.repo.repo}`);
     return { kind: "map", installRoot: result.installRoot, mappedSkills: result.mappedSkills };
   }
 
@@ -145,6 +145,13 @@ export async function installGlobalSkills(options: {
   await upsertInstalledSkills(options.cloneDir, sourceRoot, options.selectedSkills);
   await linkInstalledSkills(sourceRoot, installRoot, options.repo, options.selectedSkills);
   await (options.ensureClaudeSkillsLink ?? ensureGlobalClaudeSkillsLink)(options.cwd);
+  await addScopeManifestSkills(
+    "global",
+    options.cwd,
+    options.selectedSkills.map(
+      (skill) => `${options.repo.owner}/${options.repo.repo}/${skill.relativeDir}`,
+    ),
+  );
 
   return { installRoot };
 }
@@ -163,7 +170,8 @@ export async function installLocalProjectSkills(options: {
   await removeProjectMapAliases(options.cwd, options.repo);
   await linkInstalledSkills(sourceRoot, installRoot, options.repo, options.selectedSkills);
   await ensureProjectClaudeSkillsLink(options.cwd);
-  await addProjectManifestSkills(
+  await addScopeManifestSkills(
+    "local",
     options.cwd,
     options.selectedSkills.map(
       (skill) => `${options.repo.owner}/${options.repo.repo}/${skill.relativeDir}`,

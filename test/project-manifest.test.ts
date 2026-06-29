@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,7 +7,9 @@ import { describe, expect, test } from "bun:test";
 import {
   addProjectManifestMap,
   addProjectManifestSkills,
+  addScopeManifestSkills,
   readProjectManifest,
+  readScopeManifest,
 } from "../src/lib/project-manifest";
 
 describe("project manifest", () => {
@@ -48,6 +50,35 @@ describe("project manifest", () => {
     const raw = await readFile(join(root, ".agents", "skills", "manifest.json"), "utf8");
     expect(raw).toContain('"version": 2');
     expect(raw).toContain('"items"');
+  });
+
+  test("uses the same manifest shape for global scope", async () => {
+    const root = join(tmpdir(), `skill-global-manifest-${crypto.randomUUID()}`);
+    const previousHome = process.env.HOME;
+    process.env.HOME = root;
+
+    try {
+      await addScopeManifestSkills("global", root, [
+        "ethan-huo/agents/fp-thinking",
+        "ethan-huo/agents/cx",
+        "ethan-huo/agents/cx",
+      ]);
+
+      expect(await readScopeManifest("global", root)).toEqual({
+        version: 2,
+        items: [{ type: "skills", repo: "ethan-huo/agents", skills: ["cx", "fp-thinking"] }],
+      });
+
+      const raw = await readFile(join(root, ".agents", "skills", "manifest.json"), "utf8");
+      expect(raw).toContain('"version": 2');
+    } finally {
+      if (previousHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = previousHome;
+      }
+      await rm(root, { force: true, recursive: true });
+    }
   });
 
   test("keeps repo skill installs and map installs mutually exclusive", async () => {

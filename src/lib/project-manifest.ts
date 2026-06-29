@@ -1,8 +1,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { getProjectManifestPath } from "./paths";
+import { getManifestPath, getProjectManifestPath } from "./paths";
 import { parseFavoriteRef } from "./repo-ref";
+import type { InstallScope } from "../types";
 
 export type ProjectManifestV1 = {
   skills: string[];
@@ -26,8 +27,18 @@ export type ProjectManifest = {
   items: ProjectManifestItem[];
 };
 
+export async function readScopeManifest(
+  scope: InstallScope,
+  cwd: string,
+): Promise<ProjectManifest> {
+  return readManifestFile(getManifestPath(scope, cwd), scope);
+}
+
 export async function readProjectManifest(cwd: string): Promise<ProjectManifest> {
-  const filePath = getProjectManifestPath(cwd);
+  return readManifestFile(getProjectManifestPath(cwd), "local");
+}
+
+async function readManifestFile(filePath: string, scope: InstallScope): Promise<ProjectManifest> {
   const raw = await readFile(filePath, "utf8").catch((error: unknown) => {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
       return null;
@@ -54,21 +65,50 @@ export async function readProjectManifest(cwd: string): Promise<ProjectManifest>
   }
 
   {
-    throw new Error(`Invalid project skill manifest at ${filePath}.`);
+    throw new Error(`Invalid ${scope} skill manifest at ${filePath}.`);
   }
 }
 
+export async function writeScopeManifest(
+  scope: InstallScope,
+  cwd: string,
+  manifest: ProjectManifest,
+): Promise<void> {
+  await writeManifestFile(getManifestPath(scope, cwd), manifest);
+}
+
 export async function writeProjectManifest(cwd: string, manifest: ProjectManifest): Promise<void> {
-  const filePath = getProjectManifestPath(cwd);
+  await writeManifestFile(getProjectManifestPath(cwd), manifest);
+}
+
+async function writeManifestFile(filePath: string, manifest: ProjectManifest): Promise<void> {
   const next = normalizeProjectManifest(manifest);
 
   await mkdir(dirname(filePath), { recursive: true });
   await writeFile(filePath, `${JSON.stringify(next, null, 2)}\n`);
 }
 
+export async function addScopeManifestSkills(
+  scope: InstallScope,
+  cwd: string,
+  skillIds: string[],
+): Promise<void> {
+  const manifest = await readScopeManifest(scope, cwd);
+  await writeScopeManifest(scope, cwd, addSkillIdsToManifest(manifest, skillIds));
+}
+
 export async function addProjectManifestSkills(cwd: string, skillIds: string[]): Promise<void> {
   const manifest = await readProjectManifest(cwd);
   await writeProjectManifest(cwd, addSkillIdsToManifest(manifest, skillIds));
+}
+
+export async function addScopeManifestMap(
+  scope: InstallScope,
+  cwd: string,
+  repoId: string,
+): Promise<void> {
+  const manifest = await readScopeManifest(scope, cwd);
+  await writeScopeManifest(scope, cwd, addMapToManifest(manifest, repoId));
 }
 
 export async function addProjectManifestMap(cwd: string, repoId: string): Promise<void> {

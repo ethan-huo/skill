@@ -126,11 +126,12 @@ export const schema = {
 
   install: c
     .meta({
-      description:
-        "Install shared project skills or restore project links from .agents/skills/manifest.json.",
+      description: "Install shared skills or restore links from the scope manifest.",
       examples: [
         "skill install",
+        "skill install --global",
         "skill install ethan-huo/agents/cx",
+        "skill install ethan-huo/agents/cx --global",
         "skill install ethan-huo/agents --skill cx --skill fp-thinking",
         "skill install Owl-Listener/designer-skills --map",
       ],
@@ -142,6 +143,7 @@ export const schema = {
           repo: v.optional(v.array(v.string()), []),
           skill: v.optional(v.union([v.string(), v.array(v.string())]), []),
           map: v.optional(v.boolean(), false),
+          global: v.optional(v.boolean(), false),
         }),
       ),
     ),

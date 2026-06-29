@@ -9,16 +9,16 @@ import { listInstalledSkills } from "../lib/installed-skills";
 import {
   getInstallScope,
   getLegacyVisibleSkillRoot,
-  getProjectManifestPath,
+  getManifestPath,
   getSkillsBaseDir,
   getVisibleRepoDirPrefix,
   getVisibleSkillRoot,
 } from "../lib/paths";
 import {
-  readProjectManifest,
+  readScopeManifest,
   removeProjectManifestRepo,
   removeProjectManifestSkillIds,
-  writeProjectManifest,
+  writeScopeManifest,
 } from "../lib/project-manifest";
 import { searchableMultiselect } from "../lib/prompt";
 import { parseRepoSkillTarget } from "../lib/repo-ref";
@@ -48,9 +48,12 @@ async function removeRef(ref: string, global: boolean): Promise<void> {
     ? (await removeInstalledSkill(targetPath)) ||
       (legacyTargetPath !== null && (await removeInstalledSkill(legacyTargetPath)))
     : await removeVisibleRepoSkills(skillsBaseDir, repo);
-  const removedManifest = global
-    ? false
-    : await removeProjectManifestRef(process.cwd(), `${repo.owner}/${repo.repo}`, target.skill);
+  const removedManifest = await removeManifestRef(
+    scope,
+    process.cwd(),
+    `${repo.owner}/${repo.repo}`,
+    target.skill,
+  );
   const removedSource = global && !target.skill ? await removeSourceRepo(repo) : false;
   const removedFavorites = global && !target.skill ? await removeFavoritesForRepo(repo) : [];
 
@@ -73,16 +76,17 @@ async function removeRef(ref: string, global: boolean): Promise<void> {
   console.log(`Removed ${repo.display} from ${removedTargets.join(", ")}`);
 }
 
-async function removeProjectManifestRef(
+async function removeManifestRef(
+  scope: "local" | "global",
   cwd: string,
   repoId: string,
   skill: string | undefined,
 ): Promise<boolean> {
-  if (!existsSync(getProjectManifestPath(cwd))) {
+  if (!existsSync(getManifestPath(scope, cwd))) {
     return false;
   }
 
-  const manifest = await readProjectManifest(cwd);
+  const manifest = await readScopeManifest(scope, cwd);
   const next = skill
     ? removeProjectManifestSkillIds(manifest, [`${repoId}/${skill}`])
     : removeProjectManifestRepo(manifest, repoId);
@@ -91,7 +95,7 @@ async function removeProjectManifestRef(
     return false;
   }
 
-  await writeProjectManifest(cwd, next);
+  await writeScopeManifest(scope, cwd, next);
   return true;
 }
 

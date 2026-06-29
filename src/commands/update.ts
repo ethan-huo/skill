@@ -6,22 +6,27 @@ import { ensureGlobalClaudeSkillsLink, ensureProjectClaudeSkillsLink } from "../
 import { pMapLimit } from "../lib/concurrency";
 import { shallowCloneRepo } from "../lib/git";
 import { linkInstalledSkills } from "../lib/install";
-import { listInstalledSkills } from "../lib/installed-skills";
 import { createLiveGrid, type GridStage, type LiveGrid } from "../lib/live-grid";
-import { getSkillsBaseDir, getVisibleSkillRoot } from "../lib/paths";
-import { readProjectManifest, writeProjectManifest } from "../lib/project-manifest";
+import { getSkillsBaseDir, getSourceInstallRoot, getVisibleSkillRoot } from "../lib/paths";
+import {
+  getProjectManifestMapRepos,
+  getProjectManifestSkillIds,
+  readScopeManifest,
+  removeProjectManifestSkillIds,
+  writeScopeManifest,
+} from "../lib/project-manifest";
 import {
   hasProjectManifest,
-  listProjectMapRepoIds,
   pruneProjectManifestSkills,
   removeProjectSkillLinks,
+  seedGlobalManifestFromVisibleLinks,
   syncProjectMapRepo,
   syncProjectSkillLinks,
 } from "../lib/project-skills";
 import { parseRepoRef } from "../lib/repo-ref";
-import { listSourceRepos, updateSourceRepo } from "../lib/source-skills";
+import { updateSourceRepo } from "../lib/source-skills";
 import { diffSkillSets } from "../lib/update-diff";
-import type { RepoRef, SkillCandidate, UpdateDiff, UpdateInput } from "../types";
+import type { InstallScope, RepoRef, SkillCandidate, UpdateDiff, UpdateInput } from "../types";
 
 type RepoOutcome = {
   kind: "repo";
@@ -50,17 +55,24 @@ const MAP_ID = (repoId: string) => `map:${repoId}`;
 export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
   const input = args.input;
   const concurrency = Math.max(1, input.concurrency ?? 8);
+  const scope = input.global ? "global" : "local";
 
-  const sourceRepos = await listSourceRepos();
-  const mapRepoIds = input.global ? [] : await listProjectMapRepoIds(process.cwd());
-
-  if (sourceRepos.length === 0 && mapRepoIds.length === 0) {
-    console.log(fmt.info("No shared source skills are cached."));
-    return;
+  if (scope === "global") {
+    await seedGlobalManifestFromVisibleLinks(process.cwd());
   }
 
-  const installedSkills = await listInstalledSkills(process.cwd());
-  const installedByRepo = groupInstalledSkills(installedSkills);
+  const manifest = await readScopeManifest(scope, process.cwd());
+  const installedByRepo = groupManifestSkillIds(scope, getProjectManifestSkillIds(manifest));
+  const sourceRepos = getManifestSourceRepos(manifest);
+  const mapRepoIds = input.global ? [] : getProjectManifestMapRepos(manifest);
+
+  if (sourceRepos.length === 0 && mapRepoIds.length === 0) {
+    const manifestPath = input.global
+      ? "~/.agents/skills/manifest.json"
+      : ".agents/skills/manifest.json";
+    console.log(fmt.info(`No ${scope} skills are recorded in ${manifestPath}.`));
+    return;
+  }
 
   const rows = [
     ...sourceRepos.map((repo) => ({
@@ -132,8 +144,8 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
   // Match the old syncProjectMaps no-op manifest rewrite so any in-tree
   // touch-on-update consumers (timestamps, formatters) keep firing.
   if (mapOutcomes.length > 0 && hasProjectManifest(process.cwd())) {
-    const manifest = await readProjectManifest(process.cwd());
-    await writeProjectManifest(process.cwd(), manifest);
+    const manifest = await readScopeManifest("local", process.cwd());
+    await writeScopeManifest("local", process.cwd(), manifest);
   }
 
   for (const failure of failures) {
@@ -245,18 +257,33 @@ function printSummary(options: {
   console.log(fmt.dim(`updated ${segments.join(" · ")}`));
 }
 
-function groupInstalledSkills(
-  skills: Awaited<ReturnType<typeof listInstalledSkills>>,
-): Map<string, string[]> {
+function groupManifestSkillIds(scope: InstallScope, skillIds: string[]): Map<string, string[]> {
   const grouped = new Map<string, string[]>();
 
-  for (const skill of skills) {
-    const current = grouped.get(getInstalledGroupKey(skill.scope, skill)) ?? [];
-    current.push(skill.relativeDir);
-    grouped.set(getInstalledGroupKey(skill.scope, skill), current);
+  for (const skillId of skillIds) {
+    const parsed = parseRepoRef(skillId.split("/").slice(0, 2).join("/"));
+    const skill = skillId.split("/").slice(2).join("/");
+    const current = grouped.get(getInstalledGroupKey(scope, parsed)) ?? [];
+    current.push(skill);
+    grouped.set(getInstalledGroupKey(scope, parsed), current);
   }
 
   return grouped;
+}
+
+function getManifestSourceRepos(manifest: {
+  items: Array<{ type: "skills" | "map"; repo: string; skills?: string[] }>;
+}): Array<{ owner: string; repo: string; sourceRoot: string }> {
+  return manifest.items
+    .filter((item) => item.type === "skills")
+    .map((item) => {
+      const repo = parseRepoRef(item.repo);
+      return {
+        owner: repo.owner,
+        repo: repo.repo,
+        sourceRoot: getSourceInstallRoot(repo),
+      };
+    });
 }
 
 function getInstalledGroupKey(scope: "local" | "global", repo: Pick<RepoRef, "owner" | "repo">) {
@@ -284,22 +311,33 @@ export async function syncVisibleLinks(options: {
     sourceRoot,
   } = options;
 
-  if (updated.length > 0) {
-    await relinkExistingSkills(repo, "global", cwd, sourceRoot, globalInstalledIds, updated);
-  }
-
-  for (const skill of removed) {
-    await rm(getVisibleSkillRoot("global", cwd, repo, skill), {
-      force: true,
-      recursive: true,
-    });
-  }
-
-  if (globalInstalledIds.length > 0) {
-    await ensureGlobalClaudeSkillsLink(cwd);
-  }
-
   if (input.global) {
+    if (updated.length > 0) {
+      await relinkExistingSkills(repo, "global", cwd, sourceRoot, globalInstalledIds, updated);
+    }
+
+    for (const skill of removed) {
+      await rm(getVisibleSkillRoot("global", cwd, repo, skill), {
+        force: true,
+        recursive: true,
+      });
+    }
+
+    if (globalInstalledIds.length > 0) {
+      await ensureGlobalClaudeSkillsLink(cwd);
+    }
+
+    if (removed.length > 0) {
+      const manifest = await readScopeManifest("global", cwd);
+      await writeScopeManifest(
+        "global",
+        cwd,
+        removeProjectManifestSkillIds(
+          manifest,
+          removed.map((skill) => `${repo.owner}/${repo.repo}/${skill}`),
+        ),
+      );
+    }
     return;
   }
 

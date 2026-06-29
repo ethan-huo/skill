@@ -11,7 +11,14 @@ import {
   installLocalProjectSkills,
 } from "../src/lib/add-skills";
 import { ensureClaudeSkillsLink, ensureProjectClaudeSkillsLink } from "../src/lib/claude-skills";
-import { getSkillsBaseDir, getSourceInstallRoot, getVisibleSkillRoot } from "../src/lib/paths";
+import {
+  getManifestPath,
+  getSkillsBaseDir,
+  getSourceInstallRoot,
+  getVisibleSkillRoot,
+} from "../src/lib/paths";
+import { readScopeManifest } from "../src/lib/project-manifest";
+import { seedGlobalManifestFromVisibleLinks } from "../src/lib/project-skills";
 import type { InstalledSkill, RepoRef, SkillCandidate } from "../src/types";
 
 const repo = {
@@ -155,6 +162,7 @@ describe("add skills", () => {
   test("global install effects write hidden source and visible agents links without claude links", async () => {
     const root = join(tmpdir(), `skill-global-effects-${crypto.randomUUID()}`);
     const repoDir = join(root, "repo");
+    const previousHome = process.env.HOME;
     const isolatedRepo = {
       owner: `owner-${crypto.randomUUID()}`,
       repo: "agents",
@@ -165,6 +173,7 @@ describe("add skills", () => {
     await mkdir(join(repoDir, "skills", "cx"), { recursive: true });
     await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\n");
     const ensuredClaudeLinks: string[] = [];
+    process.env.HOME = root;
 
     try {
       const result = await installGlobalSkills({
@@ -182,6 +191,11 @@ describe("add skills", () => {
       expect(
         (await lstat(getVisibleSkillRoot("global", root, isolatedRepo, "cx"))).isSymbolicLink(),
       ).toBe(true);
+      expect(await readScopeManifest("global", root)).toEqual({
+        version: 2,
+        items: [{ type: "skills", repo: `${isolatedRepo.owner}/agents`, skills: ["cx"] }],
+      });
+      expect(await readFile(getManifestPath("global", root), "utf8")).toContain('"version": 2');
       expect(ensuredClaudeLinks).toEqual([root]);
     } finally {
       await rm(getVisibleSkillRoot("global", root, isolatedRepo, "cx"), {
@@ -190,6 +204,11 @@ describe("add skills", () => {
       });
       await rm(getSourceInstallRoot(isolatedRepo), { force: true, recursive: true });
       await rm(dirname(getSourceInstallRoot(isolatedRepo)), { force: true, recursive: true });
+      if (previousHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = previousHome;
+      }
     }
   });
 
@@ -230,6 +249,58 @@ describe("add skills", () => {
     } finally {
       await rm(getSourceInstallRoot(isolatedRepo), { force: true, recursive: true });
       await rm(dirname(getSourceInstallRoot(isolatedRepo)), { force: true, recursive: true });
+    }
+  });
+
+  test("seeds missing global manifest from visible links only", async () => {
+    const root = join(tmpdir(), `skill-global-seed-${crypto.randomUUID()}`);
+    const previousHome = process.env.HOME;
+    process.env.HOME = root;
+
+    const visibleRepo = {
+      owner: "visible-owner",
+      repo: "agents",
+      cloneUrl: "https://github.com/visible-owner/agents.git",
+      display: "visible-owner/agents",
+    } satisfies RepoRef;
+    const cachedOnlyRepo = {
+      owner: "cached-owner",
+      repo: "agents",
+      cloneUrl: "https://github.com/cached-owner/agents.git",
+      display: "cached-owner/agents",
+    } satisfies RepoRef;
+
+    try {
+      await mkdir(join(getSourceInstallRoot(visibleRepo), "cx"), { recursive: true });
+      await writeFile(
+        join(getSourceInstallRoot(visibleRepo), "cx", "SKILL.md"),
+        "---\nname: cx\n---\n",
+      );
+      await mkdir(getSkillsBaseDir("global", root), { recursive: true });
+      await symlink(
+        join(getSourceInstallRoot(visibleRepo), "cx"),
+        getVisibleSkillRoot("global", root, visibleRepo, "cx"),
+        "dir",
+      );
+
+      await mkdir(join(getSourceInstallRoot(cachedOnlyRepo), "audit"), { recursive: true });
+      await writeFile(
+        join(getSourceInstallRoot(cachedOnlyRepo), "audit", "SKILL.md"),
+        "---\nname: audit\n---\n",
+      );
+
+      expect(await seedGlobalManifestFromVisibleLinks(root)).toBe(true);
+      expect(await readScopeManifest("global", root)).toEqual({
+        version: 2,
+        items: [{ type: "skills", repo: "visible-owner/agents", skills: ["cx"] }],
+      });
+    } finally {
+      await rm(root, { force: true, recursive: true });
+      if (previousHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = previousHome;
+      }
     }
   });
 });

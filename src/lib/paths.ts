@@ -9,10 +9,14 @@ export function getInstallScope(global: boolean): InstallScope {
 
 export function getSkillsBaseDir(scope: InstallScope, cwd: string): string {
   if (scope === "global") {
-    return join(homedir(), ".agents", "skills");
+    return join(getHomeDir(), ".agents", "skills");
   }
 
   return join(cwd, ".agents", "skills");
+}
+
+export function getManifestPath(scope: InstallScope, cwd: string): string {
+  return join(getSkillsBaseDir(scope, cwd), "manifest.json");
 }
 
 export function getVisibleSkillDirName(repo: RepoRef, skill: string): string {
@@ -62,7 +66,7 @@ export function getLegacyVisibleMapRoot(scope: InstallScope, cwd: string, repo: 
 }
 
 export function getSourceSkillsBaseDir(): string {
-  return join(homedir(), ".agents", ".skills");
+  return join(getHomeDir(), ".agents", ".skills");
 }
 
 export function getSourceInstallRoot(repo: Pick<RepoRef, "owner" | "repo">): string {
@@ -74,11 +78,11 @@ export function getProjectClaudeRoot(cwd: string): string {
 }
 
 export function getGlobalClaudeRoot(): string {
-  return join(homedir(), ".claude");
+  return join(getHomeDir(), ".claude");
 }
 
 export function getProjectManifestPath(cwd: string): string {
-  return join(cwd, ".agents", "skills", "manifest.json");
+  return getManifestPath("local", cwd);
 }
 
 function normalizeSkillPath(skill: string): string {
@@ -90,4 +94,8 @@ function normalizeSkillPath(skill: string): string {
 
 function normalizeSegment(segment: string): string {
   return segment.toLowerCase();
+}
+
+function getHomeDir(): string {
+  return process.env.HOME || homedir();
 }

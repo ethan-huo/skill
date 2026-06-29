@@ -50,7 +50,7 @@ skill list
 ```
 
 Agents should prefer this path over broad search when the user's favorites already contain good candidates.
-Project installs keep repo-scoped skill and map items in `.agents/skills/manifest.json` and expose
+Project and global installs keep repo-scoped items in the scope's `manifest.json` and expose
 one-level visible links from the hidden shared source root under `~/.agents/.skills`.
 
 ### 2. Install from favorites
@@ -82,6 +82,7 @@ Search is a discovery path, not the default install path.
 skill update
 skill update --global
 skill install
+skill install --global
 
 skill remove --global
 skill remove owner/repo
@@ -111,7 +112,9 @@ skill favorite remove owner/repo owner/repo/skill
 | Command                                        | Purpose                                                            |
 | ---------------------------------------------- | ------------------------------------------------------------------ |
 | `skill install`                                | Rebuild project links and maps from `.agents/skills/manifest.json` |
+| `skill install --global`                       | Rebuild global links from `~/.agents/skills/manifest.json`         |
 | `skill install owner/repo/skill`               | Install a shared source and link one skill into this project       |
+| `skill install owner/repo/skill --global`      | Install a shared source and link one skill globally                |
 | `skill install owner/repo --skill a --skill b` | Link multiple selected skills into this project                    |
 | `skill install owner/repo --map`               | Generate one repo-level map skill with ctx-read routing rows       |
 
@@ -154,14 +157,14 @@ skill favorite remove owner/repo owner/repo/skill
 - versionless project manifests are treated as version 1 and rewritten as version 2 repo-scoped items on the next manifest write
 - repeated installs reuse shallow clone caches keyed by the remote `HEAD` hash
 - local install is blocked only when the selected `{owner}/{repo}/{skill}` is already installed globally
-- project installs link selected skills from `~/.agents/.skills` and record repo-scoped manifest items in `.agents/skills/manifest.json`
-- project-scope `skill add` and `skill install <ref>` share the same install effects
+- installs link selected skills from `~/.agents/.skills` and record repo-scoped manifest items in the target scope's manifest
+- project-scope `skill add` and `skill install <ref>` share the same install effects; `--global` targets the global manifest and visible root
 - project installs ensure `{cwd}/.claude/skills -> ../.agents/skills`, and global installs ensure `~/.claude/skills -> ~/.agents/skills`, unless the Claude `skills` path already resolves to a valid directory
-- `skill update` updates `~/.agents/.skills/{owner}/{repo}` first; visible global and project roots are reconciled from that shared source cache
+- `skill update` updates repos recorded in the current project's manifest; `skill update --global` updates repos recorded in the global manifest
 - `skill update` runs all source repos in parallel (default 8 in flight) and renders a live progress grid on stderr; the per-repo `▶ / ~ / - / +` summary plus a final totals line are printed to stdout in stable order so pipelines stay grep-friendly
 - `skill update` migrates legacy visible aliases such as `{owner}.{repo}.{skill}` and `{owner}.{repo}.map` to the current skill-first aliases
 - project-scope `skill update` removes visible links for upstream skills that disappeared, including stale symlinks whose source target is already gone
-- project-scope `skill remove` removes matching visible aliases and manifest entries; empty repo skill items are pruned
+- `skill remove` removes matching visible aliases and manifest entries from the target scope; empty repo skill items are pruned
 - `skill remove owner/repo --global` removes that shared source cache and all matching favorite refs, so future `skill update` runs stop tracking the repo
 
 Install roots:
@@ -170,7 +173,8 @@ Install roots:
 - global visible links: `~/.agents/skills/{skill.path}.{repo}.{owner}/`
 - local map skills: `{cwd}/.agents/skills/map.{repo}.{owner}/`
 - shared sources: `~/.agents/.skills/{owner}/{repo}/`
-- project manifest: `{cwd}/.agents/skills/manifest.json` stores versioned `skills` and `map` items, not visible link names
+- local manifest: `{cwd}/.agents/skills/manifest.json` stores versioned `skills` and `map` items, not visible link names
+- global manifest: `~/.agents/skills/manifest.json` stores versioned `skills` items, not visible link names
 
 To migrate an existing global install from the old nested visible layout to one-level links:
 
