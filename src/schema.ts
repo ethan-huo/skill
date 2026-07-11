@@ -179,18 +179,11 @@ export const schema = {
   update: c
     .meta({
       description: "Update shared source skill caches and reconcile visible links.",
-      examples: [
-        "skill update",
-        "skill update --global",
-        "skill update -g",
-        "skill update --concurrency 4",
-        "skill update --no-progress",
-      ],
+      examples: ["skill update", "skill update --concurrency 4", "skill update --no-progress"],
     })
     .input(
       s(
         v.object({
-          global: v.optional(v.boolean(), false),
           concurrency: v.optional(v.pipe(v.number(), v.minValue(1)), 8),
           // `--no-progress` is parsed by argc as `progress=false`; keep the field
           // positive so the negation flag works without a custom alias.

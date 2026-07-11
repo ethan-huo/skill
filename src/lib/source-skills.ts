@@ -47,11 +47,12 @@ export async function listSourceRepos(): Promise<SourceRepo[]> {
 export async function updateSourceRepo(options: {
   cloneDir: string;
   sourceRoot: string;
+  installedIds?: string[];
 }): Promise<UpdateDiff> {
   const { cloneDir, sourceRoot } = options;
   const cachedSkills = await discoverSkills(sourceRoot);
   const latestSkills = await discoverSkills(cloneDir);
-  const cachedIds = cachedSkills.map((skill) => skill.relativeDir);
+  const cachedIds = options.installedIds ?? cachedSkills.map((skill) => skill.relativeDir);
   const latestIds = latestSkills.map((skill) => skill.relativeDir);
   const diff = diffSkillSets(cachedIds, latestIds);
 

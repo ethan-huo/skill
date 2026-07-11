@@ -80,7 +80,6 @@ Search is a discovery path, not the default install path.
 
 ```bash
 skill update
-skill update --global
 skill install
 skill install --global
 
@@ -137,8 +136,7 @@ skill favorite remove owner/repo owner/repo/skill
 | -------------------------------- | ---------------------------------------------------------------------- |
 | `skill find <query>`             | Search published skills on `skills.sh`                                 |
 | `skill list`                     | List installed skills and estimate frontmatter name/description tokens |
-| `skill update`                   | Refresh shared source caches and reconcile current project links       |
-| `skill update --global`          | Refresh shared source caches and reconcile global links only           |
+| `skill update`                   | Refresh shared source caches and reconcile global plus project links   |
 | `skill update --concurrency <n>` | Run repo updates in parallel (default `8`, `1` matches old behavior)   |
 | `skill update --no-progress`     | Disable the live progress grid (auto-disabled on non-TTY/CI)           |
 
@@ -160,7 +158,7 @@ skill favorite remove owner/repo owner/repo/skill
 - installs link selected skills from `~/.agents/.skills` and record repo-scoped manifest items in the target scope's manifest
 - project-scope `skill add` and `skill install <ref>` share the same install effects; `--global` targets the global manifest and visible root
 - project installs ensure `{cwd}/.claude/skills -> ../.agents/skills`, and global installs ensure `~/.claude/skills -> ~/.agents/skills`, unless the Claude `skills` path already resolves to a valid directory
-- `skill update` updates repos recorded in the current project's manifest; `skill update --global` updates repos recorded in the global manifest
+- `skill update` updates the union of repos recorded in the global manifest and current project's manifest, then reconciles both visible roots
 - `skill update` runs all source repos in parallel (default 8 in flight) and renders a live progress grid on stderr; the per-repo `▶ / ~ / - / +` summary plus a final totals line are printed to stdout in stable order so pipelines stay grep-friendly
 - `skill update` migrates legacy visible aliases such as `{owner}.{repo}.{skill}` and `{owner}.{repo}.map` to the current skill-first aliases
 - project-scope `skill update` removes visible links for upstream skills that disappeared, including stale symlinks whose source target is already gone

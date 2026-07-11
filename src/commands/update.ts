@@ -51,26 +51,26 @@ type Outcome = RepoOutcome | MapOutcome | FailOutcome;
 
 const REPO_ID = (repo: { owner: string; repo: string }) => `repo:${repo.owner}/${repo.repo}`;
 const MAP_ID = (repoId: string) => `map:${repoId}`;
+const EMPTY_MANIFEST_MESSAGE =
+  "No global or project skills are recorded in ~/.agents/skills/manifest.json or .agents/skills/manifest.json.";
 
 export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
   const input = args.input;
   const concurrency = Math.max(1, input.concurrency ?? 8);
-  const scope = input.global ? "global" : "local";
 
-  if (scope === "global") {
-    await seedGlobalManifestFromVisibleLinks(process.cwd());
-  }
+  await seedGlobalManifestFromVisibleLinks(process.cwd());
 
-  const manifest = await readScopeManifest(scope, process.cwd());
-  const installedByRepo = groupManifestSkillIds(scope, getProjectManifestSkillIds(manifest));
-  const sourceRepos = getManifestSourceRepos(manifest);
-  const mapRepoIds = input.global ? [] : getProjectManifestMapRepos(manifest);
+  const globalManifest = await readScopeManifest("global", process.cwd());
+  const projectManifest = await readScopeManifest("local", process.cwd());
+  const installedByRepo = mergeInstalledByRepo(
+    groupManifestSkillIds("global", getProjectManifestSkillIds(globalManifest)),
+    groupManifestSkillIds("local", getProjectManifestSkillIds(projectManifest)),
+  );
+  const sourceRepos = getManifestSourceRepos([globalManifest, projectManifest]);
+  const mapRepoIds = getProjectManifestMapRepos(projectManifest);
 
   if (sourceRepos.length === 0 && mapRepoIds.length === 0) {
-    const manifestPath = input.global
-      ? "~/.agents/skills/manifest.json"
-      : ".agents/skills/manifest.json";
-    console.log(fmt.info(`No ${scope} skills are recorded in ${manifestPath}.`));
+    console.log(fmt.info(EMPTY_MANIFEST_MESSAGE));
     return;
   }
 
@@ -91,7 +91,7 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
   });
 
   const tasks: Array<() => Promise<Outcome>> = [
-    ...sourceRepos.map((repo) => () => updateRepo({ repo, input, grid, installedByRepo })),
+    ...sourceRepos.map((repo) => () => updateRepo({ repo, grid, installedByRepo })),
     ...mapRepoIds.map((repoId) => () => updateMap({ repoId, grid })),
   ];
 
@@ -162,11 +162,10 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
 
 async function updateRepo(options: {
   repo: { owner: string; repo: string; sourceRoot: string };
-  input: UpdateInput;
   grid: LiveGrid;
   installedByRepo: Map<string, string[]>;
 }): Promise<Outcome> {
-  const { repo, input, grid, installedByRepo } = options;
+  const { repo, grid, installedByRepo } = options;
   const id = REPO_ID(repo);
   const setStage = (stage: GridStage) => grid.set(id, stage);
 
@@ -179,12 +178,17 @@ async function updateRepo(options: {
     const diff = await updateSourceRepo({
       cloneDir,
       sourceRoot: repo.sourceRoot,
+      installedIds: [
+        ...new Set([
+          ...(installedByRepo.get(getInstalledGroupKey("global", repoRef)) ?? []),
+          ...(installedByRepo.get(getInstalledGroupKey("local", repoRef)) ?? []),
+        ]),
+      ],
     });
 
     setStage({ kind: "running", label: "linking" });
     await syncVisibleLinks({
       cwd: process.cwd(),
-      input,
       repo: repoRef,
       globalInstalledIds: installedByRepo.get(getInstalledGroupKey("global", repoRef)) ?? [],
       projectInstalledIds: installedByRepo.get(getInstalledGroupKey("local", repoRef)) ?? [],
@@ -271,19 +275,39 @@ function groupManifestSkillIds(scope: InstallScope, skillIds: string[]): Map<str
   return grouped;
 }
 
-function getManifestSourceRepos(manifest: {
-  items: Array<{ type: "skills" | "map"; repo: string; skills?: string[] }>;
-}): Array<{ owner: string; repo: string; sourceRoot: string }> {
-  return manifest.items
-    .filter((item) => item.type === "skills")
-    .map((item) => {
+function mergeInstalledByRepo(...maps: Array<Map<string, string[]>>): Map<string, string[]> {
+  const merged = new Map<string, string[]>();
+
+  for (const map of maps) {
+    for (const [key, skills] of map.entries()) {
+      merged.set(key, [...new Set([...(merged.get(key) ?? []), ...skills])].sort());
+    }
+  }
+
+  return merged;
+}
+
+function getManifestSourceRepos(
+  manifests: Array<{
+    items: Array<{ type: "skills" | "map"; repo: string; skills?: string[] }>;
+  }>,
+): Array<{ owner: string; repo: string; sourceRoot: string }> {
+  const repos = new Map<string, { owner: string; repo: string; sourceRoot: string }>();
+
+  for (const manifest of manifests) {
+    for (const item of manifest.items.filter((item) => item.type === "skills")) {
       const repo = parseRepoRef(item.repo);
-      return {
+      repos.set(`${repo.owner}/${repo.repo}`, {
         owner: repo.owner,
         repo: repo.repo,
         sourceRoot: getSourceInstallRoot(repo),
-      };
-    });
+      });
+    }
+  }
+
+  return [...repos.values()].sort((left, right) =>
+    `${left.owner}/${left.repo}`.localeCompare(`${right.owner}/${right.repo}`),
+  );
 }
 
 function getInstalledGroupKey(scope: "local" | "global", repo: Pick<RepoRef, "owner" | "repo">) {
@@ -292,7 +316,6 @@ function getInstalledGroupKey(scope: "local" | "global", repo: Pick<RepoRef, "ow
 
 export async function syncVisibleLinks(options: {
   cwd: string;
-  input: UpdateInput;
   repo: RepoRef;
   globalInstalledIds: string[];
   projectInstalledIds: string[];
@@ -300,49 +323,44 @@ export async function syncVisibleLinks(options: {
   removed: string[];
   sourceRoot: string;
 }): Promise<void> {
-  const {
-    cwd,
-    input,
-    repo,
-    globalInstalledIds,
-    projectInstalledIds,
-    updated,
-    removed,
-    sourceRoot,
-  } = options;
+  const { cwd, repo, globalInstalledIds, projectInstalledIds, updated, removed, sourceRoot } =
+    options;
 
-  if (input.global) {
+  if (globalInstalledIds.length > 0) {
     if (updated.length > 0) {
       await relinkExistingSkills(repo, "global", cwd, sourceRoot, globalInstalledIds, updated);
     }
 
-    for (const skill of removed) {
+    const removedGlobalSkills = filterInstalled(removed, globalInstalledIds);
+    for (const skill of removedGlobalSkills) {
       await rm(getVisibleSkillRoot("global", cwd, repo, skill), {
         force: true,
         recursive: true,
       });
     }
 
-    if (globalInstalledIds.length > 0) {
-      await ensureGlobalClaudeSkillsLink(cwd);
-    }
+    await ensureGlobalClaudeSkillsLink(cwd);
 
-    if (removed.length > 0) {
+    if (removedGlobalSkills.length > 0) {
       const manifest = await readScopeManifest("global", cwd);
       await writeScopeManifest(
         "global",
         cwd,
         removeProjectManifestSkillIds(
           manifest,
-          removed.map((skill) => `${repo.owner}/${repo.repo}/${skill}`),
+          removedGlobalSkills.map((skill) => `${repo.owner}/${repo.repo}/${skill}`),
         ),
       );
     }
+  }
+
+  if (projectInstalledIds.length === 0) {
     return;
   }
 
   await ensureProjectClaudeSkillsLink(cwd);
-  await removeProjectSkillLinks(cwd, repo, removed);
+  const removedProjectSkills = filterInstalled(removed, projectInstalledIds);
+  await removeProjectSkillLinks(cwd, repo, removedProjectSkills);
 
   if (!hasProjectManifest(cwd)) {
     return;
@@ -358,8 +376,13 @@ export async function syncVisibleLinks(options: {
   });
   await pruneProjectManifestSkills(
     cwd,
-    removed.map((skill) => `${repo.owner}/${repo.repo}/${skill}`),
+    removedProjectSkills.map((skill) => `${repo.owner}/${repo.repo}/${skill}`),
   );
+}
+
+function filterInstalled(skills: string[], installedIds: string[]): string[] {
+  const installed = new Set(installedIds);
+  return skills.filter((skill) => installed.has(skill));
 }
 
 async function relinkExistingSkills(

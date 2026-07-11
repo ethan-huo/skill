@@ -61,7 +61,6 @@ export type RemoveInput = {
 };
 
 export type UpdateInput = {
-  global: boolean;
   concurrency?: number;
   progress?: boolean;
 };
