@@ -10,6 +10,7 @@ import {
   addScopeManifestSkills,
   readProjectManifest,
   readScopeManifest,
+  writeScopeManifest,
 } from "../src/lib/project-manifest";
 
 describe("project manifest", () => {
@@ -50,6 +51,84 @@ describe("project manifest", () => {
     const raw = await readFile(join(root, ".agents", "skills", "manifest.json"), "utf8");
     expect(raw).toContain('"version": 2');
     expect(raw).toContain('"items"');
+    expect(await readFile(join(root, ".agents", "skills", ".gitignore"), "utf8")).toBe(
+      [
+        "# BEGIN skill managed entries",
+        "/cx.agents.ethan-huo",
+        "/fp-thinking.agents.ethan-huo",
+        "/map.designer-skills.owl-listener",
+        "# END skill managed entries",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  test("preserves user rules while replacing the managed block from the final manifest", async () => {
+    const root = join(tmpdir(), `skill-project-gitignore-${crypto.randomUUID()}`);
+    const skillsRoot = join(root, ".agents", "skills");
+    await mkdir(skillsRoot, { recursive: true });
+    await writeFile(
+      join(skillsRoot, ".gitignore"),
+      [
+        "# User-created skill",
+        "/private-notes",
+        "",
+        "# BEGIN skill managed entries",
+        "/stale.repo.owner",
+        "# END skill managed entries",
+        "",
+        "!/keep-this-rule",
+        "",
+      ].join("\n"),
+    );
+
+    await writeScopeManifest("local", root, {
+      version: 2,
+      items: [{ type: "skills", repo: "owner/repo", skills: ["new-skill"] }],
+    });
+
+    expect(await readFile(join(skillsRoot, ".gitignore"), "utf8")).toBe(
+      [
+        "# User-created skill",
+        "/private-notes",
+        "",
+        "# BEGIN skill managed entries",
+        "/new-skill.repo.owner",
+        "# END skill managed entries",
+        "",
+        "!/keep-this-rule",
+        "",
+      ].join("\n"),
+    );
+
+    await writeScopeManifest("local", root, { version: 2, items: [] });
+    expect(await readFile(join(skillsRoot, ".gitignore"), "utf8")).toBe(
+      [
+        "# User-created skill",
+        "/private-notes",
+        "",
+        "# BEGIN skill managed entries",
+        "# END skill managed entries",
+        "",
+        "!/keep-this-rule",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  test("rejects malformed managed blocks before mutating the manifest", async () => {
+    const root = join(tmpdir(), `skill-project-gitignore-invalid-${crypto.randomUUID()}`);
+    const skillsRoot = join(root, ".agents", "skills");
+    await mkdir(skillsRoot, { recursive: true });
+    await writeFile(join(skillsRoot, ".gitignore"), "# BEGIN skill managed entries\n/stale\n");
+
+    await expect(
+      writeScopeManifest("local", root, {
+        version: 2,
+        items: [{ type: "skills", repo: "owner/repo", skills: ["new-skill"] }],
+      }),
+    ).rejects.toThrow("Invalid skill managed block");
+    await expect(readFile(join(skillsRoot, "manifest.json"), "utf8")).rejects.toThrow();
   });
 
   test("uses the same manifest shape for global scope", async () => {
@@ -71,6 +150,9 @@ describe("project manifest", () => {
 
       const raw = await readFile(join(root, ".agents", "skills", "manifest.json"), "utf8");
       expect(raw).toContain('"version": 2');
+      await expect(
+        readFile(join(root, ".agents", "skills", ".gitignore"), "utf8"),
+      ).rejects.toThrow();
     } finally {
       if (previousHome === undefined) {
         delete process.env.HOME;

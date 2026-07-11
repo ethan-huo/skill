@@ -1,9 +1,17 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { getManifestPath, getProjectManifestPath } from "./paths";
-import { parseFavoriteRef } from "./repo-ref";
+import {
+  getManifestPath,
+  getProjectManifestPath,
+  getVisibleMapDirName,
+  getVisibleSkillDirName,
+} from "./paths";
+import { parseFavoriteRef, parseRepoRef } from "./repo-ref";
 import type { InstallScope } from "../types";
+
+const GITIGNORE_BEGIN = "# BEGIN skill managed entries";
+const GITIGNORE_END = "# END skill managed entries";
 
 export type ProjectManifestV1 = {
   skills: string[];
@@ -74,11 +82,20 @@ export async function writeScopeManifest(
   cwd: string,
   manifest: ProjectManifest,
 ): Promise<void> {
-  await writeManifestFile(getManifestPath(scope, cwd), manifest);
+  const next = normalizeProjectManifest(manifest);
+  const manifestPath = getManifestPath(scope, cwd);
+  // Validate user-owned ignore content before committing the manifest mutation.
+  const projectGitignore =
+    scope === "local" ? await renderProjectGitignore(dirname(manifestPath), next) : null;
+
+  await writeManifestFile(manifestPath, next);
+  if (projectGitignore !== null) {
+    await writeFile(projectGitignore.path, projectGitignore.contents);
+  }
 }
 
 export async function writeProjectManifest(cwd: string, manifest: ProjectManifest): Promise<void> {
-  await writeManifestFile(getProjectManifestPath(cwd), manifest);
+  await writeScopeManifest("local", cwd, manifest);
 }
 
 async function writeManifestFile(filePath: string, manifest: ProjectManifest): Promise<void> {
@@ -86,6 +103,74 @@ async function writeManifestFile(filePath: string, manifest: ProjectManifest): P
 
   await mkdir(dirname(filePath), { recursive: true });
   await writeFile(filePath, `${JSON.stringify(next, null, 2)}\n`);
+}
+
+async function renderProjectGitignore(
+  skillsRoot: string,
+  manifest: ProjectManifest,
+): Promise<{ path: string; contents: string }> {
+  const path = `${skillsRoot}/.gitignore`;
+  const existing = await readFile(path, "utf8").catch((error: unknown) => {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return "";
+    }
+
+    throw error;
+  });
+  const eol = existing.includes("\r\n") ? "\r\n" : "\n";
+  const lines = existing.length === 0 ? [] : existing.replace(/\r?\n$/, "").split(/\r?\n/);
+  const beginIndexes = findLineIndexes(lines, GITIGNORE_BEGIN);
+  const endIndexes = findLineIndexes(lines, GITIGNORE_END);
+
+  if (
+    beginIndexes.length !== endIndexes.length ||
+    beginIndexes.length > 1 ||
+    (beginIndexes.length === 1 && beginIndexes[0]! >= endIndexes[0]!)
+  ) {
+    throw new Error(`Invalid skill managed block at ${path}.`);
+  }
+
+  const block = [GITIGNORE_BEGIN, ...getManagedIgnoreRules(manifest), GITIGNORE_END];
+  if (beginIndexes.length === 1) {
+    lines.splice(beginIndexes[0]!, endIndexes[0]! - beginIndexes[0]! + 1, ...block);
+  } else {
+    if (lines.length > 0 && lines.at(-1) !== "") {
+      lines.push("");
+    }
+    lines.push(...block);
+  }
+
+  return { path, contents: `${lines.join(eol)}${eol}` };
+}
+
+function findLineIndexes(lines: string[], target: string): number[] {
+  const indexes: number[] = [];
+  for (const [index, line] of lines.entries()) {
+    if (line === target) {
+      indexes.push(index);
+    }
+  }
+  return indexes;
+}
+
+function getManagedIgnoreRules(manifest: ProjectManifest): string[] {
+  const rules: string[] = [];
+  for (const item of manifest.items) {
+    const repo = parseRepoRef(item.repo);
+    if (item.type === "map") {
+      rules.push(`/${escapeGitignoreLiteral(getVisibleMapDirName(repo))}`);
+      continue;
+    }
+
+    for (const skill of item.skills) {
+      rules.push(`/${escapeGitignoreLiteral(getVisibleSkillDirName(repo, skill))}`);
+    }
+  }
+  return rules.sort();
+}
+
+function escapeGitignoreLiteral(value: string): string {
+  return value.replace(/[\\!#*?[\] ]/g, "\\$&");
 }
 
 export async function addScopeManifestSkills(

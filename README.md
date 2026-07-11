@@ -174,6 +174,8 @@ Install roots:
 - local map skills: `{cwd}/.agents/skills/map.{repo}.{owner}/`
 - shared sources: `~/.agents/.skills/{owner}/{repo}/`
 - local manifest: `{cwd}/.agents/skills/manifest.json` stores versioned `skills` and `map` items, not visible link names
+- local manifest writes maintain an exact-name block in `{cwd}/.agents/skills/.gitignore`; entries outside that block, including user-created skills, are preserved
+- generated ignore rules prevent new links from entering Git but do not untrack links already present in the index; existing projects must remove those generated entries from the index once
 - global manifest: `~/.agents/skills/manifest.json` stores versioned `skills` items, not visible link names
 
 To migrate an existing global install from the old nested visible layout to one-level links:

@@ -1,6 +1,6 @@
 {
   "name": "skill",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "description": "Install and remove agent skills from GitHub repositories.",
   "bin": {
     "skill": "./src/cli.ts"
