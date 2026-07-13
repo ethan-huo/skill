@@ -8,14 +8,6 @@ import { readSkillFrontmatterMetadata } from "./skill-frontmatter";
 import type { RepoRef, SkillCandidate } from "../types";
 
 const INTENT_MAX_LENGTH = 180;
-const MAP_RECOMMENDATION_MIN_SKILLS = 4;
-
-export async function shouldRecommendRepoMap(
-  _repoDir: string,
-  skills: SkillCandidate[],
-): Promise<boolean> {
-  return skills.length >= MAP_RECOMMENDATION_MIN_SKILLS;
-}
 
 export async function writeProjectSkillMap(options: {
   cloneDir: string;

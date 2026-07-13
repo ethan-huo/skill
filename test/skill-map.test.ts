@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { renderSkillMap, shouldRecommendRepoMap } from "../src/lib/skill-map";
+import { renderSkillMap } from "../src/lib/skill-map";
 import { syncProjectMapFromClone } from "../src/lib/project-skills";
 import type { RepoRef, SkillCandidate } from "../src/types";
 
@@ -42,37 +42,6 @@ describe("skill map", () => {
     expect(mapContents).toContain("- When Improve visual taste, read `skills/taste/SKILL.md`.");
     expect(mapContents).not.toContain("stale map");
     expect(await readFile(join(legacyMapRoot, "SKILL.md"), "utf8").catch(() => null)).toBeNull();
-  });
-
-  test("recommends maps for repositories with four or more skills", async () => {
-    const root = join(tmpdir(), `skill-flat-catalog-${crypto.randomUUID()}`);
-    const skills: SkillCandidate[] = [];
-
-    for (let index = 0; index < 4; index += 1) {
-      const relativeDir = `skill-${index}`;
-      const sourceDir = `skills/${relativeDir}`;
-      await mkdir(join(root, sourceDir), { recursive: true });
-      await writeFile(join(root, sourceDir, "SKILL.md"), "---\nname: test\n---\n");
-      await mkdir(join(root, sourceDir, "references"), { recursive: true });
-      await writeFile(join(root, sourceDir, "references", "api.md"), "details\n");
-      skills.push({ relativeDir, sourceDir, displayLabel: relativeDir });
-    }
-
-    expect(await shouldRecommendRepoMap(root, skills)).toBe(true);
-  });
-
-  test("does not recommend maps for repositories with three or fewer skills", async () => {
-    const smallRoot = join(tmpdir(), `skill-small-catalog-${crypto.randomUUID()}`);
-    const smallSkills: SkillCandidate[] = [];
-    for (let index = 0; index < 3; index += 1) {
-      const relativeDir = `skill-${index}`;
-      const sourceDir = `skills/${relativeDir}`;
-      await mkdir(join(smallRoot, sourceDir), { recursive: true });
-      await writeFile(join(smallRoot, sourceDir, "SKILL.md"), "---\nname: test\n---\n");
-      smallSkills.push({ relativeDir, sourceDir, displayLabel: relativeDir });
-    }
-
-    expect(await shouldRecommendRepoMap(smallRoot, smallSkills)).toBe(false);
   });
 
   test("renders a single source line and path-only intent rows", async () => {

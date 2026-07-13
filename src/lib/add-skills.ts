@@ -12,10 +12,14 @@ import {
   getSourceInstallRoot,
   getVisibleMapRoot,
 } from "./paths";
-import { addScopeManifestMap, addScopeManifestSkills } from "./project-manifest";
-import { selectOne } from "./prompt";
+import {
+  addScopeManifestMap,
+  addScopeManifestSkills,
+  getProjectManifestMapRepos,
+  readScopeManifest,
+} from "./project-manifest";
 import { selectSkills } from "./select-skills";
-import { shouldRecommendRepoMap, writeProjectSkillMap } from "./skill-map";
+import { writeProjectSkillMap } from "./skill-map";
 import type { InstallScope, InstalledSkill, RepoRef, SkillCandidate } from "../types";
 
 export type RepoSkillsInstallResult = {
@@ -109,28 +113,23 @@ export async function selectRepoSkills(options: {
         )
       : (options.initialSelectors ?? []);
 
-  if (
-    !options.global &&
-    options.selectors.length === 0 &&
-    initialSelectors.length === 0 &&
-    (await shouldRecommendRepoMap(cloneDir, discoveredSkills))
-  ) {
-    const selectedMode = await selectFlatCatalogInstallMode(
-      options.repo.display,
-      discoveredSkills.length,
-    );
-    if (selectedMode === "map") {
-      return { cloneDir, selectedSkills: [], selectedMode };
-    }
-  }
-
-  const selectedSkills = await selectSkills(options.repo.display, discoveredSkills, {
+  const selection = await selectSkills(options.repo.display, discoveredSkills, {
     selectors: options.selectors,
     initialSelectors,
+    initialMap:
+      !options.global &&
+      options.selectors.length === 0 &&
+      initialSelectors.length === 0 &&
+      (await hasInstalledRepoMap(options.cwd, options.repo)),
+    offerMap: !options.global,
     promptForSelection: options.promptForSelection,
   });
 
-  return { cloneDir, selectedSkills, selectedMode: "skills" };
+  return {
+    cloneDir,
+    selectedSkills: selection.skills,
+    selectedMode: selection.mode,
+  };
 }
 
 export async function installGlobalSkills(options: {
@@ -260,26 +259,7 @@ async function assertNoConflictingGlobalSkills(
   );
 }
 
-async function selectFlatCatalogInstallMode(
-  repoDisplay: string,
-  skillCount: number,
-): Promise<"map" | "skills"> {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    return "map";
-  }
-
-  return selectOne({
-    message: `${repoDisplay} contains ${skillCount} skills.`,
-    options: [
-      {
-        label: "Install repo map (recommended)",
-        value: "map",
-      },
-      {
-        label: "Select individual skills",
-        value: "skills",
-      },
-    ],
-    initialValue: "map",
-  });
+async function hasInstalledRepoMap(cwd: string, repo: RepoRef): Promise<boolean> {
+  const repoId = `${repo.owner}/${repo.repo}`;
+  return getProjectManifestMapRepos(await readScopeManifest("local", cwd)).includes(repoId);
 }

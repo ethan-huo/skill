@@ -1,19 +1,27 @@
-import { searchableMultiselect } from "./prompt";
+import { exclusiveMultiselect, searchableMultiselect } from "./prompt";
 import type { SkillCandidate } from "../types";
+
+const MAP_SELECTION = "__skill_map__";
 
 type SelectSkillsOptions = {
   selectors?: string[];
   initialSelectors?: string[];
+  initialMap?: boolean;
+  offerMap?: boolean;
   promptForSelection?: boolean;
 };
+
+export type SkillSelection =
+  | { mode: "map"; skills: [] }
+  | { mode: "skills"; skills: SkillCandidate[] };
 
 export async function selectSkills(
   repoDisplay: string,
   skills: SkillCandidate[],
   options: SelectSkillsOptions = {},
-): Promise<SkillCandidate[]> {
+): Promise<SkillSelection> {
   if (skills.length === 0) {
-    return [];
+    return { mode: "skills", skills: [] };
   }
 
   const selectors = options.selectors ?? [];
@@ -22,7 +30,7 @@ export async function selectSkills(
   );
 
   if (skills.length === 1 && selectors.length === 0) {
-    return skills;
+    return { mode: "skills", skills };
   }
 
   if (selectors.length > 0) {
@@ -35,7 +43,7 @@ export async function selectSkills(
         `Unknown skill selector(s): ${missing.join(", ")}. Use skill folder IDs from the prompt list.`,
       );
     }
-    return selected;
+    return { mode: "skills", skills: selected };
   }
 
   if (!options.promptForSelection && initialSelectors.size === 0 && skills.length > 1) {
@@ -52,18 +60,34 @@ export async function selectSkills(
     );
   }
 
-  const response = await searchableMultiselect({
-    message: `Select skills to install from ${repoDisplay}`,
-    options: skills.map((skill) => ({
-      label: skill.displayLabel,
-      value: skill.relativeDir,
-    })),
-    initialValues: skills
-      .map((skill) => skill.relativeDir)
-      .filter((relativeDir) => initialSelectors.has(relativeDir)),
-    required: true,
-  });
+  const skillOptions = skills.map((skill) => ({
+    label: skill.displayLabel,
+    value: skill.relativeDir,
+  }));
+  const initialValues = skills
+    .map((skill) => skill.relativeDir)
+    .filter((relativeDir) => initialSelectors.has(relativeDir));
+  const response = options.offerMap
+    ? await exclusiveMultiselect({
+        message: `Select skills to install from ${repoDisplay}`,
+        exclusiveValue: MAP_SELECTION,
+        options: [{ label: "Install as repo map", value: MAP_SELECTION }, ...skillOptions],
+        initialValues: options.initialMap ? [MAP_SELECTION] : initialValues,
+      })
+    : await searchableMultiselect({
+        message: `Select skills to install from ${repoDisplay}`,
+        options: skillOptions,
+        initialValues,
+        required: true,
+      });
+
+  if (response.includes(MAP_SELECTION)) {
+    return { mode: "map", skills: [] };
+  }
 
   const selectedPaths = new Set(response);
-  return skills.filter((skill) => selectedPaths.has(skill.relativeDir));
+  return {
+    mode: "skills",
+    skills: skills.filter((skill) => selectedPaths.has(skill.relativeDir)),
+  };
 }

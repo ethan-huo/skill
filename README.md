@@ -148,7 +148,7 @@ skill favorite remove owner/repo owner/repo/skill
 - `owner/repo/skill` is shorthand for `skill add owner/repo --skill skill`
 - visible skill folders use lowercase skill-first aliases: `{skill.path}.{repo}.{owner}` while source IDs remain `{owner}/{repo}/{folder}`
 - `skill install owner/repo --map` writes `.agents/skills/map.{repo}.{owner}/SKILL.md` with a `ctx read github://owner/repo/<path>` rule and `When ..., read path/SKILL.md` rows
-- repo-level project installs recommend a map before individual selection when a repo has more than three discovered skills
+- interactive project installs show "Install as repo map" above individual skills; selecting either mode disables the other
 - interactive repo skill selection preselects already installed skills from the target scope; `--global` preselects global installs, while project installs preselect project links
 - repo maps and selected skill installs are mutually exclusive per repo; installing one mode removes the other mode from the manifest and visible aliases
 - project-scope `skill update` regenerates map items recorded in `.agents/skills/manifest.json`
