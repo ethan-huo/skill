@@ -90,4 +90,28 @@ describe("skill map", () => {
       ].join("\n"),
     );
   });
+
+  test("renders root skills with a repository-relative file path", async () => {
+    const root = join(tmpdir(), `skill-map-root-${crypto.randomUUID()}`);
+    await mkdir(root, { recursive: true });
+    await writeFile(
+      join(root, "SKILL.md"),
+      "---\nname: root\ndescription: Work from the repository root\n---\n",
+    );
+
+    expect(
+      await renderSkillMap({
+        cloneDir: root,
+        repo,
+        repoDescription: "Root skill repository",
+        skills: [
+          {
+            relativeDir: "root",
+            sourceDir: ".",
+            displayLabel: "root",
+          },
+        ],
+      }),
+    ).toContain("- When Work from the repository root, read `SKILL.md`.");
+  });
 });

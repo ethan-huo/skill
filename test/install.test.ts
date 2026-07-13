@@ -46,6 +46,31 @@ describe("install helpers", () => {
     expect(await stat(join(target, ".codex")).catch(() => null)).toBeNull();
   });
 
+  test("installs a root skill without copying checkout metadata", async () => {
+    const root = join(tmpdir(), `skill-root-install-${crypto.randomUUID()}`);
+    const repoDir = join(root, "repo");
+    const target = join(root, ".agents", ".skills", "blader", "humanizer");
+
+    await mkdir(join(repoDir, ".git"), { recursive: true });
+    await writeFile(join(repoDir, "SKILL.md"), "---\nname: humanizer\n---\n");
+    await writeFile(join(repoDir, "reference.md"), "supporting material");
+    await writeFile(join(repoDir, ".git", "HEAD"), "ref: refs/heads/main\n");
+
+    await upsertInstalledSkills(repoDir, target, [
+      {
+        relativeDir: "root",
+        sourceDir: ".",
+        displayLabel: "root",
+      },
+    ]);
+
+    expect(await readFile(join(target, "root", "SKILL.md"), "utf8")).toContain("humanizer");
+    expect(await readFile(join(target, "root", "reference.md"), "utf8")).toBe(
+      "supporting material",
+    );
+    expect(await stat(join(target, "root", ".git")).catch(() => null)).toBeNull();
+  });
+
   test("removes installed directory trees", async () => {
     const root = join(tmpdir(), `skill-remove-${crypto.randomUUID()}`);
     const target = join(root, ".agents", "skills");

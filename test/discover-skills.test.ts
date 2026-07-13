@@ -7,6 +7,19 @@ import { describe, expect, test } from "bun:test";
 import { discoverSkills } from "../src/lib/discover-skills";
 
 describe("discoverSkills", () => {
+  test("finds a skill at the repository root", async () => {
+    const root = await mkTempDir();
+    await writeFile(join(root, "SKILL.md"), "---\nname: demo\ndescription: Demo skill\n---\n");
+
+    expect(await discoverSkills(root)).toEqual([
+      {
+        relativeDir: "root",
+        sourceDir: ".",
+        displayLabel: "root",
+      },
+    ]);
+  });
+
   test("finds nested skills and normalizes them to folder IDs", async () => {
     const root = await mkTempDir();
     await writeSkill(root, "skills/cx");

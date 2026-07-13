@@ -142,7 +142,7 @@ skill favorite remove owner/repo owner/repo/skill
 
 ## How Installation Works
 
-- `skill` scans a cloned repository for `SKILL.md`, including `.codex/skills`, while ignoring repo-internal agent config roots such as `.agents`
+- `skill` scans a cloned repository for `SKILL.md`, including the repository root and `.codex/skills`, while ignoring repo-internal agent config roots such as `.agents`; a root-level skill has the stable folder ID `root`
 - discovered skill IDs are normalized to `{owner}/{repo}/{folder}`
 - copied `SKILL.md` files with repairable malformed YAML frontmatter are rewritten with Bun's YAML serializer before entering the shared source cache
 - `owner/repo/skill` is shorthand for `skill add owner/repo --skill skill`

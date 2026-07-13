@@ -71,10 +71,14 @@ export async function renderSkillMap(options: {
       join(options.cloneDir, skill.sourceDir, "SKILL.md"),
     ).catch(() => ({ name: "", description: "" }));
     const intent = summarizeIntent(metadata.description, skill);
-    lines.push(`- When ${intent}, read \`${skill.sourceDir}/SKILL.md\`.`);
+    lines.push(`- When ${intent}, read \`${getSkillFilePath(skill)}\`.`);
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function getSkillFilePath(skill: SkillCandidate): string {
+  return skill.sourceDir === "." ? "SKILL.md" : `${skill.sourceDir}/SKILL.md`;
 }
 
 function summarizeIntent(description: string, skill: SkillCandidate): string {

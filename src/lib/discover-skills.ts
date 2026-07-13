@@ -1,4 +1,4 @@
-import { basename, dirname, posix, relative } from "node:path";
+import { basename, dirname, join, posix, relative } from "node:path";
 
 import type { SkillCandidate } from "../types";
 
@@ -16,10 +16,20 @@ const IGNORED_ROOTS = new Set([
   ".trae",
   ".trae-cn",
 ]);
+const ROOT_SKILL_ID = "root";
 
 export async function discoverSkills(repoDir: string): Promise<SkillCandidate[]> {
   const glob = new Bun.Glob("**/SKILL.md");
   const discovered = new Map<string, SkillCandidate>();
+
+  // `**/SKILL.md` only matches descendants, but a repository root is also a valid skill bundle.
+  if (await Bun.file(join(repoDir, "SKILL.md")).exists()) {
+    addCandidate(discovered, {
+      relativeDir: ROOT_SKILL_ID,
+      sourceDir: ".",
+      displayLabel: ROOT_SKILL_ID,
+    });
+  }
 
   for await (const match of glob.scan({
     cwd: repoDir,
@@ -40,18 +50,22 @@ export async function discoverSkills(repoDir: string): Promise<SkillCandidate[]>
       sourceDir,
       displayLabel: relativeDir,
     } satisfies SkillCandidate;
-    const currentSkill = discovered.get(relativeDir);
-
-    // Some repos duplicate the same skill for multiple agents. Pick one stable source
-    // so the installed layout remains `owner/repo/folder` instead of mirroring upstream.
-    if (!currentSkill || compareCandidate(nextSkill, currentSkill) < 0) {
-      discovered.set(relativeDir, nextSkill);
-    }
+    addCandidate(discovered, nextSkill);
   }
 
   return [...discovered.values()].sort((left, right) =>
     left.relativeDir.localeCompare(right.relativeDir),
   );
+}
+
+function addCandidate(discovered: Map<string, SkillCandidate>, nextSkill: SkillCandidate): void {
+  const currentSkill = discovered.get(nextSkill.relativeDir);
+
+  // Some repos duplicate the same skill for multiple agents. Pick one stable source
+  // so the installed layout remains `owner/repo/folder` instead of mirroring upstream.
+  if (!currentSkill || compareCandidate(nextSkill, currentSkill) < 0) {
+    discovered.set(nextSkill.relativeDir, nextSkill);
+  }
 }
 
 function toPortableRelative(rootDir: string, targetDir: string): string {

@@ -27,7 +27,7 @@ export async function replaceInstalledSkills(
       const sourceDir = join(repoDir, skill.sourceDir);
       const destDir = join(stagingRoot, skill.relativeDir);
       await mkdir(dirname(destDir), { recursive: true });
-      await cp(sourceDir, destDir, { recursive: true });
+      await copySkillDirectory(sourceDir, destDir);
       await repairSkillFrontmatterFile(join(destDir, "SKILL.md"));
     }
 
@@ -51,9 +51,17 @@ export async function upsertInstalledSkills(
     const destDir = join(targetRoot, skill.relativeDir);
     await mkdir(dirname(destDir), { recursive: true });
     await rm(destDir, { force: true, recursive: true });
-    await cp(sourceDir, destDir, { recursive: true });
+    await copySkillDirectory(sourceDir, destDir);
     await repairSkillFrontmatterFile(join(destDir, "SKILL.md"));
   }
+}
+
+async function copySkillDirectory(sourceDir: string, destDir: string): Promise<void> {
+  await cp(sourceDir, destDir, {
+    recursive: true,
+    // Root-level skills use the checkout itself as their bundle; cache metadata is never skill content.
+    filter: (source) => source !== join(sourceDir, ".git"),
+  });
 }
 
 export async function linkInstalledSkills(
