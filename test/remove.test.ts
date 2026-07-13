@@ -86,6 +86,39 @@ describe("remove command", () => {
     });
   });
 
+  test("offers manifest maps in the interactive remove selector", async () => {
+    const root = join(tmpdir(), `skill-remove-map-selector-${crypto.randomUUID()}`);
+    const visibleMap = join(root, ".agents", "skills", "map.designer-skills.owl-listener");
+    const prompts: Array<{ label: string; value: string }[]> = [];
+
+    await mkdir(visibleMap, { recursive: true });
+    await writeFile(join(visibleMap, "SKILL.md"), "---\nname: map\ndescription: map\n---\n");
+    await writeManifest(root, [{ type: "map", repo: "Owl-Listener/designer-skills" }]);
+
+    process.chdir(root);
+    await runRemove(
+      { input: { repo: [], global: false } },
+      {
+        isTty: () => true,
+        searchableMultiselect: (options) => {
+          prompts.push(options.options);
+          return Promise.resolve(["Owl-Listener/designer-skills"]);
+        },
+      },
+    );
+
+    expect(prompts).toEqual([
+      [
+        {
+          label: "Owl-Listener/designer-skills (map)",
+          value: "Owl-Listener/designer-skills",
+        },
+      ],
+    ]);
+    expect(await lstat(visibleMap).catch(() => null)).toBeNull();
+    expect(await readManifest(root)).toEqual({ version: 2, items: [] });
+  });
+
   test("removes a selected global skill from visible links and manifest", async () => {
     const root = join(tmpdir(), `skill-remove-global-manifest-${crypto.randomUUID()}`);
     const previousHome = process.env.HOME;

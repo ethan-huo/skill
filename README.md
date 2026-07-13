@@ -101,6 +101,7 @@ skill favorite remove owner/repo owner/repo/skill
 | `skill add owner/repo/skill`               | Install one known skill directly                             |
 | `skill add owner/repo --skill a --skill b` | Install multiple skills from one repo without prompts        |
 | `skill add owner/repo`                     | Interactive selection when the repo contains multiple skills |
+| `skill remove`                             | Interactively remove local skills or repo maps               |
 | `skill remove --global`                    | Interactively remove one or more global skills               |
 | `skill remove owner/repo`                  | Remove all installed skills from one repo                    |
 | `skill remove owner/repo/skill`            | Remove one installed skill without touching siblings         |
@@ -162,6 +163,7 @@ skill favorite remove owner/repo owner/repo/skill
 - `skill update` runs all source repos in parallel (default 8 in flight) and renders a live progress grid on stderr; the per-repo `▶ / ~ / - / +` summary plus a final totals line are printed to stdout in stable order so pipelines stay grep-friendly
 - `skill update` migrates legacy visible aliases such as `{owner}.{repo}.{skill}` and `{owner}.{repo}.map` to the current skill-first aliases
 - project-scope `skill update` removes visible links for upstream skills that disappeared, including stale symlinks whose source target is already gone
+- interactive `skill remove` includes repo maps recorded in the target scope manifest alongside visible skill links
 - `skill remove` removes matching visible aliases and manifest entries from the target scope; empty repo skill items are pruned
 - `skill remove owner/repo --global` removes that shared source cache and all matching favorite refs, so future `skill update` runs stop tracking the repo
 

@@ -15,6 +15,7 @@ import {
   getVisibleSkillRoot,
 } from "../lib/paths";
 import {
+  getProjectManifestMapRepos,
   readScopeManifest,
   removeProjectManifestRepo,
   removeProjectManifestSkillIds,
@@ -25,9 +26,24 @@ import { parseRepoSkillTarget } from "../lib/repo-ref";
 import { removeSourceRepo } from "../lib/source-skills";
 import type { RemoveInput } from "../types";
 
-export async function runRemove(args: { input: RemoveInput }): Promise<void> {
+type RemovePrompt = (options: {
+  message: string;
+  options: Array<{ label: string; value: string }>;
+  required?: boolean;
+}) => Promise<string[]>;
+
+type RemoveServices = {
+  searchableMultiselect?: RemovePrompt;
+  isTty?: () => boolean;
+};
+
+export async function runRemove(
+  args: { input: RemoveInput },
+  services: RemoveServices = {},
+): Promise<void> {
   const input = args.input;
-  const refs = input.repo.length > 0 ? input.repo : await selectInstalledSkillRefs(input.global);
+  const refs =
+    input.repo.length > 0 ? input.repo : await selectInstalledSkillRefs(input.global, services);
   for (const ref of refs) {
     await removeRef(ref, input.global);
   }
@@ -99,27 +115,40 @@ async function removeManifestRef(
   return true;
 }
 
-async function selectInstalledSkillRefs(global: boolean): Promise<string[]> {
+async function selectInstalledSkillRefs(
+  global: boolean,
+  services: RemoveServices,
+): Promise<string[]> {
   const scope = getInstallScope(global);
   const installedSkills = (await listInstalledSkills(process.cwd())).filter(
     (skill) => skill.scope === scope,
   );
+  const mapRepos = getProjectManifestMapRepos(await readScopeManifest(scope, process.cwd()));
+  const options = [
+    ...installedSkills.map((skill) => ({
+      label: skill.description ? `${skill.id} (${skill.description})` : skill.id,
+      value: skill.id,
+    })),
+    // Maps are generated directories rather than source-cache symlinks, so the manifest is
+    // the installed-state source of truth for exposing them in the remove selector.
+    ...mapRepos.map((repo) => ({ label: `${repo} (map)`, value: repo })),
+  ].sort((left, right) => left.value.localeCompare(right.value));
 
-  if (installedSkills.length === 0) {
+  if (options.length === 0) {
     console.log(fmt.info(`No ${scope} skills are installed.`));
     return [];
   }
 
-  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+  const isTty = services.isTty ?? (() => Boolean(process.stdin.isTTY && process.stdout.isTTY));
+  if (!isTty()) {
     throw new Error("Interactive remove requires a TTY or explicit refs.");
   }
 
-  const response = await searchableMultiselect({
+  const selectMany =
+    services.searchableMultiselect ?? ((promptOptions) => searchableMultiselect(promptOptions));
+  const response = await selectMany({
     message: `Select ${scope} skills to remove`,
-    options: installedSkills.map((skill) => ({
-      label: skill.description ? `${skill.id} (${skill.description})` : skill.id,
-      value: skill.id,
-    })),
+    options,
     required: true,
   });
 
