@@ -131,46 +131,6 @@ describe("project manifest", () => {
     await expect(readFile(join(skillsRoot, "manifest.json"), "utf8")).rejects.toThrow();
   });
 
-  test("projects package links into root .loreignore when present (Lore has no nested ignore)", async () => {
-    const root = join(tmpdir(), `skill-project-loreignore-${crypto.randomUUID()}`);
-    const skillsRoot = join(root, ".agents", "skills");
-    await mkdir(skillsRoot, { recursive: true });
-    await writeFile(
-      join(root, ".loreignore"),
-      ["# hand-written", "node_modules/", ""].join("\n"),
-    );
-
-    await writeScopeManifest("local", root, {
-      version: 2,
-      items: [{ type: "skills", repo: "celados/slack", skills: ["slack"] }],
-    });
-
-    expect(await readFile(join(root, ".loreignore"), "utf8")).toBe(
-      [
-        "# hand-written",
-        "node_modules/",
-        "",
-        "# BEGIN skill managed entries",
-        "/.agents/skills/slack.slack.celados",
-        "/.claude/skills/slack.slack.celados",
-        "# END skill managed entries",
-        "",
-      ].join("\n"),
-    );
-  });
-
-  test("skips root .loreignore projection when the file is absent", async () => {
-    const root = join(tmpdir(), `skill-project-no-loreignore-${crypto.randomUUID()}`);
-    await mkdir(join(root, ".agents", "skills"), { recursive: true });
-
-    await writeScopeManifest("local", root, {
-      version: 2,
-      items: [{ type: "skills", repo: "celados/slack", skills: ["slack"] }],
-    });
-
-    await expect(readFile(join(root, ".loreignore"), "utf8")).rejects.toThrow();
-  });
-
   test("uses the same manifest shape for global scope", async () => {
     const root = join(tmpdir(), `skill-global-manifest-${crypto.randomUUID()}`);
     const previousHome = process.env.HOME;

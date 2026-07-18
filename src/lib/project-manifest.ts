@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 
 import {
   getManifestPath,
@@ -12,11 +12,6 @@ import type { InstallScope } from "../types";
 
 const GITIGNORE_BEGIN = "# BEGIN skill managed entries";
 const GITIGNORE_END = "# END skill managed entries";
-// Lore only reads the workspace-root `.loreignore` (no nested ignores). Skill
-// package symlinks must be projected there so install trees stay out of Lore
-// while `manifest.json` remains Lore-owned. See berth/docker/lore/WORKSPACE-SYNC.md §1.
-const LOREIGNORE_BEGIN = "# BEGIN skill managed entries";
-const LOREIGNORE_END = "# END skill managed entries";
 
 export type ProjectManifestV1 = {
   skills: string[];
@@ -92,15 +87,10 @@ export async function writeScopeManifest(
   // Validate user-owned ignore content before committing the manifest mutation.
   const projectGitignore =
     scope === "local" ? await renderProjectGitignore(dirname(manifestPath), next) : null;
-  // Root `.loreignore` only — Lore does not honor nested ignore files.
-  const rootLoreignore = scope === "local" ? await renderRootLoreignore(cwd, next) : null;
 
   await writeManifestFile(manifestPath, next);
   if (projectGitignore !== null) {
     await writeFile(projectGitignore.path, projectGitignore.contents);
-  }
-  if (rootLoreignore !== null) {
-    await writeFile(rootLoreignore.path, rootLoreignore.contents);
   }
 }
 
@@ -119,79 +109,28 @@ async function renderProjectGitignore(
   skillsRoot: string,
   manifest: ProjectManifest,
 ): Promise<{ path: string; contents: string }> {
-  return renderManagedIgnoreFile({
-    path: join(skillsRoot, ".gitignore"),
-    begin: GITIGNORE_BEGIN,
-    end: GITIGNORE_END,
-    rules: getManagedIgnoreRules(manifest),
-    createIfMissing: true,
-  });
-}
-
-/**
- * Project skill package links into the workspace-root `.loreignore` when present.
- * Nested `.loreignore` is unsupported by Lore — this is the only effective surface.
- */
-async function renderRootLoreignore(
-  cwd: string,
-  manifest: ProjectManifest,
-): Promise<{ path: string; contents: string } | null> {
-  const path = join(cwd, ".loreignore");
+  const path = `${skillsRoot}/.gitignore`;
   const existing = await readFile(path, "utf8").catch((error: unknown) => {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-      return null;
+      return "";
     }
 
     throw error;
   });
-  if (existing === null) {
-    return null;
-  }
-
-  return renderManagedIgnoreFile({
-    path,
-    begin: LOREIGNORE_BEGIN,
-    end: LOREIGNORE_END,
-    rules: getRootLoreignoreRules(manifest),
-    createIfMissing: false,
-    existing,
-  });
-}
-
-async function renderManagedIgnoreFile(options: {
-  path: string;
-  begin: string;
-  end: string;
-  rules: string[];
-  createIfMissing: boolean;
-  existing?: string;
-}): Promise<{ path: string; contents: string }> {
-  const existing =
-    options.existing ??
-    (await readFile(options.path, "utf8").catch((error: unknown) => {
-      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-        if (!options.createIfMissing) {
-          throw error;
-        }
-        return "";
-      }
-
-      throw error;
-    }));
   const eol = existing.includes("\r\n") ? "\r\n" : "\n";
   const lines = existing.length === 0 ? [] : existing.replace(/\r?\n$/, "").split(/\r?\n/);
-  const beginIndexes = findLineIndexes(lines, options.begin);
-  const endIndexes = findLineIndexes(lines, options.end);
+  const beginIndexes = findLineIndexes(lines, GITIGNORE_BEGIN);
+  const endIndexes = findLineIndexes(lines, GITIGNORE_END);
 
   if (
     beginIndexes.length !== endIndexes.length ||
     beginIndexes.length > 1 ||
     (beginIndexes.length === 1 && beginIndexes[0]! >= endIndexes[0]!)
   ) {
-    throw new Error(`Invalid skill managed block at ${options.path}.`);
+    throw new Error(`Invalid skill managed block at ${path}.`);
   }
 
-  const block = [options.begin, ...options.rules, options.end];
+  const block = [GITIGNORE_BEGIN, ...getManagedIgnoreRules(manifest), GITIGNORE_END];
   if (beginIndexes.length === 1) {
     lines.splice(beginIndexes[0]!, endIndexes[0]! - beginIndexes[0]! + 1, ...block);
   } else {
@@ -201,7 +140,7 @@ async function renderManagedIgnoreFile(options: {
     lines.push(...block);
   }
 
-  return { path: options.path, contents: `${lines.join(eol)}${eol}` };
+  return { path, contents: `${lines.join(eol)}${eol}` };
 }
 
 function findLineIndexes(lines: string[], target: string): number[] {
@@ -226,18 +165,6 @@ function getManagedIgnoreRules(manifest: ProjectManifest): string[] {
     for (const skill of item.skills) {
       rules.push(`/${escapeGitignoreLiteral(getVisibleSkillDirName(repo, skill))}`);
     }
-  }
-  return rules.sort();
-}
-
-/** Root-anchored rules for both agent skill entrypoints (claude is usually a symlink). */
-function getRootLoreignoreRules(manifest: ProjectManifest): string[] {
-  const rules: string[] = [];
-  for (const relative of getManagedIgnoreRules(manifest)) {
-    // relative is `/name` under `.agents/skills`
-    const name = relative.startsWith("/") ? relative.slice(1) : relative;
-    rules.push(`/.agents/skills/${name}`);
-    rules.push(`/.claude/skills/${name}`);
   }
   return rules.sort();
 }
