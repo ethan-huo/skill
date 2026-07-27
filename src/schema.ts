@@ -12,7 +12,8 @@ export const schema = {
         "skill add ethan-huo/agents",
         "skill add pbakaus/impeccable/audit",
         "skill add https://github.com/ethan-huo/agents --global",
-        "skill add ethan-huo/agents --skill cx --skill fp-thinking",
+        "skill add ethan-huo/agents --skills 'cx,fp-thinking'",
+        "skill add backnotprop/plannotator --skills 'core/{plannotator-annotate,plannotator-review},claude/plannotator-last'",
       ],
     })
     .args("repo")
@@ -21,7 +22,15 @@ export const schema = {
         v.object({
           repo: v.string(),
           global: v.optional(v.boolean(), false),
-          skill: v.optional(v.union([v.string(), v.array(v.string())]), []),
+          skills: v.optional(
+            v.pipe(
+              v.string(),
+              v.description(
+                "Select skills with skill, variant/skill, or variant/{skill,...} expressions.",
+              ),
+            ),
+            "",
+          ),
         }),
       ),
     ),
@@ -132,7 +141,8 @@ export const schema = {
         "skill install --global",
         "skill install ethan-huo/agents/cx",
         "skill install ethan-huo/agents/cx --global",
-        "skill install ethan-huo/agents --skill cx --skill fp-thinking",
+        "skill install ethan-huo/agents --skills 'cx,fp-thinking'",
+        "skill install backnotprop/plannotator --skills 'core/{plannotator-annotate,plannotator-review},claude/plannotator-last'",
         "skill install Owl-Listener/designer-skills --map",
       ],
     })
@@ -141,7 +151,15 @@ export const schema = {
       s(
         v.object({
           repo: v.optional(v.array(v.string()), []),
-          skill: v.optional(v.union([v.string(), v.array(v.string())]), []),
+          skills: v.optional(
+            v.pipe(
+              v.string(),
+              v.description(
+                "Select skills with skill, variant/skill, or variant/{skill,...} expressions.",
+              ),
+            ),
+            "",
+          ),
           map: v.optional(v.boolean(), false),
           global: v.optional(v.boolean(), false),
         }),

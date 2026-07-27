@@ -16,17 +16,29 @@ export type SkillCandidate = {
   relativeDir: string;
   sourceDir: string;
   displayLabel: string;
+  variant?: string;
+};
+
+export type SkillGroup = {
+  relativeDir: string;
+  displayLabel: string;
+  candidates: SkillCandidate[];
+};
+
+export type SkillSelector = {
+  skill: string;
+  variant?: string;
 };
 
 export type AddInput = {
   repo: string;
   global: boolean;
-  skill: string | string[];
+  skills: string;
 };
 
 export type InstallInput = {
   repo: string[];
-  skill: string | string[];
+  skills: string;
   map: boolean;
   global: boolean;
 };

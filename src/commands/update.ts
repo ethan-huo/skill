@@ -10,13 +10,16 @@ import { createLiveGrid, type GridStage, type LiveGrid } from "../lib/live-grid"
 import { getSkillsBaseDir, getSourceInstallRoot, getVisibleSkillRoot } from "../lib/paths";
 import {
   getProjectManifestMapRepos,
-  getProjectManifestSkillIds,
+  getProjectManifestSkills,
   readScopeManifest,
   removeProjectManifestSkillIds,
+  resolveProjectManifestSkillSources,
   writeScopeManifest,
 } from "../lib/project-manifest";
+import type { ManifestSkill, ProjectManifest } from "../lib/project-manifest";
 import {
   hasProjectManifest,
+  hasScopeManifest,
   pruneProjectManifestSkills,
   removeProjectSkillLinks,
   seedGlobalManifestFromVisibleLinks,
@@ -32,6 +35,7 @@ type RepoOutcome = {
   kind: "repo";
   repo: { owner: string; repo: string };
   diff: UpdateDiff;
+  resolvedSkills: ManifestSkill[];
 };
 
 type MapOutcome = {
@@ -63,8 +67,8 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
   const globalManifest = await readScopeManifest("global", process.cwd());
   const projectManifest = await readScopeManifest("local", process.cwd());
   const installedByRepo = mergeInstalledByRepo(
-    groupManifestSkillIds("global", getProjectManifestSkillIds(globalManifest)),
-    groupManifestSkillIds("local", getProjectManifestSkillIds(projectManifest)),
+    groupManifestSkills("global", getProjectManifestSkills(globalManifest)),
+    groupManifestSkills("local", getProjectManifestSkills(projectManifest)),
   );
   const sourceRepos = getManifestSourceRepos([globalManifest, projectManifest]);
   const mapRepoIds = getProjectManifestMapRepos(projectManifest);
@@ -131,6 +135,8 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
   );
   mapOutcomes.sort((left, right) => left.repoId.localeCompare(right.repoId));
 
+  await persistResolvedSources(process.cwd(), repoOutcomes);
+
   for (const outcome of repoOutcomes) {
     console.log(fmt.info(`${outcome.repo.owner}/${outcome.repo.repo} (source)`));
     printDiff(outcome.diff);
@@ -163,7 +169,7 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
 async function updateRepo(options: {
   repo: { owner: string; repo: string; sourceRoot: string };
   grid: LiveGrid;
-  installedByRepo: Map<string, string[]>;
+  installedByRepo: Map<string, ManifestSkill[]>;
 }): Promise<Outcome> {
   const { repo, grid, installedByRepo } = options;
   const id = REPO_ID(repo);
@@ -175,30 +181,33 @@ async function updateRepo(options: {
     const cloneDir = await shallowCloneRepo(repoRef);
 
     setStage({ kind: "running", label: "diffing" });
-    const diff = await updateSourceRepo({
+    const sourceUpdate = await updateSourceRepo({
       cloneDir,
       sourceRoot: repo.sourceRoot,
-      installedIds: [
-        ...new Set([
-          ...(installedByRepo.get(getInstalledGroupKey("global", repoRef)) ?? []),
-          ...(installedByRepo.get(getInstalledGroupKey("local", repoRef)) ?? []),
-        ]),
-      ],
+      installedSkills: mergeManifestSkills(
+        installedByRepo.get(getInstalledGroupKey("global", repoRef)) ?? [],
+        installedByRepo.get(getInstalledGroupKey("local", repoRef)) ?? [],
+      ),
     });
+    const { diff, resolvedSkills } = sourceUpdate;
 
     setStage({ kind: "running", label: "linking" });
     await syncVisibleLinks({
       cwd: process.cwd(),
       repo: repoRef,
-      globalInstalledIds: installedByRepo.get(getInstalledGroupKey("global", repoRef)) ?? [],
-      projectInstalledIds: installedByRepo.get(getInstalledGroupKey("local", repoRef)) ?? [],
+      globalInstalledIds: (installedByRepo.get(getInstalledGroupKey("global", repoRef)) ?? []).map(
+        (skill) => skill.id,
+      ),
+      projectInstalledIds: (installedByRepo.get(getInstalledGroupKey("local", repoRef)) ?? []).map(
+        (skill) => skill.id,
+      ),
       updated: diff.updated,
       removed: diff.removed,
       sourceRoot: repo.sourceRoot,
     });
 
     setStage({ kind: "done", label: summarizeDiff(diff) });
-    return { kind: "repo", repo, diff };
+    return { kind: "repo", repo, diff, resolvedSkills };
   } catch (error) {
     setStage({ kind: "error", label: error instanceof Error ? error.message : String(error) });
     return {
@@ -261,12 +270,14 @@ function printSummary(options: {
   console.log(fmt.dim(`updated ${segments.join(" · ")}`));
 }
 
-function groupManifestSkillIds(scope: InstallScope, skillIds: string[]): Map<string, string[]> {
-  const grouped = new Map<string, string[]>();
+function groupManifestSkills(
+  scope: InstallScope,
+  skills: Array<ManifestSkill & { repo: string }>,
+): Map<string, ManifestSkill[]> {
+  const grouped = new Map<string, ManifestSkill[]>();
 
-  for (const skillId of skillIds) {
-    const parsed = parseRepoRef(skillId.split("/").slice(0, 2).join("/"));
-    const skill = skillId.split("/").slice(2).join("/");
+  for (const skill of skills) {
+    const parsed = parseRepoRef(skill.repo);
     const current = grouped.get(getInstalledGroupKey(scope, parsed)) ?? [];
     current.push(skill);
     grouped.set(getInstalledGroupKey(scope, parsed), current);
@@ -275,12 +286,14 @@ function groupManifestSkillIds(scope: InstallScope, skillIds: string[]): Map<str
   return grouped;
 }
 
-function mergeInstalledByRepo(...maps: Array<Map<string, string[]>>): Map<string, string[]> {
-  const merged = new Map<string, string[]>();
+function mergeInstalledByRepo(
+  ...maps: Array<Map<string, ManifestSkill[]>>
+): Map<string, ManifestSkill[]> {
+  const merged = new Map<string, ManifestSkill[]>();
 
   for (const map of maps) {
     for (const [key, skills] of map.entries()) {
-      merged.set(key, [...new Set([...(merged.get(key) ?? []), ...skills])].sort());
+      merged.set(key, mergeManifestSkills(merged.get(key) ?? [], skills));
     }
   }
 
@@ -288,9 +301,7 @@ function mergeInstalledByRepo(...maps: Array<Map<string, string[]>>): Map<string
 }
 
 function getManifestSourceRepos(
-  manifests: Array<{
-    items: Array<{ type: "skills" | "map"; repo: string; skills?: string[] }>;
-  }>,
+  manifests: ProjectManifest[],
 ): Array<{ owner: string; repo: string; sourceRoot: string }> {
   const repos = new Map<string, { owner: string; repo: string; sourceRoot: string }>();
 
@@ -308,6 +319,41 @@ function getManifestSourceRepos(
   return [...repos.values()].sort((left, right) =>
     `${left.owner}/${left.repo}`.localeCompare(`${right.owner}/${right.repo}`),
   );
+}
+
+function mergeManifestSkills(...groups: ManifestSkill[][]): ManifestSkill[] {
+  const merged = new Map<string, ManifestSkill>();
+  for (const skill of groups.flat()) {
+    const current = merged.get(skill.id);
+    if (current?.source && skill.source && current.source !== skill.source) {
+      throw new Error(
+        `Installed skill "${skill.id}" selects conflicting sources "${current.source}" and "${skill.source}" across scopes.`,
+      );
+    }
+    merged.set(skill.id, current?.source ? current : skill);
+  }
+  return [...merged.values()].sort((left, right) => left.id.localeCompare(right.id));
+}
+
+async function persistResolvedSources(cwd: string, outcomes: RepoOutcome[]): Promise<void> {
+  if (outcomes.length === 0) {
+    return;
+  }
+
+  for (const scope of ["global", "local"] as const) {
+    if (!hasScopeManifest(scope, cwd)) {
+      continue;
+    }
+    let manifest = await readScopeManifest(scope, cwd);
+    for (const outcome of outcomes) {
+      manifest = resolveProjectManifestSkillSources(
+        manifest,
+        `${outcome.repo.owner}/${outcome.repo.repo}`,
+        outcome.resolvedSkills,
+      );
+    }
+    await writeScopeManifest(scope, cwd, manifest);
+  }
 }
 
 function getInstalledGroupKey(scope: "local" | "global", repo: Pick<RepoRef, "owner" | "repo">) {

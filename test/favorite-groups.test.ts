@@ -42,7 +42,7 @@ describe("groupFavoritesForInstall", () => {
           cloneUrl: "https://github.com/ethan-huo/agents.git",
           display: "ethan-huo/agents",
         },
-        selectors: ["cx", "fp-thinking"],
+        selectors: [{ skill: "cx" }, { skill: "fp-thinking" }],
         promptForSelection: true,
       },
       {
@@ -52,7 +52,7 @@ describe("groupFavoritesForInstall", () => {
           cloneUrl: "https://github.com/pbakaus/impeccable.git",
           display: "pbakaus/impeccable",
         },
-        selectors: ["audit"],
+        selectors: [{ skill: "audit" }],
         promptForSelection: false,
       },
     ]);

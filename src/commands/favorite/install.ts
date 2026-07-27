@@ -50,7 +50,7 @@ export async function runFavoriteInstall(args: { input: FavoriteInstallInput }):
       global: isGlobal,
       repo: group.repo,
       selectors: group.selectors,
-      initialSelectors: group.selectors,
+      initialSelectors: group.selectors.map((selector) => selector.skill),
       promptForSelection: group.promptForSelection,
     });
 

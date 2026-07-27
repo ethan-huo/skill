@@ -1,10 +1,11 @@
 import { readdir, rm, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { discoverSkills } from "./discover-skills";
+import { discoverSkillGroups, discoverSkills, fingerprintSkillDirectory } from "./discover-skills";
 import { pruneEmptyParents, upsertInstalledSkills } from "./install";
 import { getSourceInstallRoot, getSourceSkillsBaseDir } from "./paths";
 import { diffSkillSets } from "./update-diff";
+import type { ManifestSkill } from "./project-manifest";
 import type { RepoRef, SkillCandidate, UpdateDiff } from "../types";
 
 export type SourceRepo = {
@@ -47,17 +48,31 @@ export async function listSourceRepos(): Promise<SourceRepo[]> {
 export async function updateSourceRepo(options: {
   cloneDir: string;
   sourceRoot: string;
-  installedIds?: string[];
-}): Promise<UpdateDiff> {
+  installedSkills?: ManifestSkill[];
+}): Promise<{ diff: UpdateDiff; resolvedSkills: ManifestSkill[] }> {
   const { cloneDir, sourceRoot } = options;
-  const cachedSkills = await discoverSkills(sourceRoot);
-  const latestSkills = await discoverSkills(cloneDir);
-  const cachedIds = options.installedIds ?? cachedSkills.map((skill) => skill.relativeDir);
-  const latestIds = latestSkills.map((skill) => skill.relativeDir);
+  const installedSkills =
+    options.installedSkills ??
+    (await discoverSkills(sourceRoot)).map((skill) => ({ id: skill.relativeDir }));
+  const latestGroups = await discoverSkillGroups(cloneDir);
+  const latestIds = latestGroups.map((group) => group.relativeDir);
+  const cachedIds = installedSkills.map((skill) => skill.id);
   const diff = diffSkillSets(cachedIds, latestIds);
+  const updated = new Set(diff.updated);
+  const resolvedCandidates: SkillCandidate[] = [];
 
-  if (diff.updated.length > 0) {
-    await upsertInstalledSkills(cloneDir, sourceRoot, filterSkills(latestSkills, diff.updated));
+  for (const installed of installedSkills) {
+    if (!updated.has(installed.id)) {
+      continue;
+    }
+    const group = latestGroups.find((candidate) => candidate.relativeDir === installed.id)!;
+    resolvedCandidates.push(
+      await resolveInstalledCandidate(cloneDir, sourceRoot, group.candidates, installed),
+    );
+  }
+
+  if (resolvedCandidates.length > 0) {
+    await upsertInstalledSkills(cloneDir, sourceRoot, resolvedCandidates);
   }
 
   for (const skill of diff.removed) {
@@ -65,7 +80,13 @@ export async function updateSourceRepo(options: {
   }
 
   await pruneEmptyParents(sourceRoot, getSourceSkillsBaseDir());
-  return diff;
+  return {
+    diff,
+    resolvedSkills: resolvedCandidates.map((candidate) => ({
+      id: candidate.relativeDir,
+      source: candidate.sourceDir,
+    })),
+  };
 }
 
 export async function removeSourceRepo(
@@ -84,7 +105,63 @@ export async function removeSourceRepo(
   return true;
 }
 
-function filterSkills(skills: SkillCandidate[], relativeDirs: string[]): SkillCandidate[] {
-  const wanted = new Set(relativeDirs);
-  return skills.filter((skill) => wanted.has(skill.relativeDir));
+async function resolveInstalledCandidate(
+  cloneDir: string,
+  sourceRoot: string,
+  candidates: SkillCandidate[],
+  installed: ManifestSkill,
+): Promise<SkillCandidate> {
+  if (installed.source) {
+    const selected = candidates.find((candidate) => candidate.sourceDir === installed.source);
+    if (selected) {
+      return selected;
+    }
+  }
+
+  if (!installed.source && candidates.length === 1) {
+    return candidates[0]!;
+  }
+
+  const matching = await findCandidatesMatchingCache(
+    cloneDir,
+    sourceRoot,
+    candidates,
+    installed.id,
+  );
+  if (matching.length === 1) {
+    return matching[0]!;
+  }
+
+  if (installed.source) {
+    throw new Error(
+      `Selected source "${installed.source}" for skill "${installed.id}" no longer exists. Re-run skill add with an explicit variant.`,
+    );
+  }
+
+  throw new Error(
+    `Installed skill "${installed.id}" predates variant tracking and matches multiple sources: ${candidates.map((candidate) => `${candidate.variant}/${candidate.relativeDir}`).join(", ")}. Re-run skill add with an explicit variant.`,
+  );
+}
+
+async function findCandidatesMatchingCache(
+  cloneDir: string,
+  sourceRoot: string,
+  candidates: SkillCandidate[],
+  skillId: string,
+): Promise<SkillCandidate[]> {
+  const cachedFingerprint = await fingerprintSkillDirectory(join(sourceRoot, skillId)).catch(
+    () => null,
+  );
+  if (cachedFingerprint === null) {
+    return [];
+  }
+
+  const matching: SkillCandidate[] = [];
+  for (const candidate of candidates) {
+    const fingerprint = await fingerprintSkillDirectory(join(cloneDir, candidate.sourceDir));
+    if (fingerprint === cachedFingerprint) {
+      matching.push(candidate);
+    }
+  }
+  return matching;
 }

@@ -82,11 +82,11 @@ describe("project update cleanup", () => {
       expect(await lstat(projectLink).catch(() => null)).toBeNull();
       expect(await lstat(globalLink).catch(() => null)).toBeNull();
       expect(JSON.parse(await readFile(join(globalRoot, "manifest.json"), "utf8"))).toEqual({
-        version: 2,
+        version: 3,
         items: [],
       });
       expect(JSON.parse(await readFile(join(projectRoot, "manifest.json"), "utf8"))).toEqual({
-        version: 2,
+        version: 3,
         items: [],
       });
       expect(await readFile(join(projectRoot, ".gitignore"), "utf8")).toBe(

@@ -1,10 +1,10 @@
 import { repoIdentityKey } from "./favorite-key";
 import { parseRepoRef } from "./repo-ref";
-import type { FavoriteRef, RepoRef } from "../types";
+import type { FavoriteRef, RepoRef, SkillSelector } from "../types";
 
 export type FavoriteInstallGroup = {
   repo: RepoRef;
-  selectors: string[];
+  selectors: SkillSelector[];
   promptForSelection: boolean;
 };
 
@@ -39,7 +39,7 @@ export function groupFavoritesForInstall(favorites: FavoriteRef[]): FavoriteInst
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([, group]) => ({
       repo: group.repo,
-      selectors: [...group.selectors].sort(),
+      selectors: [...group.selectors].sort().map((skill) => ({ skill })),
       promptForSelection: group.promptForSelection,
     }));
 }

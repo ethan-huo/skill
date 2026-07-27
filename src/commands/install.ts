@@ -7,6 +7,7 @@ import {
   restoreProjectSkills,
 } from "../lib/project-skills";
 import { parseRepoSkillTarget } from "../lib/repo-ref";
+import { parseSkillSelectors } from "../lib/skill-selector";
 import type { InstallInput } from "../types";
 
 export async function runInstall(args: { input: InstallInput }): Promise<void> {
@@ -25,12 +26,14 @@ export async function runInstall(args: { input: InstallInput }): Promise<void> {
   }
 
   if (input.repo.length > 1) {
-    throw new Error("Install accepts at most one repository ref. Use --skill for multiple skills.");
+    throw new Error(
+      "Install accepts at most one repository ref. Use --skills for multiple skills.",
+    );
   }
 
   const target = parseRepoSkillTarget(input.repo[0]!);
   if (input.map) {
-    if (target.skill || normalizeSelectors(input.skill).length > 0) {
+    if (target.skill || normalizeSelectors(input.skills).length > 0) {
       throw new Error("Install --map accepts a repository ref only; do not pass a skill selector.");
     }
 
@@ -44,7 +47,7 @@ export async function runInstall(args: { input: InstallInput }): Promise<void> {
   }
 
   const repo = target.repo;
-  const selectors = normalizeSelectors(input.skill, target.skill);
+  const selectors = normalizeSelectors(input.skills, target.skill);
   const result = await installRepoSkills({
     cwd: process.cwd(),
     global: input.global,
@@ -85,24 +88,25 @@ async function restoreLinks(global: boolean): Promise<void> {
   }
 }
 
-function normalizeSelectors(value: string | string[], shorthandSkill?: string): string[] {
-  const explicitSelectors = Array.isArray(value) ? value : value ? [value] : [];
+function normalizeSelectors(value: string, shorthandSkill?: string) {
+  const explicitSelectors = parseSkillSelectors(value);
   if (!shorthandSkill) {
     return explicitSelectors;
   }
 
   if (explicitSelectors.length === 0) {
-    return [shorthandSkill];
+    return [{ skill: shorthandSkill }];
   }
 
-  const normalizedSelectors = new Set(
-    explicitSelectors.map((selector) => selector.trim()).filter(Boolean),
-  );
-  if (normalizedSelectors.size === 1 && normalizedSelectors.has(shorthandSkill)) {
-    return [shorthandSkill];
+  if (
+    explicitSelectors.length === 1 &&
+    explicitSelectors[0]!.skill === shorthandSkill &&
+    !explicitSelectors[0]!.variant
+  ) {
+    return explicitSelectors;
   }
 
   throw new Error(
-    `Conflicting skill selectors: repo shorthand requested "${shorthandSkill}" but --skill provided ${explicitSelectors.join(", ")}.`,
+    `Conflicting skill selectors: repo shorthand requested "${shorthandSkill}" but --skills provided "${value}".`,
   );
 }

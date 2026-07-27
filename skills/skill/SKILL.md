@@ -38,7 +38,8 @@ Prefer non-interactive installs whenever you already know the exact skill IDs:
 
 ```bash
 skill add owner/repo/skill
-skill add owner/repo --skill skill-a --skill skill-b
+skill add owner/repo --skills 'skill-a,skill-b'
+skill add owner/repo --skills 'core/{skill-a,skill-b},claude/skill-c'
 ```
 
 Use a repo map when the repo is a broad skill catalog and you do not need specific local bundles:
@@ -60,15 +61,9 @@ Repo maps are project-local synthetic skills for broad catalogs. They keep one v
 
 Use a map when the user wants coverage from a repo that has multiple skills and no obvious single target. Do not install a pile of separate skills just because the repo exposes them separately.
 
-The CLI recommends a repo map when a repo-level project install discovers more than three skills.
+Interactive project installs offer a repo map alongside individual skills. The two modes are mutually exclusive. Non-interactive installs must choose explicitly with `--map` or `--skills`.
 
-When that detector matches:
-
-- project-local `skill add owner/repo` and `skill install owner/repo` recommend a map before individual selection in TTY sessions
-- non-interactive project installs default to a map instead of failing on a multiselect
-- project-scope `skill update` regenerates maps recorded in `.agents/skills/manifest.json`
-- explicit selectors such as `owner/repo/skill` or `--skill skill-a` still install concrete skills
-- `--global` does not auto-recommend maps
+Project-scope `skill update` regenerates maps recorded in `.agents/skills/manifest.json`.
 
 ## When To Use `find`
 
@@ -86,7 +81,7 @@ Do not start with `find` if the favorites already contain a good match.
 - Start from `skill --schema` for command discovery, then use normal CLI commands directly.
 - `skill favorite list --json` is optional. Use it only when structured output is genuinely useful for piping or external processing.
 - `skill favorite install` and `skill favorite remove` without refs are interactive flows. Use them only when prompt-driven selection is acceptable in the current session.
-- `skill add owner/repo` without explicit `--skill` may prompt, but repos with more than three skills auto-map in non-interactive project-local installs.
+- `skill add owner/repo` without explicit `--skills` may prompt. Non-interactive installs must pass `--skills` or explicitly use `--map`.
 
 ## Maintenance Commands
 
@@ -102,5 +97,5 @@ Use maintenance commands when the user asks for maintenance. Do not churn instal
 ## Failure Modes
 
 - If `favorite add` or `favorite refresh` fails because `gh` is not authenticated, tell the user to run `gh auth login` and retry.
-- If non-interactive install hits a bundled repo with multiple skills, rerun with explicit `--skill` selectors or use `--map` when a repo-level index is the right outcome.
+- If non-interactive install hits multiple logical skills or variants, rerun with `--skills 'skill,variant/{skill,...}'` or use `--map` when a repo-level index is the right outcome.
 - If local install conflicts with an existing global install of the same repo, ask whether the global install should remain the source of truth.

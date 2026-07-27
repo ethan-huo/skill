@@ -44,7 +44,8 @@ For most real usage, start from favorites and install only what the current proj
 
 ```bash
 skill install owner/repo/skill
-skill install owner/repo --skill skill-a --skill skill-b
+skill install owner/repo --skills 'skill-a,skill-b'
+skill install owner/repo --skills 'core/{skill-a,skill-b},claude/skill-c'
 skill install owner/repo --map
 skill list
 ```
@@ -96,27 +97,28 @@ skill favorite remove owner/repo owner/repo/skill
 
 ### Install And Remove
 
-| Command                                    | Purpose                                                      |
-| ------------------------------------------ | ------------------------------------------------------------ |
-| `skill add owner/repo/skill`               | Install one known skill directly                             |
-| `skill add owner/repo --skill a --skill b` | Install multiple skills from one repo without prompts        |
-| `skill add owner/repo`                     | Interactive selection when the repo contains multiple skills |
-| `skill remove`                             | Interactively remove local skills or repo maps               |
-| `skill remove --global`                    | Interactively remove one or more global skills               |
-| `skill remove owner/repo`                  | Remove all installed skills from one repo                    |
-| `skill remove owner/repo/skill`            | Remove one installed skill without touching siblings         |
-| `skill remove owner/repo --global`         | Purge global links, shared source cache, and repo favorites  |
+| Command                                              | Purpose                                                      |
+| ---------------------------------------------------- | ------------------------------------------------------------ |
+| `skill add owner/repo/skill`                         | Install one known skill directly                             |
+| `skill add owner/repo --skills 'a,b'`                | Install multiple skills from one repo without prompts        |
+| `skill add owner/repo --skills 'core/{a,b},other/c'` | Select exact variants without expanding repeated selectors   |
+| `skill add owner/repo`                               | Interactive selection when the repo contains multiple skills |
+| `skill remove`                                       | Interactively remove local skills or repo maps               |
+| `skill remove --global`                              | Interactively remove one or more global skills               |
+| `skill remove owner/repo`                            | Remove all installed skills from one repo                    |
+| `skill remove owner/repo/skill`                      | Remove one installed skill without touching siblings         |
+| `skill remove owner/repo --global`                   | Purge global links, shared source cache, and repo favorites  |
 
 ### Project Links
 
-| Command                                        | Purpose                                                            |
-| ---------------------------------------------- | ------------------------------------------------------------------ |
-| `skill install`                                | Rebuild project links and maps from `.agents/skills/manifest.json` |
-| `skill install --global`                       | Rebuild global links from `~/.agents/skills/manifest.json`         |
-| `skill install owner/repo/skill`               | Install a shared source and link one skill into this project       |
-| `skill install owner/repo/skill --global`      | Install a shared source and link one skill globally                |
-| `skill install owner/repo --skill a --skill b` | Link multiple selected skills into this project                    |
-| `skill install owner/repo --map`               | Generate one repo-level map skill with ctx-read routing rows       |
+| Command                                   | Purpose                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------ |
+| `skill install`                           | Rebuild project links and maps from `.agents/skills/manifest.json` |
+| `skill install --global`                  | Rebuild global links from `~/.agents/skills/manifest.json`         |
+| `skill install owner/repo/skill`          | Install a shared source and link one skill into this project       |
+| `skill install owner/repo/skill --global` | Install a shared source and link one skill globally                |
+| `skill install owner/repo --skills 'a,b'` | Link multiple selected skills into this project                    |
+| `skill install owner/repo --map`          | Generate one repo-level map skill with ctx-read routing rows       |
 
 ### Favorites
 
@@ -145,15 +147,18 @@ skill favorite remove owner/repo owner/repo/skill
 
 - `skill` scans a cloned repository for `SKILL.md`, including the repository root and `.codex/skills`, while ignoring repo-internal agent config roots such as `.agents`; a root-level skill has the stable folder ID `root`
 - discovered skill IDs are normalized to `{owner}/{repo}/{folder}`
+- same-name bundles with identical files are safely collapsed; bundles with different content remain distinct variants
+- interactive installs select logical skills first, then use one repo-level variant radio when the selected conflicts share the same variants; mismatched variant sets are resolved per skill
+- non-interactive installs use `--skills 'skill,variant/skill,variant/{skill,...}'`; unqualified ambiguous skills fail with the available qualified selectors
 - copied `SKILL.md` files with repairable malformed YAML frontmatter are rewritten with Bun's YAML serializer before entering the shared source cache
-- `owner/repo/skill` is shorthand for `skill add owner/repo --skill skill`
+- `owner/repo/skill` is shorthand for `skill add owner/repo --skills 'skill'`
 - visible skill folders use lowercase skill-first aliases: `{skill.path}.{repo}.{owner}` while source IDs remain `{owner}/{repo}/{folder}`
 - `skill install owner/repo --map` writes `.agents/skills/map.{repo}.{owner}/SKILL.md` with a `ctx read github://owner/repo/<path>` rule and `When ..., read path/SKILL.md` rows
 - interactive project installs show "Install as repo map" above individual skills; selecting either mode disables the other
 - interactive repo skill selection preselects already installed skills from the target scope; `--global` preselects global installs, while project installs preselect project links
 - repo maps and selected skill installs are mutually exclusive per repo; installing one mode removes the other mode from the manifest and visible aliases
 - project-scope `skill update` regenerates map items recorded in `.agents/skills/manifest.json`
-- versionless project manifests are treated as version 1 and rewritten as version 2 repo-scoped items on the next manifest write
+- versionless and version 2 manifests migrate to version 3; new installs persist each logical skill ID with its exact upstream source path
 - repeated installs reuse shallow clone caches keyed by the remote `HEAD` hash
 - local install is blocked only when the selected `{owner}/{repo}/{skill}` is already installed globally
 - installs link selected skills from `~/.agents/.skills` and record repo-scoped manifest items in the target scope's manifest
@@ -173,10 +178,10 @@ Install roots:
 - global visible links: `~/.agents/skills/{skill.path}.{repo}.{owner}/`
 - local map skills: `{cwd}/.agents/skills/map.{repo}.{owner}/`
 - shared sources: `~/.agents/.skills/{owner}/{repo}/`
-- local manifest: `{cwd}/.agents/skills/manifest.json` stores versioned `skills` and `map` items, not visible link names
+- local manifest: `{cwd}/.agents/skills/manifest.json` stores versioned `skills` with exact source paths and `map` items, not visible link names
 - local manifest writes maintain an exact-name block in `{cwd}/.agents/skills/.gitignore`; entries outside that block, including user-created skills, are preserved
 - generated ignore rules prevent new links from entering Git but do not untrack links already present in the index; existing projects must remove those generated entries from the index once
-- global manifest: `~/.agents/skills/manifest.json` stores versioned `skills` items, not visible link names
+- global manifest: `~/.agents/skills/manifest.json` stores versioned `skills` with exact source paths, not visible link names
 
 To migrate an existing global install from the old nested visible layout to one-level links:
 
@@ -214,7 +219,7 @@ If you want an agent to use this tool in new projects, install this skill into t
 
 ## Operational Notes
 
-- non-interactive installs that match multiple skills must pass explicit `--skill <folder>` selectors
+- non-interactive installs that match multiple skills must pass a `--skills '<selector,...>'` expression
 - `favorite install` without ids requires a TTY; in non-TTY environments pass ids explicitly
 - `favorite remove` without ids requires a TTY; in non-TTY environments pass ids explicitly
 - `favorite install --global` installs into the global skill root

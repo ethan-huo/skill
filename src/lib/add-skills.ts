@@ -1,7 +1,7 @@
 import { rm } from "node:fs/promises";
 
 import { ensureGlobalClaudeSkillsLink, ensureProjectClaudeSkillsLink } from "./claude-skills";
-import { discoverSkills } from "./discover-skills";
+import { discoverSkillGroups } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, removeVisibleRepoSkills, upsertInstalledSkills } from "./install";
 import { listInstalledSkills } from "./installed-skills";
@@ -20,7 +20,13 @@ import {
 } from "./project-manifest";
 import { selectSkills } from "./select-skills";
 import { writeProjectSkillMap } from "./skill-map";
-import type { InstallScope, InstalledSkill, RepoRef, SkillCandidate } from "../types";
+import type {
+  InstallScope,
+  InstalledSkill,
+  RepoRef,
+  SkillCandidate,
+  SkillSelector,
+} from "../types";
 
 export type RepoSkillsInstallResult = {
   kind: "skills";
@@ -40,7 +46,7 @@ export async function installRepoSkills(options: {
   cwd: string;
   global: boolean;
   repo: RepoRef;
-  selectors: string[];
+  selectors: SkillSelector[];
   initialSelectors?: string[];
   promptForSelection?: boolean;
 }): Promise<RepoInstallResult> {
@@ -85,7 +91,7 @@ export async function installRepoSkills(options: {
 export async function selectRepoSkills(options: {
   cwd: string;
   repo: RepoRef;
-  selectors: string[];
+  selectors: SkillSelector[];
   initialSelectors?: string[];
   promptForSelection?: boolean;
   global?: boolean;
@@ -96,8 +102,8 @@ export async function selectRepoSkills(options: {
 }> {
   const cloneDir = await shallowCloneRepo(options.repo);
 
-  const discoveredSkills = await discoverSkills(cloneDir);
-  if (discoveredSkills.length === 0) {
+  const discoveredGroups = await discoverSkillGroups(cloneDir);
+  if (discoveredGroups.length === 0) {
     throw new Error(`No SKILL.md files found in ${options.repo.display}.`);
   }
 
@@ -113,7 +119,7 @@ export async function selectRepoSkills(options: {
         )
       : (options.initialSelectors ?? []);
 
-  const selection = await selectSkills(options.repo.display, discoveredSkills, {
+  const selection = await selectSkills(options.repo.display, discoveredGroups, {
     selectors: options.selectors,
     initialSelectors,
     initialMap:
@@ -147,9 +153,11 @@ export async function installGlobalSkills(options: {
   await addScopeManifestSkills(
     "global",
     options.cwd,
-    options.selectedSkills.map(
-      (skill) => `${options.repo.owner}/${options.repo.repo}/${skill.relativeDir}`,
-    ),
+    `${options.repo.owner}/${options.repo.repo}`,
+    options.selectedSkills.map((skill) => ({
+      id: skill.relativeDir,
+      source: skill.sourceDir,
+    })),
   );
 
   return { installRoot };
@@ -172,9 +180,11 @@ export async function installLocalProjectSkills(options: {
   await addScopeManifestSkills(
     "local",
     options.cwd,
-    options.selectedSkills.map(
-      (skill) => `${options.repo.owner}/${options.repo.repo}/${skill.relativeDir}`,
-    ),
+    `${options.repo.owner}/${options.repo.repo}`,
+    options.selectedSkills.map((skill) => ({
+      id: skill.relativeDir,
+      source: skill.sourceDir,
+    })),
   );
 
   return { installRoot };

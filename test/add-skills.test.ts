@@ -192,10 +192,16 @@ describe("add skills", () => {
         (await lstat(getVisibleSkillRoot("global", root, isolatedRepo, "cx"))).isSymbolicLink(),
       ).toBe(true);
       expect(await readScopeManifest("global", root)).toEqual({
-        version: 2,
-        items: [{ type: "skills", repo: `${isolatedRepo.owner}/agents`, skills: ["cx"] }],
+        version: 3,
+        items: [
+          {
+            type: "skills",
+            repo: `${isolatedRepo.owner}/agents`,
+            skills: [{ id: "cx", source: "skills/cx" }],
+          },
+        ],
       });
-      expect(await readFile(getManifestPath("global", root), "utf8")).toContain('"version": 2');
+      expect(await readFile(getManifestPath("global", root), "utf8")).toContain('"version": 3');
       expect(ensuredClaudeLinks).toEqual([root]);
     } finally {
       await rm(getVisibleSkillRoot("global", root, isolatedRepo, "cx"), {
@@ -291,8 +297,14 @@ describe("add skills", () => {
 
       expect(await seedGlobalManifestFromVisibleLinks(root)).toBe(true);
       expect(await readScopeManifest("global", root)).toEqual({
-        version: 2,
-        items: [{ type: "skills", repo: "visible-owner/agents", skills: ["cx"] }],
+        version: 3,
+        items: [
+          {
+            type: "skills",
+            repo: "visible-owner/agents",
+            skills: [{ id: "cx" }],
+          },
+        ],
       });
     } finally {
       await rm(root, { force: true, recursive: true });

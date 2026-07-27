@@ -37,8 +37,8 @@ describe("remove command", () => {
     expect(await lstat(firstLink).catch(() => null)).toBeNull();
     expect((await lstat(secondLink)).isSymbolicLink()).toBe(true);
     expect(await readManifest(root)).toEqual({
-      version: 2,
-      items: [{ type: "skills", repo: "repo/abc", skills: ["b"] }],
+      version: 3,
+      items: [{ type: "skills", repo: "repo/abc", skills: [{ id: "b" }] }],
     });
   });
 
@@ -57,7 +57,7 @@ describe("remove command", () => {
     await runRemove({ input: { repo: ["repo/abc/a"], global: false } });
 
     expect(await lstat(skillLink).catch(() => null)).toBeNull();
-    expect(await readManifest(root)).toEqual({ version: 2, items: [] });
+    expect(await readManifest(root)).toEqual({ version: 3, items: [] });
   });
 
   test("removes repo-level project skill and map manifest items", async () => {
@@ -81,8 +81,8 @@ describe("remove command", () => {
     await runRemove({ input: { repo: ["repo/abc"], global: false } });
 
     expect(await readManifest(root)).toEqual({
-      version: 2,
-      items: [{ type: "skills", repo: "other/repo", skills: ["x"] }],
+      version: 3,
+      items: [{ type: "skills", repo: "other/repo", skills: [{ id: "x" }] }],
     });
   });
 
@@ -116,7 +116,7 @@ describe("remove command", () => {
       ],
     ]);
     expect(await lstat(visibleMap).catch(() => null)).toBeNull();
-    expect(await readManifest(root)).toEqual({ version: 2, items: [] });
+    expect(await readManifest(root)).toEqual({ version: 3, items: [] });
   });
 
   test("removes a selected global skill from visible links and manifest", async () => {
@@ -137,7 +137,7 @@ describe("remove command", () => {
       await runRemove({ input: { repo: ["repo/abc/a"], global: true } });
 
       expect(await lstat(skillLink).catch(() => null)).toBeNull();
-      expect(await readManifest(root)).toEqual({ version: 2, items: [] });
+      expect(await readManifest(root)).toEqual({ version: 3, items: [] });
     } finally {
       await rm(root, { force: true, recursive: true });
       if (previousHome === undefined) {

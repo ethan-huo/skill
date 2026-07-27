@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { discoverSkills } from "../src/lib/discover-skills";
+import { discoverSkillGroups, discoverSkills } from "../src/lib/discover-skills";
 
 describe("discoverSkills", () => {
   test("finds a skill at the repository root", async () => {
@@ -43,7 +43,7 @@ describe("discoverSkills", () => {
     ]);
   });
 
-  test("dedupes repeated skill folders and prefers codex sources", async () => {
+  test("collapses byte-identical repeated skill bundles", async () => {
     const root = await mkTempDir();
     await writeSkill(root, ".claude/skills/adapt");
     await writeSkill(root, ".agents/skills/adapt");
@@ -58,6 +58,47 @@ describe("discoverSkills", () => {
         sourceDir: ".codex/skills/adapt",
         displayLabel: "adapt",
       },
+    ]);
+  });
+
+  test("keeps different same-name bundles as ordered variants", async () => {
+    const root = await mkTempDir();
+    await writeSkill(root, "apps/skills/core/adapt", "core");
+    await writeSkill(root, "apps/skills/claude/adapt", "claude");
+
+    expect(await discoverSkillGroups(root)).toEqual([
+      {
+        relativeDir: "adapt",
+        displayLabel: "adapt",
+        candidates: [
+          {
+            relativeDir: "adapt",
+            sourceDir: "apps/skills/claude/adapt",
+            displayLabel: "adapt",
+            variant: "claude",
+          },
+          {
+            relativeDir: "adapt",
+            sourceDir: "apps/skills/core/adapt",
+            displayLabel: "adapt",
+            variant: "core",
+          },
+        ],
+      },
+    ]);
+  });
+
+  test("uses the nearest distinctive parent segment as the variant label", async () => {
+    const root = await mkTempDir();
+    await writeSkill(root, "apps/skills/core/adapt", "core");
+    await writeSkill(root, "apps/skills/claude/adapt", "claude");
+    await writeSkill(root, "apps/kiro-cli/skills/adapt", "kiro");
+
+    const groups = await discoverSkillGroups(root);
+    expect(groups[0]!.candidates.map((candidate) => candidate.variant)).toEqual([
+      "claude",
+      "core",
+      "kiro-cli",
     ]);
   });
 
@@ -87,8 +128,11 @@ async function mkTempDir(): Promise<string> {
   return root;
 }
 
-async function writeSkill(root: string, relativeDir: string): Promise<void> {
+async function writeSkill(root: string, relativeDir: string, body = ""): Promise<void> {
   const skillDir = join(root, relativeDir);
   await mkdir(skillDir, { recursive: true });
-  await writeFile(join(skillDir, "SKILL.md"), "---\nname: demo\ndescription: Demo skill\n---\n");
+  await writeFile(
+    join(skillDir, "SKILL.md"),
+    `---\nname: demo\ndescription: Demo skill\n---\n${body}`,
+  );
 }

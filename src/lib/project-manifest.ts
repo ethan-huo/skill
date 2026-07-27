@@ -17,10 +17,27 @@ export type ProjectManifestV1 = {
   skills: string[];
 };
 
+export type ProjectManifestV2 = {
+  version: 2;
+  items: Array<
+    | {
+        type: "skills";
+        repo: string;
+        skills: string[];
+      }
+    | ProjectManifestMapItem
+  >;
+};
+
+export type ManifestSkill = {
+  id: string;
+  source?: string;
+};
+
 export type ProjectManifestSkillsItem = {
   type: "skills";
   repo: string;
-  skills: string[];
+  skills: ManifestSkill[];
 };
 
 export type ProjectManifestMapItem = {
@@ -31,7 +48,7 @@ export type ProjectManifestMapItem = {
 export type ProjectManifestItem = ProjectManifestSkillsItem | ProjectManifestMapItem;
 
 export type ProjectManifest = {
-  version: 2;
+  version: 3;
   items: ProjectManifestItem[];
 };
 
@@ -56,12 +73,16 @@ async function readManifestFile(filePath: string, scope: InstallScope): Promise<
   });
 
   if (raw === null) {
-    return { version: 2, items: [] };
+    return { version: 3, items: [] };
   }
 
   const data = JSON.parse(raw) as unknown;
-  if (isProjectManifestV2(data)) {
+  if (isProjectManifestV3(data)) {
     return normalizeProjectManifest(data);
+  }
+
+  if (isProjectManifestV2(data)) {
+    return normalizeProjectManifest(migrateProjectManifestV2(data));
   }
 
   if (isProjectManifestV1(data)) {
@@ -69,12 +90,10 @@ async function readManifestFile(filePath: string, scope: InstallScope): Promise<
   }
 
   if (isEmptyProjectManifest(data)) {
-    return { version: 2, items: [] };
+    return { version: 3, items: [] };
   }
 
-  {
-    throw new Error(`Invalid ${scope} skill manifest at ${filePath}.`);
-  }
+  throw new Error(`Invalid ${scope} skill manifest at ${filePath}.`);
 }
 
 export async function writeScopeManifest(
@@ -163,7 +182,7 @@ function getManagedIgnoreRules(manifest: ProjectManifest): string[] {
     }
 
     for (const skill of item.skills) {
-      rules.push(`/${escapeGitignoreLiteral(getVisibleSkillDirName(repo, skill))}`);
+      rules.push(`/${escapeGitignoreLiteral(getVisibleSkillDirName(repo, skill.id))}`);
     }
   }
   return rules.sort();
@@ -176,15 +195,20 @@ function escapeGitignoreLiteral(value: string): string {
 export async function addScopeManifestSkills(
   scope: InstallScope,
   cwd: string,
-  skillIds: string[],
+  repoId: string,
+  skills: ManifestSkill[],
 ): Promise<void> {
   const manifest = await readScopeManifest(scope, cwd);
-  await writeScopeManifest(scope, cwd, addSkillIdsToManifest(manifest, skillIds));
+  await writeScopeManifest(scope, cwd, addSkillsToManifest(manifest, repoId, skills));
 }
 
-export async function addProjectManifestSkills(cwd: string, skillIds: string[]): Promise<void> {
+export async function addProjectManifestSkills(
+  cwd: string,
+  repoId: string,
+  skills: ManifestSkill[],
+): Promise<void> {
   const manifest = await readProjectManifest(cwd);
-  await writeProjectManifest(cwd, addSkillIdsToManifest(manifest, skillIds));
+  await writeProjectManifest(cwd, addSkillsToManifest(manifest, repoId, skills));
 }
 
 export async function addScopeManifestMap(
@@ -209,11 +233,25 @@ export function getProjectManifestSkillIds(manifest: ProjectManifest): string[] 
     }
 
     for (const skill of item.skills) {
-      skillIds.push(`${item.repo}/${skill}`);
+      skillIds.push(`${item.repo}/${skill.id}`);
     }
   }
 
   return skillIds.sort();
+}
+
+export function getProjectManifestSkills(
+  manifest: ProjectManifest,
+): Array<ManifestSkill & { repo: string }> {
+  return manifest.items
+    .filter((item): item is ProjectManifestSkillsItem => item.type === "skills")
+    .flatMap((item) => item.skills.map((skill) => ({ repo: item.repo, ...skill })))
+    .sort(
+      (left, right) =>
+        left.repo.localeCompare(right.repo) ||
+        left.id.localeCompare(right.id) ||
+        (left.source ?? "").localeCompare(right.source ?? ""),
+    );
 }
 
 export function getProjectManifestMapRepos(manifest: ProjectManifest): string[] {
@@ -238,12 +276,12 @@ export function removeProjectManifestSkillIds(
         return item;
       }
 
-      const skills = item.skills.filter((skill) => !missing.has(`${item.repo}/${skill}`));
+      const skills = item.skills.filter((skill) => !missing.has(`${item.repo}/${skill.id}`));
       return skills.length > 0 ? { ...item, skills } : null;
     })
     .filter((item): item is ProjectManifestItem => item !== null);
 
-  return normalizeProjectManifest({ version: 2, items: nextItems });
+  return normalizeProjectManifest({ version: 3, items: nextItems });
 }
 
 export function removeProjectManifestRepo(
@@ -251,61 +289,111 @@ export function removeProjectManifestRepo(
   repoId: string,
 ): ProjectManifest {
   return normalizeProjectManifest({
-    version: 2,
+    version: 3,
     items: manifest.items.filter((item) => item.repo !== repoId),
   });
 }
 
-function addSkillIdsToManifest(manifest: ProjectManifest, skillIds: string[]): ProjectManifest {
-  const skillRepos = new Set<string>();
-  for (const skillId of skillIds) {
-    const favorite = parseFavoriteRef(skillId);
-    if (!favorite.skill) {
-      throw new Error(`Project skill manifest entry must use owner/repo/skill: ${skillId}`);
-    }
-
-    skillRepos.add(`${favorite.owner}/${favorite.repo}`);
-  }
-
-  const nextItems = manifest.items.filter(
-    (item) => item.type !== "map" || !skillRepos.has(item.repo),
+export function resolveProjectManifestSkillSources(
+  manifest: ProjectManifest,
+  repoId: string,
+  resolvedSkills: ManifestSkill[],
+): ProjectManifest {
+  const resolved = new Map(
+    resolvedSkills
+      .filter((skill): skill is Required<ManifestSkill> => typeof skill.source === "string")
+      .map((skill) => [skill.id, skill.source]),
   );
-  for (const skillId of skillIds) {
-    const favorite = parseFavoriteRef(skillId);
-    if (!favorite.skill) {
-      throw new Error(`Project skill manifest entry must use owner/repo/skill: ${skillId}`);
-    }
-
-    const repo = `${favorite.owner}/${favorite.repo}`;
-    const current = nextItems.find(
-      (item): item is ProjectManifestSkillsItem => item.type === "skills" && item.repo === repo,
-    );
-    if (current) {
-      current.skills.push(favorite.skill);
-      continue;
-    }
-
-    nextItems.push({ type: "skills", repo, skills: [favorite.skill] });
+  if (resolved.size === 0) {
+    return manifest;
   }
 
-  return normalizeProjectManifest({ version: 2, items: nextItems });
+  return normalizeProjectManifest({
+    version: 3,
+    items: manifest.items.map((item) => {
+      if (item.type !== "skills" || item.repo !== repoId) {
+        return item;
+      }
+      return {
+        ...item,
+        skills: item.skills.map((skill) => {
+          const source = resolved.get(skill.id);
+          return source ? { id: skill.id, source } : skill;
+        }),
+      };
+    }),
+  });
+}
+
+function addSkillsToManifest(
+  manifest: ProjectManifest,
+  repoId: string,
+  skills: ManifestSkill[],
+): ProjectManifest {
+  const repo = parseRepoRef(repoId);
+  const normalizedRepoId = `${repo.owner}/${repo.repo}`;
+  const nextItems = manifest.items.filter(
+    (item) => item.type !== "map" || item.repo !== normalizedRepoId,
+  );
+  const current = nextItems.find(
+    (item): item is ProjectManifestSkillsItem =>
+      item.type === "skills" && item.repo === normalizedRepoId,
+  );
+  if (current) {
+    current.skills.push(...skills);
+  } else {
+    nextItems.push({ type: "skills", repo: normalizedRepoId, skills: [...skills] });
+  }
+
+  return normalizeProjectManifest({ version: 3, items: nextItems });
 }
 
 function addMapToManifest(manifest: ProjectManifest, repoId: string): ProjectManifest {
   const nextItems = manifest.items.filter((item) => item.repo !== repoId);
 
   return normalizeProjectManifest({
-    version: 2,
+    version: 3,
     items: [...nextItems, { type: "map", repo: repoId }],
   });
 }
 
 function migrateProjectManifestV1(manifest: ProjectManifestV1): ProjectManifest {
-  return addSkillIdsToManifest({ version: 2, items: [] }, manifest.skills);
+  const items: ProjectManifestItem[] = [];
+  for (const skillId of manifest.skills) {
+    const favorite = parseFavoriteRef(skillId);
+    if (!favorite.skill) {
+      throw new Error(`Project skill manifest entry must use owner/repo/skill: ${skillId}`);
+    }
+    const repo = `${favorite.owner}/${favorite.repo}`;
+    const current = items.find(
+      (item): item is ProjectManifestSkillsItem => item.type === "skills" && item.repo === repo,
+    );
+    const skill = { id: favorite.skill };
+    if (current) {
+      current.skills.push(skill);
+    } else {
+      items.push({ type: "skills", repo, skills: [skill] });
+    }
+  }
+  return normalizeProjectManifest({ version: 3, items });
+}
+
+function migrateProjectManifestV2(manifest: ProjectManifestV2): ProjectManifest {
+  return {
+    version: 3,
+    items: manifest.items.map((item) =>
+      item.type === "map"
+        ? item
+        : {
+            ...item,
+            skills: item.skills.map((id) => ({ id })),
+          },
+    ),
+  };
 }
 
 function normalizeProjectManifest(manifest: ProjectManifest): ProjectManifest {
-  const skillsByRepo = new Map<string, string[]>();
+  const skillsByRepo = new Map<string, Map<string, ManifestSkill>>();
   const maps = new Set<string>();
 
   for (const item of manifest.items) {
@@ -319,16 +407,21 @@ function normalizeProjectManifest(manifest: ProjectManifest): ProjectManifest {
       continue;
     }
 
-    const current = skillsByRepo.get(item.repo) ?? [];
-    current.push(...item.skills);
+    const current = skillsByRepo.get(item.repo) ?? new Map<string, ManifestSkill>();
+    for (const skill of item.skills) {
+      const previous = current.get(skill.id);
+      current.set(skill.id, skill.source ? skill : (previous ?? skill));
+    }
     skillsByRepo.set(item.repo, current);
   }
 
   const items: ProjectManifestItem[] = [];
-  for (const [repo, skills] of [...skillsByRepo.entries()].sort((left, right) =>
+  for (const [repo, skillsById] of [...skillsByRepo.entries()].sort((left, right) =>
     left[0].localeCompare(right[0]),
   )) {
-    const nextSkills = [...new Set(skills)].sort();
+    const nextSkills = [...skillsById.values()].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    );
     if (nextSkills.length > 0) {
       items.push({ type: "skills", repo, skills: nextSkills });
     }
@@ -338,7 +431,7 @@ function normalizeProjectManifest(manifest: ProjectManifest): ProjectManifest {
     items.push({ type: "map", repo });
   }
 
-  return { version: 2, items };
+  return { version: 3, items };
 }
 
 function isProjectManifestV1(data: unknown): data is ProjectManifestV1 {
@@ -351,17 +444,17 @@ function isProjectManifestV1(data: unknown): data is ProjectManifestV1 {
   );
 }
 
-function isProjectManifestV2(data: unknown): data is ProjectManifest {
+function isProjectManifestV3(data: unknown): data is ProjectManifest {
   return (
     typeof data === "object" &&
     data !== null &&
-    (data as { version?: unknown }).version === 2 &&
+    (data as { version?: unknown }).version === 3 &&
     Array.isArray((data as { items?: unknown }).items) &&
-    (data as { items: unknown[] }).items.every(isProjectManifestItem)
+    (data as { items: unknown[] }).items.every(isProjectManifestV3Item)
   );
 }
 
-function isProjectManifestItem(data: unknown): data is ProjectManifestItem {
+function isProjectManifestV3Item(data: unknown): data is ProjectManifestItem {
   if (typeof data !== "object" || data === null) {
     return false;
   }
@@ -375,7 +468,38 @@ function isProjectManifestItem(data: unknown): data is ProjectManifestItem {
     item.type === "skills" &&
     typeof item.repo === "string" &&
     Array.isArray(item.skills) &&
-    item.skills.every((skill) => typeof skill === "string")
+    item.skills.every(
+      (skill) =>
+        typeof skill === "object" &&
+        skill !== null &&
+        typeof (skill as { id?: unknown }).id === "string" &&
+        ((skill as { source?: unknown }).source === undefined ||
+          typeof (skill as { source?: unknown }).source === "string"),
+    )
+  );
+}
+
+function isProjectManifestV2(data: unknown): data is ProjectManifestV2 {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    (data as { version?: unknown }).version === 2 &&
+    Array.isArray((data as { items?: unknown }).items) &&
+    (data as { items: unknown[] }).items.every((entry) => {
+      if (typeof entry !== "object" || entry === null) {
+        return false;
+      }
+      const item = entry as { type?: unknown; repo?: unknown; skills?: unknown };
+      if (item.type === "map") {
+        return typeof item.repo === "string";
+      }
+      return (
+        item.type === "skills" &&
+        typeof item.repo === "string" &&
+        Array.isArray(item.skills) &&
+        item.skills.every((skill) => typeof skill === "string")
+      );
+    })
   );
 }
 

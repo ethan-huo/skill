@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { discoverSkills } from "./discover-skills";
+import { discoverSkillGroups } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
 import { fetchRepoDescription, GitHubNotFoundError } from "./github";
 import { parseRepoRef } from "./repo-ref";
@@ -32,12 +32,19 @@ export async function loadFavoriteMetadata(favorite: FavoriteRef): Promise<Favor
   }
 
   const cloneDir = await shallowCloneRepo(repo);
-  const discoveredSkills = await discoverSkills(cloneDir);
-  const skill = discoveredSkills.find((candidate) => candidate.relativeDir === favorite.skill);
-  if (!skill) {
+  const discoveredGroups = await discoverSkillGroups(cloneDir);
+  const group = discoveredGroups.find((candidate) => candidate.relativeDir === favorite.skill);
+  if (!group) {
     throw new FavoriteMissingError(`Favorite no longer exists: ${favorite.id}`);
   }
 
+  if (group.candidates.length > 1) {
+    return {
+      description: repoDescription,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+  const skill = group.candidates[0]!;
   const skillDescription =
     (await readSkillDescription(join(cloneDir, skill.sourceDir, "SKILL.md")).catch(() => "")) ||
     repoDescription;

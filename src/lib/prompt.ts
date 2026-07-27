@@ -43,6 +43,18 @@ export async function searchableMultiselect<Value extends string>(options: {
   return [...response];
 }
 
+export async function selectOne<Value extends string>(options: {
+  message: string;
+  options: Array<p.Option<Value>>;
+  initialValue: Value;
+}): Promise<Value> {
+  const response = await p.select(options);
+  if (p.isCancel(response)) {
+    throw new Error("Selection cancelled.");
+  }
+  return response;
+}
+
 export async function exclusiveMultiselect<Value extends string>(options: {
   message: string;
   exclusiveValue: Value;
