@@ -1,6 +1,8 @@
 ---
 name: skill
-description: Manage agent skills with the `skill` CLI. Use when the user asks to install suitable skills into the current project, inspect or refresh favorite skills, or manage installed skills from GitHub repositories.
+description: >
+  Manage agent skills with the `skill` CLI when installing suitable skills,
+  inspecting favorites, or maintaining GitHub-backed skill installs.
 ---
 
 # skill — Skill Manager
@@ -14,17 +16,18 @@ For agents, the main job is not to expose every command. The main job is to help
 Before using this tool, inspect its command surface once:
 
 ```bash
-skill --schema
+skill @schema
 ```
 
-Use the schema output to understand the available commands, arguments, and flags in one pass. Do not guess the command surface from memory.
+Commands use dotted paths and one quoted object literal. Use the schema output
+to learn the exact input type instead of guessing it from memory.
 
 ## Primary Workflow (REQUIRED)
 
 1. Read the current project context first.
    Look at the stack, runtime, framework, repo shape, and any existing `.agents/skills` state before deciding what to install.
 2. Start from favorites, not search.
-   Use `skill favorite list` to inspect the user's curated refs.
+   Use `skill favorite.list` to inspect the user's curated refs.
 3. Pick a small set of relevant skills from the user's favorites.
    Prefer skill-level refs such as `owner/repo/skill` when they already exist.
 4. Install locally by default.
@@ -37,15 +40,15 @@ Use the schema output to understand the available commands, arguments, and flags
 Prefer non-interactive installs whenever you already know the exact skill IDs:
 
 ```bash
-skill add owner/repo/skill
-skill add owner/repo --skills 'skill-a,skill-b'
-skill add owner/repo --skills 'core/{skill-a,skill-b},claude/skill-c'
+skill add "{ repo: 'owner/repo/skill' }"
+skill add "{ repo: 'owner/repo', skills: 'skill-a,skill-b' }"
+skill add "{ repo: 'owner/repo', skills: 'core/{skill-a,skill-b},claude/skill-c' }"
 ```
 
 Use a repo map when the repo is a broad skill catalog and you do not need specific local bundles:
 
 ```bash
-skill install owner/repo --map
+skill install "{ repo: ['owner/repo'], map: true }"
 ```
 
 Use repo-level favorites as broader hints, not as the first choice for automation.
@@ -67,7 +70,7 @@ Project-scope `skill update` regenerates maps recorded in `.agents/skills/manife
 
 ## When To Use `find`
 
-Use `skill find <query>` only when at least one of these is true:
+Use `skill find "{ query: '<query>' }"` only when at least one of these is true:
 
 - the user's favorites do not cover the task
 - the user explicitly asks to browse or discover new skills
@@ -78,19 +81,19 @@ Do not start with `find` if the favorites already contain a good match.
 ## Interactive vs Non-Interactive
 
 - Prefer non-interactive commands for agent work.
-- Start from `skill --schema` for command discovery, then use normal CLI commands directly.
-- `skill favorite list --json` is optional. Use it only when structured output is genuinely useful for piping or external processing.
-- `skill favorite install` and `skill favorite remove` without refs are interactive flows. Use them only when prompt-driven selection is acceptable in the current session.
-- `skill add owner/repo` without explicit `--skills` may prompt. Non-interactive installs must pass `--skills` or explicitly use `--map`.
+- Start from `skill @schema` for command discovery, then use structured object input.
+- Successful commands return YAML on stdout; progress and interactive UI use stderr.
+- `skill favorite.install` and `skill favorite.remove` without ids are interactive flows. Use them only when prompt-driven selection is acceptable in the current session.
+- `skill add "{ repo: 'owner/repo' }"` may prompt. Non-interactive installs must pass `skills` or explicitly use `map` through `install`.
 
 ## Maintenance Commands
 
 These are valid tools, but they are not the default agent path.
 
-- `skill favorite refresh`: refresh cached descriptions and remove upstream refs that no longer exist
+- `skill favorite.refresh`: refresh cached descriptions and remove upstream refs that no longer exist
 - `skill update`: refresh installed skills from upstream
-- `skill remove owner/repo[/skill]`: remove installed skills
-- `skill favorite add/remove`: manage the user's favorite refs
+- `skill remove "{ repo: ['owner/repo/skill'] }"`: remove installed skills
+- `skill favorite.add` / `skill favorite.remove`: manage the user's favorite refs
 
 Use maintenance commands when the user asks for maintenance. Do not churn installed skills or favorites unprompted.
 

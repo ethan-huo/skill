@@ -21,28 +21,27 @@ type FavoriteRemoveServices = {
 export async function runFavoriteRemove(
   args: { input: FavoriteRemoveInput },
   services: FavoriteRemoveServices = {},
-): Promise<void> {
+): Promise<{ removed: FavoriteRef[]; missing: FavoriteRef[] }> {
   const removeFavoriteRefs = services.removeFavorites ?? removeFavorites;
   const ids =
     args.input.ids.length > 0 ? args.input.ids : await selectFavoriteRefsForRemoval(services);
 
   if (ids.length === 0) {
-    return;
+    return { removed: [], missing: [] };
   }
 
   const result = await removeFavoriteRefs(ids);
-  const log = services.log ?? console.log;
-
-  for (const favorite of result.removed) {
-    log(`Removed favorite ${favorite.id}`);
+  if (services.log) {
+    for (const favorite of result.removed) {
+      services.log(`Removed favorite ${favorite.id}`);
+    }
+    for (const favorite of result.missing) {
+      services.log(`Missing favorite ${favorite.id}`);
+    }
   }
 
   if (result.missing.length === 0) {
-    return;
-  }
-
-  for (const favorite of result.missing) {
-    log(`Missing favorite ${favorite.id}`);
+    return result;
   }
 
   throw new Error(

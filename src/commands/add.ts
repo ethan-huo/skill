@@ -3,7 +3,7 @@ import { parseRepoSkillTarget } from "../lib/repo-ref";
 import { parseSkillSelectors } from "../lib/skill-selector";
 import type { AddInput } from "../types";
 
-export async function runAdd(args: { input: AddInput }): Promise<void> {
+export async function runAdd(args: { input: AddInput }) {
   const input = args.input;
   const target = parseRepoSkillTarget(input.repo);
   const repo = target.repo;
@@ -16,17 +16,20 @@ export async function runAdd(args: { input: AddInput }): Promise<void> {
   });
 
   if (result.kind === "map") {
-    console.log(
-      `Installed map for ${result.mappedSkills.length} skill(s) to ${result.installRoot}`,
-    );
-    console.log(`- ${repo.display} (map)`);
-    return;
+    return {
+      kind: "map" as const,
+      repo: repo.display,
+      installRoot: result.installRoot,
+      skills: result.mappedSkills.map((skill) => skill.relativeDir),
+    };
   }
 
-  console.log(`Installed ${result.selectedSkills.length} skill(s) to ${result.installRoot}`);
-  for (const skill of result.selectedSkills) {
-    console.log(`- ${repo.display}/${skill.relativeDir}`);
-  }
+  return {
+    kind: "skills" as const,
+    repo: repo.display,
+    installRoot: result.installRoot,
+    skills: result.selectedSkills.map((skill) => skill.relativeDir),
+  };
 }
 
 function normalizeSelectors(value: string, shorthandSkill?: string) {

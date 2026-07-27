@@ -13,6 +13,7 @@ import { runInstall } from "./commands/install";
 import { runList } from "./commands/list";
 import { runRemove } from "./commands/remove";
 import { runUpdate } from "./commands/update";
+import { normalizeArgv } from "./lib/normalize-argv";
 import { schema } from "./schema";
 
 const app = cli(schema, {
@@ -23,33 +24,25 @@ const app = cli(schema, {
 
 const argv = normalizeArgv(process.argv.slice(2));
 
-app.run(
+const handlers = {
+  add: runAdd,
+  favorite: {
+    add: runFavoriteAdd,
+    list: runFavoriteList,
+    install: runFavoriteInstall,
+    refresh: runFavoriteRefresh,
+    remove: runFavoriteRemove,
+  },
+  find: runFind,
+  install: runInstall,
+  list: runList,
+  remove: runRemove,
+  update: runUpdate,
+};
+
+await app.run(
   {
-    handlers: {
-      add: runAdd,
-      favorite: {
-        add: runFavoriteAdd,
-        list: runFavoriteList,
-        install: runFavoriteInstall,
-        refresh: runFavoriteRefresh,
-        remove: runFavoriteRemove,
-      },
-      find: runFind,
-      install: runInstall,
-      list: runList,
-      remove: runRemove,
-      update: runUpdate,
-    },
+    handlers,
   },
   argv,
 );
-
-function normalizeArgv(argv: string[]): string[] {
-  return argv.map((arg) => {
-    if (arg === "-g") {
-      return "--global";
-    }
-
-    return arg;
-  });
-}

@@ -7,16 +7,14 @@ const s = toStandardJsonSchema;
 export const schema = {
   add: c
     .meta({
-      description: "Clone a GitHub repository, select skills, and install them.",
+      description: "Clone a GitHub repository, select skills, and install them",
       examples: [
-        "skill add ethan-huo/agents",
-        "skill add pbakaus/impeccable/audit",
-        "skill add https://github.com/ethan-huo/agents --global",
-        "skill add ethan-huo/agents --skills 'cx,fp-thinking'",
-        "skill add backnotprop/plannotator --skills 'core/{plannotator-annotate,plannotator-review},claude/plannotator-last'",
+        `skill add "{ repo: 'ethan-huo/agents' }"`,
+        `skill add "{ repo: 'pbakaus/impeccable/audit' }"`,
+        `skill add "{ repo: 'ethan-huo/agents', global: true }"`,
       ],
     })
-    .args("repo")
+    .positional("repo")
     .input(
       s(
         v.object({
@@ -37,10 +35,10 @@ export const schema = {
 
   find: c
     .meta({
-      description: "Search published skills and print the results as a TOON list.",
-      examples: ["skill find seo", "skill find animation --limit 5"],
+      description: "Search published skills",
+      examples: [`skill find "{ query: 'animation', limit: 5 }"`],
     })
-    .args("query")
+    .positional("query")
     .input(
       s(
         v.object({
@@ -52,19 +50,14 @@ export const schema = {
 
   favorite: group(
     {
-      description: "Manage favorite repository and skill refs.",
+      description: "Manage favorite repository and skill refs",
     },
     {
       add: c
         .meta({
-          description: "Save a favorite repository or skill ref.",
-          examples: [
-            "skill favorite add ethan-huo/agents",
-            "skill favorite add ethan-huo/agents/cx",
-            "skill favorite add ethan-huo/agents ethan-huo/agents/cx",
-          ],
+          description: "Save favorite repository or skill refs",
+          examples: [`skill favorite.add "{ ids: ['ethan-huo/agents', 'ethan-huo/agents/cx'] }"`],
         })
-        .args("ids...")
         .input(
           s(
             v.object({
@@ -75,15 +68,8 @@ export const schema = {
 
       remove: c
         .meta({
-          description: "Remove a favorite repository or skill ref.",
-          examples: [
-            "skill favorite remove",
-            "skill favorite remove ethan-huo/agents",
-            "skill favorite remove ethan-huo/agents/cx",
-            "skill favorite remove ethan-huo/agents ethan-huo/agents/cx",
-          ],
+          description: "Remove favorite repository or skill refs",
         })
-        .args("ids...")
         .input(
           s(
             v.object({
@@ -94,8 +80,7 @@ export const schema = {
 
       list: c
         .meta({
-          description: "List saved favorite repository and skill refs.",
-          examples: ["skill favorite list", "skill favorite list --json"],
+          description: "List saved favorite repository and skill refs",
         })
         .input(
           s(
@@ -107,21 +92,15 @@ export const schema = {
 
       refresh: c
         .meta({
-          description: "Refresh favorite metadata and remove refs that no longer exist upstream.",
-          examples: ["skill favorite refresh"],
+          description: "Refresh favorite metadata and remove refs that no longer exist upstream",
         })
         .input(s(v.object({}))),
 
       install: c
         .meta({
-          description: "Install favorites. Without ids, opens an interactive selector (TTY only).",
-          examples: [
-            "skill favorite install",
-            "skill favorite install ethan-huo/agents/cx",
-            "skill favorite install ethan-huo/agents --global",
-          ],
+          description: "Install favorites, or open an interactive selector when ids are omitted",
+          examples: [`skill favorite.install "{ ids: ['ethan-huo/agents/cx'], global: true }"`],
         })
-        .args("ids...")
         .input(
           s(
             v.object({
@@ -135,18 +114,13 @@ export const schema = {
 
   install: c
     .meta({
-      description: "Install shared skills or restore links from the scope manifest.",
+      description: "Install shared skills or restore links from the scope manifest",
       examples: [
-        "skill install",
-        "skill install --global",
-        "skill install ethan-huo/agents/cx",
-        "skill install ethan-huo/agents/cx --global",
-        "skill install ethan-huo/agents --skills 'cx,fp-thinking'",
-        "skill install backnotprop/plannotator --skills 'core/{plannotator-annotate,plannotator-review},claude/plannotator-last'",
-        "skill install Owl-Listener/designer-skills --map",
+        `skill install "{ repo: ['ethan-huo/agents/cx'], global: true }"`,
+        `skill install "{ repo: ['ethan-huo/agents'], skills: 'cx,fp-thinking' }"`,
+        `skill install "{ repo: ['Owl-Listener/designer-skills'], map: true }"`,
       ],
     })
-    .args("repo...")
     .input(
       s(
         v.object({
@@ -169,15 +143,9 @@ export const schema = {
   remove: c
     .meta({
       description:
-        "Remove an installed repository or a single installed skill. Global repo removal also purges shared source cache and favorites.",
-      examples: [
-        "skill remove --global",
-        "skill remove ethan-huo/agents",
-        "skill remove ethan-huo/agents/cx",
-        "skill remove ethan-huo/agents --global",
-      ],
+        "Remove installed repositories or skills; global repo removal also purges shared source cache and favorites",
+      examples: [`skill remove "{ repo: ['ethan-huo/agents/cx'], global: true }"`],
     })
-    .args("repo...")
     .input(
       s(
         v.object({
@@ -189,22 +157,19 @@ export const schema = {
 
   list: c
     .meta({
-      description: "List local and global installed skills.",
-      examples: ["skill list"],
+      description: "List local and global installed skills",
     })
     .input(s(v.object({}))),
 
   update: c
     .meta({
-      description: "Update shared source skill caches and reconcile visible links.",
-      examples: ["skill update", "skill update --concurrency 4", "skill update --no-progress"],
+      description: "Update shared source skill caches and reconcile visible links",
+      examples: [`skill update "{ concurrency: 4, progress: false }"`],
     })
     .input(
       s(
         v.object({
           concurrency: v.optional(v.pipe(v.number(), v.minValue(1)), 8),
-          // `--no-progress` is parsed by argc as `progress=false`; keep the field
-          // positive so the negation flag works without a custom alias.
           progress: v.optional(v.boolean(), true),
         }),
       ),

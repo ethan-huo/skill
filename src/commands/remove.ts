@@ -1,8 +1,6 @@
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 
-import { fmt } from "argc/terminal";
-
 import { removeFavoritesForRepo } from "../lib/favorites";
 import { pruneEmptyParents, removeInstalledSkill, removeVisibleRepoSkills } from "../lib/install";
 import { listInstalledSkills } from "../lib/installed-skills";
@@ -40,16 +38,19 @@ type RemoveServices = {
 export async function runRemove(
   args: { input: RemoveInput },
   services: RemoveServices = {},
-): Promise<void> {
+): Promise<{ removed: Array<Awaited<ReturnType<typeof removeRef>>> }> {
   const input = args.input;
   const refs =
     input.repo.length > 0 ? input.repo : await selectInstalledSkillRefs(input.global, services);
+  const removed = [];
   for (const ref of refs) {
-    await removeRef(ref, input.global);
+    // Manifest writes share one file, so removals stay sequential to avoid lost updates.
+    removed.push(await removeRef(ref, input.global));
   }
+  return { removed };
 }
 
-async function removeRef(ref: string, global: boolean): Promise<void> {
+async function removeRef(ref: string, global: boolean) {
   const target = parseRepoSkillTarget(ref);
   const repo = target.repo;
   const scope = getInstallScope(global);
@@ -79,8 +80,12 @@ async function removeRef(ref: string, global: boolean): Promise<void> {
 
   await pruneEmptyParents(dirname(targetPath), skillsBaseDir);
   if (target.skill) {
-    console.log(`Removed ${repo.display}/${target.skill} from ${skillsBaseDir}`);
-    return;
+    return {
+      repo: repo.display,
+      skill: target.skill,
+      scope,
+      removed: ["visible skill", ...(removedManifest ? ["manifest"] : [])],
+    };
   }
 
   const removedTargets = [
@@ -89,7 +94,11 @@ async function removeRef(ref: string, global: boolean): Promise<void> {
     removedSource ? "shared source" : null,
     removedFavorites.length > 0 ? "favorites" : null,
   ].filter((target): target is string => target !== null);
-  console.log(`Removed ${repo.display} from ${removedTargets.join(", ")}`);
+  return {
+    repo: repo.display,
+    scope,
+    removed: removedTargets,
+  };
 }
 
 async function removeManifestRef(
@@ -135,7 +144,6 @@ async function selectInstalledSkillRefs(
   ].sort((left, right) => left.value.localeCompare(right.value));
 
   if (options.length === 0) {
-    console.log(fmt.info(`No ${scope} skills are installed.`));
     return [];
   }
 

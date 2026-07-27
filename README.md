@@ -76,6 +76,8 @@ skill find animation --limit 5
 ```
 
 Search is a discovery path, not the default install path.
+Results are emitted as a YAML list so agents and pipelines receive the complete
+records without terminal-width truncation.
 
 ### 4. Maintenance
 
@@ -94,6 +96,16 @@ skill favorite remove owner/repo owner/repo/skill
 ```
 
 ## Command Reference
+
+`skill @schema` is the agent contract. Agent calls use dotted command paths and one
+quoted object literal:
+
+```bash
+skill favorite.list
+skill install "{ repo: ['owner/repo'], skills: 'skill-a,skill-b' }"
+```
+
+The positional and flag forms below remain the shorter human-facing surface.
 
 ### Install And Remove
 
@@ -165,7 +177,7 @@ skill favorite remove owner/repo owner/repo/skill
 - project-scope `skill add` and `skill install <ref>` share the same install effects; `--global` targets the global manifest and visible root
 - project installs ensure `{cwd}/.claude/skills -> ../.agents/skills`, and global installs ensure `~/.claude/skills -> ~/.agents/skills`, unless the Claude `skills` path already resolves to a valid directory
 - `skill update` updates the union of repos recorded in the global manifest and current project's manifest, then reconciles both visible roots
-- `skill update` runs all source repos in parallel (default 8 in flight) and renders a live progress grid on stderr; the per-repo `▶ / ~ / - / +` summary plus a final totals line are printed to stdout in stable order so pipelines stay grep-friendly
+- `skill update` runs all source repos in parallel (default 8 in flight), renders a live progress grid on stderr, and returns stable-order YAML records for repo diffs, regenerated maps, and failures on stdout
 - `skill update` migrates legacy visible aliases such as `{owner}.{repo}.{skill}` and `{owner}.{repo}.map` to the current skill-first aliases
 - project-scope `skill update` removes visible links for upstream skills that disappeared, including stale symlinks whose source target is already gone
 - interactive `skill remove` includes repo maps recorded in the target scope manifest alongside visible skill links
@@ -208,7 +220,7 @@ This repository ships with an installable agent-facing skill at [skills/skill/SK
 
 That skill is intentionally narrower than this README. It teaches agents the main workflow:
 
-1. inspect `skill --schema` first to learn the command surface
+1. inspect `skill @schema` first to learn the command surface
 2. read project context
 3. inspect favorites
 4. pick a small set of relevant skills

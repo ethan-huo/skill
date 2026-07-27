@@ -1,5 +1,3 @@
-import { fmt } from "argc/terminal";
-
 import { installRepoSkills } from "../../lib/add-skills";
 import { groupFavoritesForInstall } from "../../lib/favorite-groups";
 import { listFavorites } from "../../lib/favorites";
@@ -7,7 +5,7 @@ import { resolveFavoriteRefs } from "../../lib/resolve-favorite-refs";
 import { searchableMultiselect } from "../../lib/prompt";
 import type { FavoriteInstallInput } from "../../types";
 
-export async function runFavoriteInstall(args: { input: FavoriteInstallInput }): Promise<void> {
+export async function runFavoriteInstall(args: { input: FavoriteInstallInput }) {
   const { ids, global: isGlobal } = args.input;
   const favorites = await listFavorites();
 
@@ -23,8 +21,7 @@ export async function runFavoriteInstall(args: { input: FavoriteInstallInput }):
     selectedFavorites = matched;
   } else if (process.stdin.isTTY && process.stdout.isTTY) {
     if (favorites.length === 0) {
-      console.log(fmt.info("No favorite refs found."));
-      return;
+      return { installed: [] };
     }
 
     const response = await searchableMultiselect({
@@ -44,6 +41,7 @@ export async function runFavoriteInstall(args: { input: FavoriteInstallInput }):
     );
   }
 
+  const installed = [];
   for (const group of groupFavoritesForInstall(selectedFavorites)) {
     const result = await installRepoSkills({
       cwd: process.cwd(),
@@ -55,16 +53,22 @@ export async function runFavoriteInstall(args: { input: FavoriteInstallInput }):
     });
 
     if (result.kind === "map") {
-      console.log(
-        `Installed map for ${result.mappedSkills.length} skill(s) to ${result.installRoot}`,
-      );
-      console.log(`- ${group.repo.display} (map)`);
+      installed.push({
+        kind: "map" as const,
+        repo: group.repo.display,
+        installRoot: result.installRoot,
+        skills: result.mappedSkills.map((skill) => skill.relativeDir),
+      });
       continue;
     }
 
-    console.log(`Installed ${result.selectedSkills.length} skill(s) to ${result.installRoot}`);
-    for (const skill of result.selectedSkills) {
-      console.log(`- ${group.repo.display}/${skill.relativeDir}`);
-    }
+    installed.push({
+      kind: "skills" as const,
+      repo: group.repo.display,
+      installRoot: result.installRoot,
+      skills: result.selectedSkills.map((skill) => skill.relativeDir),
+    });
   }
+
+  return { installed };
 }

@@ -1,5 +1,3 @@
-import { fmt } from "argc/terminal";
-
 import { installRepoSkills } from "../lib/add-skills";
 import {
   installProjectRepoMap,
@@ -10,7 +8,7 @@ import { parseRepoSkillTarget } from "../lib/repo-ref";
 import { parseSkillSelectors } from "../lib/skill-selector";
 import type { InstallInput } from "../types";
 
-export async function runInstall(args: { input: InstallInput }): Promise<void> {
+export async function runInstall(args: { input: InstallInput }) {
   const input = args.input;
   if (input.map && input.repo.length === 0) {
     throw new Error("Install --map requires a repository ref.");
@@ -21,8 +19,7 @@ export async function runInstall(args: { input: InstallInput }): Promise<void> {
   }
 
   if (input.repo.length === 0) {
-    await restoreLinks(input.global);
-    return;
+    return restoreLinks(input.global);
   }
 
   if (input.repo.length > 1) {
@@ -41,9 +38,12 @@ export async function runInstall(args: { input: InstallInput }): Promise<void> {
       cwd: process.cwd(),
       repo: target.repo,
     });
-    console.log(`Linked map for ${mappedSkills.length} skill(s) to ${installRoot}`);
-    console.log(`- ${target.repo.display} (map)`);
-    return;
+    return {
+      kind: "map" as const,
+      repo: target.repo.display,
+      installRoot,
+      skills: mappedSkills.map((skill) => skill.relativeDir),
+    };
   }
 
   const repo = target.repo;
@@ -56,36 +56,31 @@ export async function runInstall(args: { input: InstallInput }): Promise<void> {
   });
 
   if (result.kind === "map") {
-    console.log(`Linked map for ${result.mappedSkills.length} skill(s) to ${result.installRoot}`);
-    console.log(`- ${repo.display} (map)`);
-    return;
+    return {
+      kind: "map" as const,
+      repo: repo.display,
+      installRoot: result.installRoot,
+      skills: result.mappedSkills.map((skill) => skill.relativeDir),
+    };
   }
 
-  console.log(`Linked ${result.selectedSkills.length} skill(s) to ${result.installRoot}`);
-  for (const skill of result.selectedSkills) {
-    console.log(`- ${repo.display}/${skill.relativeDir}`);
-  }
+  return {
+    kind: "skills" as const,
+    repo: repo.display,
+    installRoot: result.installRoot,
+    skills: result.selectedSkills.map((skill) => skill.relativeDir),
+  };
 }
 
-async function restoreLinks(global: boolean): Promise<void> {
+async function restoreLinks(global: boolean) {
   const result = global
     ? await restoreGlobalSkills(process.cwd())
     : await restoreProjectSkills(process.cwd());
-
-  if (result.restored.length === 0 && result.missing.length === 0) {
-    const scope = global ? "global" : "project";
-    const manifest = global ? "~/.agents/skills/manifest.json" : ".agents/skills/manifest.json";
-    console.log(fmt.info(`No ${scope} skills are recorded in ${manifest}.`));
-    return;
-  }
-
-  for (const skill of result.restored) {
-    console.log(fmt.green(`~ ${skill}`));
-  }
-
-  for (const skill of result.missing) {
-    console.log(fmt.red(`- ${skill} (missing upstream)`));
-  }
+  return {
+    kind: "restore" as const,
+    scope: global ? ("global" as const) : ("local" as const),
+    ...result,
+  };
 }
 
 function normalizeSelectors(value: string, shorthandSkill?: string) {

@@ -1,7 +1,5 @@
 import { rm } from "node:fs/promises";
 
-import { fmt } from "argc/terminal";
-
 import { ensureGlobalClaudeSkillsLink, ensureProjectClaudeSkillsLink } from "../lib/claude-skills";
 import { pMapLimit } from "../lib/concurrency";
 import { shallowCloneRepo } from "../lib/git";
@@ -58,7 +56,7 @@ const MAP_ID = (repoId: string) => `map:${repoId}`;
 const EMPTY_MANIFEST_MESSAGE =
   "No global or project skills are recorded in ~/.agents/skills/manifest.json or .agents/skills/manifest.json.";
 
-export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
+export async function runUpdate(args: { input: UpdateInput }) {
   const input = args.input;
   const concurrency = Math.max(1, input.concurrency ?? 8);
 
@@ -74,8 +72,12 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
   const mapRepoIds = getProjectManifestMapRepos(projectManifest);
 
   if (sourceRepos.length === 0 && mapRepoIds.length === 0) {
-    console.log(fmt.info(EMPTY_MANIFEST_MESSAGE));
-    return;
+    return {
+      repos: [],
+      maps: [],
+      failures: [],
+      message: EMPTY_MANIFEST_MESSAGE,
+    };
   }
 
   const rows = [
@@ -127,25 +129,13 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
     }
   }
 
-  // The plan promises stable ordering on stdout regardless of completion
-  // order — keep it sorted by owner/repo (and repoId for maps) so output stays
-  // grep-friendly across runs.
+  // Stable ordering makes the structured result deterministic regardless of completion order.
   repoOutcomes.sort((left, right) =>
     `${left.repo.owner}/${left.repo.repo}`.localeCompare(`${right.repo.owner}/${right.repo.repo}`),
   );
   mapOutcomes.sort((left, right) => left.repoId.localeCompare(right.repoId));
 
   await persistResolvedSources(process.cwd(), repoOutcomes);
-
-  for (const outcome of repoOutcomes) {
-    console.log(fmt.info(`${outcome.repo.owner}/${outcome.repo.repo} (source)`));
-    printDiff(outcome.diff);
-  }
-
-  for (const outcome of mapOutcomes) {
-    console.log(fmt.info(`${outcome.repoId} (map)`));
-    console.log(fmt.yellow(`  ~ regenerated ${outcome.mappedSkills} skill(s)`));
-  }
 
   // Match the old syncProjectMaps no-op manifest rewrite so any in-tree
   // touch-on-update consumers (timestamps, formatters) keep firing.
@@ -154,16 +144,25 @@ export async function runUpdate(args: { input: UpdateInput }): Promise<void> {
     await writeScopeManifest("local", process.cwd(), manifest);
   }
 
-  for (const failure of failures) {
-    const detail = failure.error instanceof Error ? failure.error.message : String(failure.error);
-    console.log(fmt.error(`${failure.title}: ${detail}`));
-  }
-
-  printSummary({ repoOutcomes, mapOutcomes, failures });
-
   if (failures.length > 0) {
     process.exitCode = 1;
   }
+
+  return {
+    repos: repoOutcomes.map((outcome) => ({
+      repo: `${outcome.repo.owner}/${outcome.repo.repo}`,
+      ...outcome.diff,
+    })),
+    maps: mapOutcomes.map((outcome) => ({
+      repo: outcome.repoId,
+      mappedSkills: outcome.mappedSkills,
+    })),
+    failures: failures.map((failure) => ({
+      id: failure.id,
+      title: failure.title,
+      detail: failure.error instanceof Error ? failure.error.message : String(failure.error),
+    })),
+  };
 }
 
 async function updateRepo(options: {
@@ -246,28 +245,6 @@ function summarizeDiff(diff: UpdateDiff): string {
   if (diff.removed.length > 0) parts.push(`-${diff.removed.length}`);
   if (diff.added.length > 0) parts.push(`+${diff.added.length}`);
   return parts.length === 0 ? "no changes" : parts.join(" ");
-}
-
-function printSummary(options: {
-  repoOutcomes: RepoOutcome[];
-  mapOutcomes: MapOutcome[];
-  failures: FailOutcome[];
-}): void {
-  const { repoOutcomes, mapOutcomes, failures } = options;
-  const totalUpdated = repoOutcomes.reduce((sum, outcome) => sum + outcome.diff.updated.length, 0);
-  const totalRemoved = repoOutcomes.reduce((sum, outcome) => sum + outcome.diff.removed.length, 0);
-  const totalAdded = repoOutcomes.reduce((sum, outcome) => sum + outcome.diff.added.length, 0);
-  const repoCount = repoOutcomes.length;
-  const mapCount = mapOutcomes.length;
-
-  const segments = [
-    `${repoCount} repo${repoCount === 1 ? "" : "s"}`,
-    mapCount > 0 ? `${mapCount} map${mapCount === 1 ? "" : "s"}` : null,
-    `~${totalUpdated} -${totalRemoved} +${totalAdded}`,
-    failures.length > 0 ? fmt.red(`✗${failures.length}`) : null,
-  ].filter(Boolean);
-
-  console.log(fmt.dim(`updated ${segments.join(" · ")}`));
 }
 
 function groupManifestSkills(
@@ -456,23 +433,4 @@ function toInstalledCandidates(installedIds: string[], updated: string[]): Skill
       sourceDir: skill,
       displayLabel: skill,
     }));
-}
-
-function printDiff(diff: ReturnType<typeof diffSkillSets>): void {
-  if (diff.updated.length === 0 && diff.removed.length === 0 && diff.added.length === 0) {
-    console.log(fmt.dim("  no changes"));
-    return;
-  }
-
-  for (const skill of diff.updated) {
-    console.log(fmt.yellow(`  ~ ${skill}`));
-  }
-
-  for (const skill of diff.removed) {
-    console.log(fmt.red(`  - ${skill}`));
-  }
-
-  for (const skill of diff.added) {
-    console.log(fmt.green(`  + ${skill} (available, not installed)`));
-  }
 }
