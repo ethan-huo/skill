@@ -2,12 +2,12 @@
 name: skill
 description: >
   Manage agent skills with the `skill` CLI when installing suitable skills,
-  inspecting favorites, or maintaining GitHub-backed skill installs.
+  inspecting favorites, or maintaining GitHub and filesystem-backed installs.
 ---
 
 # skill — Skill Manager
 
-`skill` installs agent skills from GitHub into the current project or the user's global skill root.
+`skill` installs agent skills from GitHub or live filesystem origins into the current project or the user's global skill root.
 
 For agents, the main job is not to expose every command. The main job is to help the user get the right skills into the current project with the least machinery.
 
@@ -43,7 +43,13 @@ Prefer non-interactive installs whenever you already know the exact skill IDs:
 skill add "{ repo: 'owner/repo/skill' }"
 skill add "{ repo: 'owner/repo', skills: 'skill-a,skill-b' }"
 skill add "{ repo: 'owner/repo', skills: 'core/{skill-a,skill-b},claude/skill-c' }"
+skill add "{ repo: 'fs:../agents/skills', skills: 'skill-a,skill-b' }"
 ```
+
+Filesystem sources must use deterministic path syntax: an absolute path, `./`, `../`, `~/`,
+`fs:<path>`, or a `file://` URL. A bare `owner/repo` is always GitHub syntax even if that
+relative directory exists. Filesystem skills are linked directly from their canonical origin,
+so edits are live and `skill update` does not copy or fetch them.
 
 Use a repo map when the repo is a broad skill catalog and you do not need specific local bundles:
 
@@ -91,7 +97,7 @@ Do not start with `find` if the favorites already contain a good match.
 These are valid tools, but they are not the default agent path.
 
 - `skill favorite.refresh`: refresh cached descriptions and remove upstream refs that no longer exist
-- `skill update`: refresh installed skills from upstream
+- `skill update`: refresh GitHub installs; filesystem origins are already live
 - `skill remove "{ repo: ['owner/repo/skill'] }"`: remove installed skills
 - `skill favorite.add` / `skill favorite.remove`: manage the user's favorite refs
 

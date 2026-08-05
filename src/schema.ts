@@ -7,18 +7,24 @@ const s = toStandardJsonSchema;
 export const schema = {
   add: c
     .meta({
-      description: "Clone a GitHub repository, select skills, and install them",
+      description: "Install skills from a GitHub repository or filesystem directory",
       examples: [
         `skill add "{ repo: 'ethan-huo/agents' }"`,
         `skill add "{ repo: 'pbakaus/impeccable/audit' }"`,
         `skill add "{ repo: 'ethan-huo/agents', global: true }"`,
+        `skill add "{ repo: 'fs:../agents/skills', skills: 'cx' }"`,
       ],
     })
     .positional("repo")
     .input(
       s(
         v.object({
-          repo: v.string(),
+          repo: v.pipe(
+            v.string(),
+            v.description(
+              "GitHub repository ref or explicit filesystem source: absolute path, ./path, ../path, ~/path, fs:<path>, or file:// URL.",
+            ),
+          ),
           global: v.optional(v.boolean(), false),
           skills: v.optional(
             v.pipe(
@@ -114,17 +120,28 @@ export const schema = {
 
   install: c
     .meta({
-      description: "Install shared skills or restore links from the scope manifest",
+      description: "Install GitHub or filesystem skills, or restore links from the scope manifest",
       examples: [
         `skill install "{ repo: ['ethan-huo/agents/cx'], global: true }"`,
         `skill install "{ repo: ['ethan-huo/agents'], skills: 'cx,fp-thinking' }"`,
         `skill install "{ repo: ['Owl-Listener/designer-skills'], map: true }"`,
+        `skill install "{ repo: ['/Users/me/code/agents/skills'], skills: 'cx' }"`,
       ],
     })
     .input(
       s(
         v.object({
-          repo: v.optional(v.array(v.string()), []),
+          repo: v.optional(
+            v.array(
+              v.pipe(
+                v.string(),
+                v.description(
+                  "GitHub repository ref or explicit filesystem source; at most one source is accepted.",
+                ),
+              ),
+            ),
+            [],
+          ),
           skills: v.optional(
             v.pipe(
               v.string(),
@@ -143,7 +160,7 @@ export const schema = {
   remove: c
     .meta({
       description:
-        "Remove installed repositories or skills; global repo removal also purges shared source cache and favorites",
+        "Remove installed GitHub or filesystem sources and skills; global GitHub repo removal also purges cache and favorites",
       examples: [`skill remove "{ repo: ['ethan-huo/agents/cx'], global: true }"`],
     })
     .input(

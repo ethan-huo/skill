@@ -20,7 +20,7 @@ import {
   writeScopeManifest,
 } from "../lib/project-manifest";
 import { searchableMultiselect } from "../lib/prompt";
-import { parseRepoSkillTarget } from "../lib/repo-ref";
+import { resolveSourceTarget } from "../lib/source-ref";
 import { removeSourceRepo } from "../lib/source-skills";
 import type { RemoveInput } from "../types";
 
@@ -51,17 +51,19 @@ export async function runRemove(
 }
 
 async function removeRef(ref: string, global: boolean) {
-  const target = parseRepoSkillTarget(ref);
+  const target = await resolveSourceTarget(ref, process.cwd());
   const repo = target.repo;
+  const filesystemSource = target.kind === "filesystem";
+  const skill = target.kind === "github" ? target.skill : undefined;
   const scope = getInstallScope(global);
   const skillsBaseDir = getSkillsBaseDir(scope, process.cwd());
-  const targetPath = target.skill
-    ? getVisibleSkillRoot(scope, process.cwd(), repo, target.skill)
+  const targetPath = skill
+    ? getVisibleSkillRoot(scope, process.cwd(), repo, skill)
     : `${skillsBaseDir}/${getVisibleRepoDirPrefix(repo)}*`;
-  const legacyTargetPath = target.skill
-    ? getLegacyVisibleSkillRoot(scope, process.cwd(), repo, target.skill)
+  const legacyTargetPath = skill
+    ? getLegacyVisibleSkillRoot(scope, process.cwd(), repo, skill)
     : null;
-  const removed = target.skill
+  const removed = skill
     ? (await removeInstalledSkill(targetPath)) ||
       (legacyTargetPath !== null && (await removeInstalledSkill(legacyTargetPath)))
     : await removeVisibleRepoSkills(skillsBaseDir, repo);
@@ -69,20 +71,22 @@ async function removeRef(ref: string, global: boolean) {
     scope,
     process.cwd(),
     `${repo.owner}/${repo.repo}`,
-    target.skill,
+    skill,
   );
-  const removedSource = global && !target.skill ? await removeSourceRepo(repo) : false;
-  const removedFavorites = global && !target.skill ? await removeFavoritesForRepo(repo) : [];
+  const removedSource =
+    global && !skill && !filesystemSource ? await removeSourceRepo(repo) : false;
+  const removedFavorites =
+    global && !skill && !filesystemSource ? await removeFavoritesForRepo(repo) : [];
 
   if (!removed && !removedManifest && !removedSource && removedFavorites.length === 0) {
     throw new Error(`Nothing installed at ${targetPath}`);
   }
 
   await pruneEmptyParents(dirname(targetPath), skillsBaseDir);
-  if (target.skill) {
+  if (skill) {
     return {
       repo: repo.display,
-      skill: target.skill,
+      skill,
       scope,
       removed: ["visible skill", ...(removedManifest ? ["manifest"] : [])],
     };

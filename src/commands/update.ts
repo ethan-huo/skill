@@ -1,4 +1,5 @@
 import { rm } from "node:fs/promises";
+import { isAbsolute } from "node:path";
 
 import { ensureGlobalClaudeSkillsLink, ensureProjectClaudeSkillsLink } from "../lib/claude-skills";
 import { pMapLimit } from "../lib/concurrency";
@@ -69,14 +70,19 @@ export async function runUpdate(args: { input: UpdateInput }) {
     groupManifestSkills("local", getProjectManifestSkills(projectManifest)),
   );
   const sourceRepos = getManifestSourceRepos([globalManifest, projectManifest]);
+  const filesystemSources = getManifestFilesystemSources([globalManifest, projectManifest]);
   const mapRepoIds = getProjectManifestMapRepos(projectManifest);
 
   if (sourceRepos.length === 0 && mapRepoIds.length === 0) {
     return {
       repos: [],
       maps: [],
+      filesystemSources,
       failures: [],
-      message: EMPTY_MANIFEST_MESSAGE,
+      message:
+        filesystemSources.length > 0
+          ? "Filesystem sources are live links and do not require updates. Run skill install to repair their links."
+          : EMPTY_MANIFEST_MESSAGE,
     };
   }
 
@@ -157,12 +163,31 @@ export async function runUpdate(args: { input: UpdateInput }) {
       repo: outcome.repoId,
       mappedSkills: outcome.mappedSkills,
     })),
+    filesystemSources,
     failures: failures.map((failure) => ({
       id: failure.id,
       title: failure.title,
       detail: failure.error instanceof Error ? failure.error.message : String(failure.error),
     })),
   };
+}
+
+function getManifestFilesystemSources(manifests: ProjectManifest[]): string[] {
+  return [
+    ...new Set(
+      manifests.flatMap((manifest) =>
+        manifest.items.flatMap((item) =>
+          item.type === "skills" &&
+          item.skills.length > 0 &&
+          item.skills.every((skill) => skill.source && isAbsolute(skill.source))
+            ? item.skills
+                .map((skill) => skill.source)
+                .filter((source): source is string => source !== undefined)
+            : [],
+        ),
+      ),
+    ),
+  ].sort();
 }
 
 async function updateRepo(options: {
@@ -285,6 +310,14 @@ function getManifestSourceRepos(
   for (const manifest of manifests) {
     for (const item of manifest.items.filter((item) => item.type === "skills")) {
       const repo = parseRepoRef(item.repo);
+      // Filesystem origins are already live; cloning their synthetic identity would turn them
+      // into a bogus GitHub source. `skill install` remains the explicit link-repair operation.
+      if (
+        item.skills.length > 0 &&
+        item.skills.every((skill) => skill.source && isAbsolute(skill.source))
+      ) {
+        continue;
+      }
       repos.set(`${repo.owner}/${repo.repo}`, {
         owner: repo.owner,
         repo: repo.repo,

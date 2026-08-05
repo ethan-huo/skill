@@ -82,6 +82,22 @@ export async function linkInstalledSkills(
   }
 }
 
+export async function linkSkillDirectories(
+  targetRoot: string,
+  repo: RepoRef,
+  skills: Array<{ relativeDir: string; sourcePath: string }>,
+): Promise<void> {
+  await mkdir(targetRoot, { recursive: true });
+
+  for (const skill of skills) {
+    const destDir = join(targetRoot, getVisibleSkillDirName(repo, skill.relativeDir));
+    const legacyDestDir = join(targetRoot, getLegacyVisibleSkillDirName(repo, skill.relativeDir));
+    await rm(legacyDestDir, { force: true, recursive: true });
+    await rm(destDir, { force: true, recursive: true });
+    await symlink(skill.sourcePath, destDir, "dir");
+  }
+}
+
 export async function removeVisibleRepoSkills(targetRoot: string, repo: RepoRef): Promise<boolean> {
   const entries = await readdir(targetRoot, { withFileTypes: true }).catch(() => []);
   const visibleRepo = getVisibleRepoDirPrefix(repo);

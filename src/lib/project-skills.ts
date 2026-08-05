@@ -1,10 +1,11 @@
 import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 
 import { installLocalProjectSkills, type RepoInstallResult, selectRepoSkills } from "./add-skills";
 import { ensureGlobalClaudeSkillsLink, ensureProjectClaudeSkillsLink } from "./claude-skills";
 import { shallowCloneRepo } from "./git";
+import { restoreFilesystemSkills } from "./filesystem-skills";
 import { linkInstalledSkills, removeVisibleRepoSkills } from "./install";
 import { listInstalledSkills } from "./installed-skills";
 import {
@@ -24,10 +25,10 @@ import {
   writeScopeManifest,
 } from "./project-manifest";
 import type { ManifestSkill } from "./project-manifest";
-import { parseFavoriteRef, parseRepoRef } from "./repo-ref";
+import { parseRepoRef } from "./repo-ref";
 import { updateSourceRepo } from "./source-skills";
 import { writeProjectSkillMap, writeProjectSkillMapFromClone } from "./skill-map";
-import type { RepoRef, SkillCandidate, SkillSelector } from "../types";
+import type { InstalledSkill, RepoRef, SkillCandidate, SkillSelector } from "../types";
 
 export async function installProjectRepoSkills(options: {
   cwd: string;
@@ -91,6 +92,22 @@ export async function restoreProjectSkills(cwd: string): Promise<{
 
   for (const group of groups.values()) {
     const repo = parseRepoRef(`${group.owner}/${group.repo}`);
+    if (isFilesystemManifestGroup(group.skills)) {
+      const result = await restoreFilesystemSkills({
+        cwd,
+        global: false,
+        repo,
+        skills: group.skills,
+      });
+      restored.push(...result.restored);
+      missing.push(...result.missing);
+      await removeProjectSkillLinks(
+        cwd,
+        repo,
+        result.missing.map((skillId) => skillId.split("/").at(-1)!),
+      );
+      continue;
+    }
     const cloneDir = await shallowCloneRepo(repo);
     const sourceRoot = getSourceInstallRoot(repo);
     const sourceUpdate = await updateSourceRepo({
@@ -159,6 +176,23 @@ export async function restoreGlobalSkills(cwd: string): Promise<{
 
   for (const group of groups.values()) {
     const repo = parseRepoRef(`${group.owner}/${group.repo}`);
+    if (isFilesystemManifestGroup(group.skills)) {
+      const result = await restoreFilesystemSkills({
+        cwd,
+        global: true,
+        repo,
+        skills: group.skills,
+      });
+      restored.push(...result.restored);
+      missing.push(...result.missing);
+      for (const skillId of result.missing) {
+        await rm(getVisibleSkillRoot("global", cwd, repo, skillId.split("/").at(-1)!), {
+          force: true,
+          recursive: true,
+        });
+      }
+      continue;
+    }
     const cloneDir = await shallowCloneRepo(repo);
     const sourceRoot = getSourceInstallRoot(repo);
     const sourceUpdate = await updateSourceRepo({
@@ -204,22 +238,17 @@ export async function seedGlobalManifestFromVisibleLinks(cwd: string): Promise<b
     return false;
   }
 
-  const skillIds = (await listInstalledSkills(cwd))
-    .filter((skill) => skill.scope === "global")
-    .map((skill) => skill.id);
+  const installedSkills = (await listInstalledSkills(cwd)).filter(
+    (skill) => skill.scope === "global",
+  );
 
-  if (skillIds.length === 0) {
+  if (installedSkills.length === 0) {
     return false;
   }
 
-  const grouped = groupManifestSkills(skillIds);
+  const grouped = groupManifestSkills(installedSkills);
   for (const group of grouped.values()) {
-    await addScopeManifestSkills(
-      "global",
-      cwd,
-      `${group.owner}/${group.repo}`,
-      group.skills.map((id) => ({ id })),
-    );
+    await addScopeManifestSkills("global", cwd, `${group.owner}/${group.repo}`, group.skills);
   }
   return true;
 }
@@ -343,23 +372,18 @@ export function hasScopeManifest(scope: "local" | "global", cwd: string): boolea
 }
 
 function groupManifestSkills(
-  skillIds: string[],
-): Map<string, { owner: string; repo: string; skills: string[] }> {
-  const groups = new Map<string, { owner: string; repo: string; skills: string[] }>();
+  installedSkills: InstalledSkill[],
+): Map<string, { owner: string; repo: string; skills: ManifestSkill[] }> {
+  const groups = new Map<string, { owner: string; repo: string; skills: ManifestSkill[] }>();
 
-  for (const skillId of skillIds) {
-    const favorite = parseFavoriteRef(skillId);
-    if (!favorite.skill) {
-      throw new Error(`Project skill manifest entry must use owner/repo/skill: ${skillId}`);
-    }
-
-    const key = `${favorite.owner}/${favorite.repo}`;
-    const current = groups.get(key) ?? {
-      owner: favorite.owner,
-      repo: favorite.repo,
+  for (const skill of installedSkills) {
+    const key = `${skill.owner}/${skill.repo}`;
+    const current: { owner: string; repo: string; skills: ManifestSkill[] } = groups.get(key) ?? {
+      owner: skill.owner,
+      repo: skill.repo,
       skills: [],
     };
-    current.skills.push(favorite.skill);
+    current.skills.push({ id: skill.relativeDir, source: skill.source });
     groups.set(key, current);
   }
 
@@ -382,6 +406,10 @@ function groupManifestEntries(
     groups.set(key, current);
   }
   return groups;
+}
+
+function isFilesystemManifestGroup(skills: ManifestSkill[]): boolean {
+  return skills.length > 0 && skills.every((skill) => skill.source && isAbsolute(skill.source));
 }
 
 async function removeProjectSkill(repo: RepoRef, cwd: string, skill: string): Promise<void> {

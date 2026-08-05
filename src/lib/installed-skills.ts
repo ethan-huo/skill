@@ -1,5 +1,5 @@
 import { readdir, readlink, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 
 import { getSkillsBaseDir } from "./paths";
 import { readSkillFrontmatterMetadata } from "./skill-frontmatter";
@@ -27,9 +27,9 @@ async function listSkillsForScope(scope: InstallScope, baseDir: string): Promise
     }
 
     const installRoot = join(baseDir, entry.name);
-    const parsed =
-      parseSourceSkillLinkTarget(await readlink(installRoot).catch(() => "")) ??
-      parseVisibleSkillDirName(entry.name);
+    const linkTarget = await readlink(installRoot).catch(() => "");
+    const cachedSource = parseSourceSkillLinkTarget(linkTarget);
+    const parsed = cachedSource ?? parseVisibleSkillDirName(entry.name);
     if (parsed === null) {
       continue;
     }
@@ -51,6 +51,7 @@ async function listSkillsForScope(scope: InstallScope, baseDir: string): Promise
       description: frontmatter.description,
       scope,
       installRoot,
+      source: cachedSource === null && isAbsolute(linkTarget) ? linkTarget : undefined,
     });
   }
 

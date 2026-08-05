@@ -88,6 +88,7 @@ export type InstalledSkill = {
   description: string;
   scope: SkillScopeLabel;
   installRoot: string;
+  source?: string;
 };
 
 export type SearchSkill = {

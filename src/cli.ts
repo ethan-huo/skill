@@ -19,7 +19,7 @@ import { schema } from "./schema";
 const app = cli(schema, {
   name: "skill",
   version: packageJson.version,
-  description: "Install and remove agent skills from GitHub repositories.",
+  description: "Install and remove agent skills from GitHub or filesystem sources.",
 });
 
 const argv = normalizeArgv(process.argv.slice(2));
