@@ -60,6 +60,35 @@ describe("remove command", () => {
     expect(await readManifest(root)).toEqual({ version: 3, items: [] });
   });
 
+  test("removes a GitHub skill by its canonical source ID", async () => {
+    const root = join(tmpdir(), `skill-remove-canonical-${crypto.randomUUID()}`);
+    const sourceRoot = join(root, ".agents", ".skills", "repo", "abc", "a");
+    const skillLink = join(root, ".agents", "skills", "a.abc.repo");
+
+    await mkdir(sourceRoot, { recursive: true });
+    await mkdir(join(root, ".agents", "skills"), { recursive: true });
+    await symlink(sourceRoot, skillLink, "dir");
+    await writeFile(
+      join(root, ".agents", "skills", "manifest.json"),
+      `${JSON.stringify({
+        version: 3,
+        items: [
+          {
+            type: "skills",
+            repo: "repo/abc",
+            skills: [{ id: "a", source: "skills/a" }],
+          },
+        ],
+      })}\n`,
+    );
+
+    process.chdir(root);
+    await runRemove({ input: { repo: ["gh:repo/abc/skills/a"], global: false } });
+
+    expect(await lstat(skillLink).catch(() => null)).toBeNull();
+    expect(await readManifest(root)).toEqual({ version: 3, items: [] });
+  });
+
   test("removes repo-level project skill and map manifest items", async () => {
     const root = join(tmpdir(), `skill-remove-repo-manifest-${crypto.randomUUID()}`);
     const visibleRoot = join(root, ".agents", "skills");

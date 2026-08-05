@@ -13,6 +13,7 @@ import {
   getVisibleSkillRoot,
 } from "../lib/paths";
 import {
+  getProjectManifestSkills,
   getProjectManifestMapRepos,
   readScopeManifest,
   removeProjectManifestRepo,
@@ -21,6 +22,8 @@ import {
 } from "../lib/project-manifest";
 import { searchableMultiselect } from "../lib/prompt";
 import { resolveSourceTarget } from "../lib/source-ref";
+import { formatManifestSkillId } from "../lib/skill-ref";
+import { parseRepoRef } from "../lib/repo-ref";
 import { removeSourceRepo } from "../lib/source-skills";
 import type { RemoveInput } from "../types";
 
@@ -51,28 +54,35 @@ export async function runRemove(
 }
 
 async function removeRef(ref: string, global: boolean) {
-  const target = await resolveSourceTarget(ref, process.cwd());
-  const repo = target.repo;
-  const filesystemSource = target.kind === "filesystem";
-  const skill = target.kind === "github" ? target.skill : undefined;
   const scope = getInstallScope(global);
-  const skillsBaseDir = getSkillsBaseDir(scope, process.cwd());
+  const cwd = process.cwd();
+  const manifest = await readScopeManifest(scope, cwd);
+  const installedRef = getProjectManifestSkills(manifest).find(
+    (candidate) => formatManifestSkillId(candidate.repo, candidate) === ref,
+  );
+  const target = installedRef ? null : await resolveSourceTarget(ref, cwd);
+  if (target?.kind === "github" && target.sourcePath) {
+    throw new Error(`Nothing installed with skill ID ${ref}`);
+  }
+  const repo = installedRef ? parseRepoRef(installedRef.repo) : target!.repo;
+  const filesystemSource = installedRef
+    ? Boolean(installedRef.source?.startsWith("/"))
+    : target!.kind === "filesystem";
+  const skill = installedRef
+    ? installedRef.id
+    : target!.kind === "github"
+      ? target!.skill
+      : undefined;
+  const skillsBaseDir = getSkillsBaseDir(scope, cwd);
   const targetPath = skill
-    ? getVisibleSkillRoot(scope, process.cwd(), repo, skill)
+    ? getVisibleSkillRoot(scope, cwd, repo, skill)
     : `${skillsBaseDir}/${getVisibleRepoDirPrefix(repo)}*`;
-  const legacyTargetPath = skill
-    ? getLegacyVisibleSkillRoot(scope, process.cwd(), repo, skill)
-    : null;
+  const legacyTargetPath = skill ? getLegacyVisibleSkillRoot(scope, cwd, repo, skill) : null;
   const removed = skill
     ? (await removeInstalledSkill(targetPath)) ||
       (legacyTargetPath !== null && (await removeInstalledSkill(legacyTargetPath)))
     : await removeVisibleRepoSkills(skillsBaseDir, repo);
-  const removedManifest = await removeManifestRef(
-    scope,
-    process.cwd(),
-    `${repo.owner}/${repo.repo}`,
-    skill,
-  );
+  const removedManifest = await removeManifestRef(scope, cwd, `${repo.owner}/${repo.repo}`, skill);
   const removedSource =
     global && !skill && !filesystemSource ? await removeSourceRepo(repo) : false;
   const removedFavorites =

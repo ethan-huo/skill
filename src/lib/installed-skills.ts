@@ -2,13 +2,15 @@ import { readdir, readlink, stat } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 
 import { getSkillsBaseDir } from "./paths";
+import { getProjectManifestSkills, readScopeManifest } from "./project-manifest";
 import { readSkillFrontmatterMetadata } from "./skill-frontmatter";
+import { formatManifestSkillId } from "./skill-ref";
 import type { InstallScope, InstalledSkill } from "../types";
 
 export async function listInstalledSkills(cwd: string): Promise<InstalledSkill[]> {
   const skills = await Promise.all(
     (["local", "global"] as const).map((scope) =>
-      listSkillsForScope(scope, getSkillsBaseDir(scope, cwd)),
+      listSkillsForScope(scope, getSkillsBaseDir(scope, cwd), cwd),
     ),
   );
   return skills
@@ -18,7 +20,17 @@ export async function listInstalledSkills(cwd: string): Promise<InstalledSkill[]
     );
 }
 
-async function listSkillsForScope(scope: InstallScope, baseDir: string): Promise<InstalledSkill[]> {
+async function listSkillsForScope(
+  scope: InstallScope,
+  baseDir: string,
+  cwd: string,
+): Promise<InstalledSkill[]> {
+  const manifestSkills = new Map(
+    getProjectManifestSkills(await readScopeManifest(scope, cwd)).map((skill) => [
+      `${skill.repo}/${skill.id}`,
+      skill,
+    ]),
+  );
   const entries = await readdir(baseDir, { withFileTypes: true }).catch(() => []);
   const skills: InstalledSkill[] = [];
   for (const entry of entries) {
@@ -42,8 +54,12 @@ async function listSkillsForScope(scope: InstallScope, baseDir: string): Promise
     const frontmatter = await readSkillFrontmatterMetadata(join(installRoot, "SKILL.md")).catch(
       () => ({ name: "", description: "" }),
     );
+    const repoId = `${parsed.owner}/${parsed.repo}`;
+    const manifestSkill = manifestSkills.get(`${repoId}/${parsed.skill}`);
     skills.push({
-      id: `${parsed.owner}/${parsed.repo}/${parsed.skill}`,
+      id: manifestSkill
+        ? formatManifestSkillId(repoId, manifestSkill)
+        : `gh:${repoId}/${parsed.skill}`,
       owner: parsed.owner,
       repo: parsed.repo,
       relativeDir: parsed.skill,

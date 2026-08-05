@@ -39,6 +39,20 @@ describe("resolve source target", () => {
     }
   });
 
+  test("parses a canonical GitHub skill ID as an exact repository source path", async () => {
+    expect(await resolveSourceTarget("gh:owner/repo/skills/cx", "/tmp")).toMatchObject({
+      kind: "github",
+      repo: { display: "owner/repo" },
+      sourcePath: "skills/cx",
+    });
+  });
+
+  test("rejects gh: refs without a skill source path", async () => {
+    await expect(resolveSourceTarget("gh:owner/repo", "/tmp")).rejects.toThrow(
+      "gh:<owner>/<repo>/<source-path>",
+    );
+  });
+
   test("rejects a missing filesystem source without reinterpreting it as GitHub", async () => {
     const cwd = join(tmpdir(), `skill-source-ref-${crypto.randomUUID()}`);
     await expect(resolveSourceTarget("./missing", cwd)).rejects.toThrow(

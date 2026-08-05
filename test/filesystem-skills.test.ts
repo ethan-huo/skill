@@ -51,7 +51,7 @@ describe("filesystem skills", () => {
 
       await rm(visible, { force: true });
       expect(await restoreProjectSkills(projectRoot)).toEqual({
-        restored: [`${source.repo.owner}/${source.repo.repo}/cx`],
+        restored: [`fs:${join(canonicalSourceRoot, "cx")}`],
         missing: [],
       });
       expect(await readlink(visible)).toBe(join(canonicalSourceRoot, "cx"));
@@ -59,7 +59,7 @@ describe("filesystem skills", () => {
       await rm(join(sourceRoot, "cx", "SKILL.md"));
       expect(await restoreProjectSkills(projectRoot)).toEqual({
         restored: [],
-        missing: [`${source.repo.owner}/${source.repo.repo}/cx`],
+        missing: [`fs:${join(canonicalSourceRoot, "cx")}`],
       });
       expect(await readScopeManifest("local", projectRoot)).toEqual({ version: 3, items: [] });
     } finally {

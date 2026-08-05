@@ -8,6 +8,7 @@ import { listInstalledSkills } from "./installed-skills";
 import { getInstallScope, getSkillsBaseDir } from "./paths";
 import { addScopeManifestSkills } from "./project-manifest";
 import { selectSkills } from "./select-skills";
+import { formatFilesystemSkillId } from "./skill-ref";
 import { validateSkillSelectorName } from "./skill-selector";
 import type { FilesystemSourceTarget } from "./source-ref";
 import type { ManifestSkill } from "./project-manifest";
@@ -104,7 +105,9 @@ export async function restoreFilesystemSkills(options: {
   const links: Array<{ relativeDir: string; sourcePath: string }> = [];
 
   for (const skill of options.skills) {
-    const id = `${options.repo.owner}/${options.repo.repo}/${skill.id}`;
+    const id = skill.source
+      ? formatFilesystemSkillId(skill.source)
+      : `${options.repo.owner}/${options.repo.repo}/${skill.id}`;
     if (!skill.source || !(await isUsableFilesystemSkill(skill.source))) {
       missing.push(id);
       continue;

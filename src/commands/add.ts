@@ -1,6 +1,7 @@
 import { installRepoSkills } from "../lib/add-skills";
 import { installFilesystemSkills } from "../lib/filesystem-skills";
 import { resolveSourceTarget } from "../lib/source-ref";
+import { formatFilesystemSkillId, formatGitHubSkillId } from "../lib/skill-ref";
 import { parseSkillSelectors } from "../lib/skill-selector";
 import type { AddInput } from "../types";
 
@@ -18,7 +19,9 @@ export async function runAdd(args: { input: AddInput }) {
       kind: "skills" as const,
       repo: target.repo.display,
       installRoot: result.installRoot,
-      skills: result.selectedSkills.map((skill) => skill.relativeDir),
+      skills: result.selectedSkills.map((skill) =>
+        formatFilesystemSkillId(`${target.path}/${skill.sourceDir}`),
+      ),
     };
   }
   const repo = target.repo;
@@ -28,6 +31,7 @@ export async function runAdd(args: { input: AddInput }) {
     global: input.global,
     repo,
     selectors,
+    sourcePath: target.sourcePath,
   });
 
   if (result.kind === "map") {
@@ -43,7 +47,7 @@ export async function runAdd(args: { input: AddInput }) {
     kind: "skills" as const,
     repo: repo.display,
     installRoot: result.installRoot,
-    skills: result.selectedSkills.map((skill) => skill.relativeDir),
+    skills: result.selectedSkills.map((skill) => formatGitHubSkillId(repo, skill.sourceDir)),
   };
 }
 

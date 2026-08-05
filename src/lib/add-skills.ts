@@ -49,6 +49,7 @@ export async function installRepoSkills(options: {
   selectors: SkillSelector[];
   initialSelectors?: string[];
   promptForSelection?: boolean;
+  sourcePath?: string;
 }): Promise<RepoInstallResult> {
   const scope = getInstallScope(options.global);
   const { cloneDir, selectedSkills, selectedMode } = await selectRepoSkills({
@@ -95,6 +96,7 @@ export async function selectRepoSkills(options: {
   initialSelectors?: string[];
   promptForSelection?: boolean;
   global?: boolean;
+  sourcePath?: string;
 }): Promise<{
   cloneDir: string;
   selectedSkills: SkillCandidate[];
@@ -105,6 +107,19 @@ export async function selectRepoSkills(options: {
   const discoveredGroups = await discoverSkillGroups(cloneDir);
   if (discoveredGroups.length === 0) {
     throw new Error(`No SKILL.md files found in ${options.repo.display}.`);
+  }
+
+  if (options.sourcePath !== undefined) {
+    if (options.selectors.length > 0) {
+      throw new Error("A canonical gh: skill ID cannot be combined with --skills.");
+    }
+    const selectedSkill = discoveredGroups
+      .flatMap((group) => group.candidates)
+      .find((skill) => skill.sourceDir === options.sourcePath);
+    if (!selectedSkill) {
+      throw new Error(`No skill found at ${options.repo.display}/${options.sourcePath}.`);
+    }
+    return { cloneDir, selectedSkills: [selectedSkill], selectedMode: "skills" };
   }
 
   const initialSelectors =

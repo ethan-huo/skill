@@ -45,6 +45,7 @@ For most real usage, start from favorites and install only what the current proj
 
 ```bash
 skill install owner/repo/skill
+skill install gh:owner/repo/path/to/skill
 skill install owner/repo --skills 'skill-a,skill-b'
 skill install owner/repo --skills 'core/{skill-a,skill-b},claude/skill-c'
 skill install owner/repo --map
@@ -114,6 +115,7 @@ The positional and flag forms below remain the shorter human-facing surface.
 | Command                                              | Purpose                                                       |
 | ---------------------------------------------------- | ------------------------------------------------------------- |
 | `skill add owner/repo/skill`                         | Install one known skill directly                              |
+| `skill add gh:owner/repo/path/to/skill`              | Install one exact GitHub skill ID from `skill list`           |
 | `skill add owner/repo --skills 'a,b'`                | Install multiple skills from one repo without prompts         |
 | `skill add owner/repo --skills 'core/{a,b},other/c'` | Select exact variants without expanding repeated selectors    |
 | `skill add owner/repo`                               | Interactive selection when the repo contains multiple skills  |
@@ -123,6 +125,8 @@ The positional and flag forms below remain the shorter human-facing surface.
 | `skill remove --global`                              | Interactively remove one or more global skills                |
 | `skill remove owner/repo`                            | Remove all installed skills from one repo                     |
 | `skill remove owner/repo/skill`                      | Remove one installed skill without touching siblings          |
+| `skill remove gh:owner/repo/path/to/skill`           | Remove one GitHub skill by its canonical ID                   |
+| `skill remove fs:/absolute/path/to/skill`            | Remove one filesystem skill by its canonical ID               |
 | `skill remove owner/repo --global`                   | Purge global links, shared source cache, and repo favorites   |
 | `skill remove fs:../agents/skills`                   | Remove all links and manifest records for a filesystem source |
 
@@ -133,6 +137,7 @@ The positional and flag forms below remain the shorter human-facing surface.
 | `skill install`                           | Rebuild project links and maps from `.agents/skills/manifest.json` |
 | `skill install --global`                  | Rebuild global links from `~/.agents/skills/manifest.json`         |
 | `skill install owner/repo/skill`          | Install a shared source and link one skill into this project       |
+| `skill install gh:owner/repo/path/skill`  | Round-trip an exact GitHub ID emitted by `skill list`              |
 | `skill install owner/repo/skill --global` | Install a shared source and link one skill globally                |
 | `skill install owner/repo --skills 'a,b'` | Link multiple selected skills into this project                    |
 | `skill install owner/repo --map`          | Generate one repo-level map skill with ctx-read routing rows       |
@@ -164,13 +169,13 @@ The positional and flag forms below remain the shorter human-facing surface.
 ## How Installation Works
 
 - `skill` scans a cloned GitHub repository or resolved filesystem directory for `SKILL.md`, including nested catalogs, while ignoring agent config roots such as `.agents`; a GitHub root-level skill has the stable folder ID `root`
-- discovered skill IDs are normalized to `{owner}/{repo}/{folder}`
+- public skill IDs preserve their origin: `gh:{owner}/{repo}/{source-path}` or `fs:{absolute-skill-path}`
 - same-name bundles with identical files are safely collapsed; bundles with different content remain distinct variants
 - interactive installs select logical skills first, then use one repo-level variant radio when the selected conflicts share the same variants; mismatched variant sets are resolved per skill
 - non-interactive installs use `--skills 'skill,variant/skill,variant/{skill,...}'`; unqualified ambiguous skills fail with the available qualified selectors
 - copied `SKILL.md` files with repairable malformed YAML frontmatter are rewritten with Bun's YAML serializer before entering the shared source cache
 - `owner/repo/skill` is shorthand for `skill add owner/repo --skills 'skill'`
-- visible skill folders use lowercase skill-first aliases: `{skill.path}.{repo}.{owner}` while source IDs remain `{owner}/{repo}/{folder}`
+- visible skill folders use lowercase skill-first aliases: `{skill.path}.{repo}.{owner}`; these collision-safe aliases are internal and are not public skill IDs
 - `skill install owner/repo --map` writes `.agents/skills/map.{repo}.{owner}/SKILL.md` with a `ctx read github://owner/repo/<path>` rule and `When ..., read path/SKILL.md` rows
 - interactive project installs show "Install as repo map" above individual skills; selecting either mode disables the other
 - interactive repo skill selection preselects already installed skills from the target scope; `--global` preselects global installs, while project installs preselect project links
@@ -179,7 +184,7 @@ The positional and flag forms below remain the shorter human-facing surface.
 - versionless and version 2 manifests migrate to version 3; new installs persist each logical skill ID with its exact upstream source path
 - repeated installs reuse shallow clone caches keyed by the remote `HEAD` hash
 - filesystem inputs are resolved by syntax, never by probing whether `owner/repo` happens to exist in the current directory; use an absolute path, `./`, `../`, `~/`, `fs:<path>`, or `file://` URL
-- filesystem origins are canonicalized with `realpath`, receive a stable `fs/<label>-<path-hash>` identity, and link directly into the visible skill root; edits at the origin are immediately visible
+- filesystem origins are canonicalized with `realpath` and link directly into the visible skill root; their public IDs are absolute `fs:` paths, while an internal path hash only namespaces aliases and manifest records
 - a filesystem directory containing one root-level `SKILL.md` uses the directory basename as its skill ID instead of the GitHub-only `root` ID
 - `skill update` reports filesystem origins as live links and does not clone or copy them; `skill install` restores their links from the manifest and removes records whose origin `SKILL.md` disappeared
 - local install is blocked only when the selected `{owner}/{repo}/{skill}` is already installed globally

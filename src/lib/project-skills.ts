@@ -26,6 +26,7 @@ import {
 } from "./project-manifest";
 import type { ManifestSkill } from "./project-manifest";
 import { parseRepoRef } from "./repo-ref";
+import { formatManifestSkillId } from "./skill-ref";
 import { updateSourceRepo } from "./source-skills";
 import { writeProjectSkillMap, writeProjectSkillMapFromClone } from "./skill-map";
 import type { InstalledSkill, RepoRef, SkillCandidate, SkillSelector } from "../types";
@@ -87,6 +88,7 @@ export async function restoreProjectSkills(cwd: string): Promise<{
   const groups = groupManifestEntries(getProjectManifestSkills(manifest));
   const restored: string[] = [];
   const missing: string[] = [];
+  const missingManifestIds: string[] = [];
   let nextManifest = manifest;
   await ensureProjectClaudeSkillsLink(cwd);
 
@@ -101,10 +103,16 @@ export async function restoreProjectSkills(cwd: string): Promise<{
       });
       restored.push(...result.restored);
       missing.push(...result.missing);
+      const missingSkills = group.skills.filter((skill) =>
+        result.missing.includes(formatManifestSkillId(`${group.owner}/${group.repo}`, skill)),
+      );
+      missingManifestIds.push(
+        ...missingSkills.map((skill) => `${group.owner}/${group.repo}/${skill.id}`),
+      );
       await removeProjectSkillLinks(
         cwd,
         repo,
-        result.missing.map((skillId) => skillId.split("/").at(-1)!),
+        missingSkills.map((skill) => skill.id),
       );
       continue;
     }
@@ -119,7 +127,13 @@ export async function restoreProjectSkills(cwd: string): Promise<{
 
     for (const skill of sourceUpdate.diff.removed) {
       const skillId = `${group.owner}/${group.repo}/${skill}`;
-      missing.push(skillId);
+      const manifestSkill = group.skills.find((candidate) => candidate.id === skill);
+      missing.push(
+        manifestSkill
+          ? formatManifestSkillId(`${group.owner}/${group.repo}`, manifestSkill)
+          : skillId,
+      );
+      missingManifestIds.push(skillId);
       await removeProjectSkill(repo, cwd, skill);
     }
 
@@ -136,14 +150,13 @@ export async function restoreProjectSkills(cwd: string): Promise<{
       sourceUpdate.resolvedSkills,
     );
 
-    for (const skill of selectedSkills) {
-      const skillId = `${group.owner}/${group.repo}/${skill.relativeDir}`;
-      restored.push(skillId);
+    for (const skill of sourceUpdate.resolvedSkills) {
+      restored.push(formatManifestSkillId(`${group.owner}/${group.repo}`, skill));
     }
   }
 
-  if (missing.length > 0) {
-    nextManifest = removeProjectManifestSkillIds(nextManifest, missing);
+  if (missingManifestIds.length > 0) {
+    nextManifest = removeProjectManifestSkillIds(nextManifest, missingManifestIds);
   }
 
   for (const repoId of getProjectManifestMapRepos(manifest)) {
@@ -170,6 +183,7 @@ export async function restoreGlobalSkills(cwd: string): Promise<{
   const groups = groupManifestEntries(getProjectManifestSkills(manifest));
   const restored: string[] = [];
   const missing: string[] = [];
+  const missingManifestIds: string[] = [];
   let nextManifest = manifest;
 
   await ensureGlobalClaudeSkillsLink(cwd);
@@ -185,8 +199,14 @@ export async function restoreGlobalSkills(cwd: string): Promise<{
       });
       restored.push(...result.restored);
       missing.push(...result.missing);
-      for (const skillId of result.missing) {
-        await rm(getVisibleSkillRoot("global", cwd, repo, skillId.split("/").at(-1)!), {
+      const missingSkills = group.skills.filter((skill) =>
+        result.missing.includes(formatManifestSkillId(`${group.owner}/${group.repo}`, skill)),
+      );
+      missingManifestIds.push(
+        ...missingSkills.map((skill) => `${group.owner}/${group.repo}/${skill.id}`),
+      );
+      for (const skill of missingSkills) {
+        await rm(getVisibleSkillRoot("global", cwd, repo, skill.id), {
           force: true,
           recursive: true,
         });
@@ -203,7 +223,14 @@ export async function restoreGlobalSkills(cwd: string): Promise<{
     const selectedSkills = toCachedCandidates(sourceUpdate.resolvedSkills);
 
     for (const skill of sourceUpdate.diff.removed) {
-      missing.push(`${group.owner}/${group.repo}/${skill}`);
+      const skillId = `${group.owner}/${group.repo}/${skill}`;
+      const manifestSkill = group.skills.find((candidate) => candidate.id === skill);
+      missing.push(
+        manifestSkill
+          ? formatManifestSkillId(`${group.owner}/${group.repo}`, manifestSkill)
+          : skillId,
+      );
+      missingManifestIds.push(skillId);
       await rm(getVisibleSkillRoot("global", cwd, repo, skill), { force: true, recursive: true });
     }
 
@@ -218,13 +245,13 @@ export async function restoreGlobalSkills(cwd: string): Promise<{
       sourceUpdate.resolvedSkills,
     );
 
-    for (const skill of selectedSkills) {
-      restored.push(`${group.owner}/${group.repo}/${skill.relativeDir}`);
+    for (const skill of sourceUpdate.resolvedSkills) {
+      restored.push(formatManifestSkillId(`${group.owner}/${group.repo}`, skill));
     }
   }
 
-  if (missing.length > 0) {
-    nextManifest = removeProjectManifestSkillIds(nextManifest, missing);
+  if (missingManifestIds.length > 0) {
+    nextManifest = removeProjectManifestSkillIds(nextManifest, missingManifestIds);
     await writeScopeManifest("global", cwd, nextManifest);
   } else if (hasScopeManifest("global", cwd)) {
     await writeScopeManifest("global", cwd, nextManifest);

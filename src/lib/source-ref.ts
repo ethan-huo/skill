@@ -5,12 +5,14 @@ import { basename, dirname, isAbsolute, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseRepoSkillTarget } from "./repo-ref";
+import { parseCanonicalGitHubSkillRef } from "./skill-ref";
 import type { RepoRef } from "../types";
 
 export type GitHubSourceTarget = {
   kind: "github";
   repo: RepoRef;
   skill?: string;
+  sourcePath?: string;
 };
 
 export type FilesystemSourceTarget = {
@@ -23,6 +25,10 @@ export type SourceTarget = GitHubSourceTarget | FilesystemSourceTarget;
 
 export async function resolveSourceTarget(raw: string, cwd: string): Promise<SourceTarget> {
   const value = raw.trim();
+  const canonicalGitHubSkill = parseCanonicalGitHubSkillRef(value);
+  if (canonicalGitHubSkill !== null) {
+    return canonicalGitHubSkill;
+  }
   // Classification must not depend on cwd contents: an existing `owner/repo` directory is
   // still GitHub syntax unless the caller uses an explicit path form.
   const path = parseFilesystemPath(value, cwd);

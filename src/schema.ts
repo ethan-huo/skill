@@ -11,6 +11,7 @@ export const schema = {
       examples: [
         `skill add "{ repo: 'ethan-huo/agents' }"`,
         `skill add "{ repo: 'pbakaus/impeccable/audit' }"`,
+        `skill add "{ repo: 'gh:ethan-huo/agents/skills/cx' }"`,
         `skill add "{ repo: 'ethan-huo/agents', global: true }"`,
         `skill add "{ repo: 'fs:../agents/skills', skills: 'cx' }"`,
       ],
@@ -22,7 +23,7 @@ export const schema = {
           repo: v.pipe(
             v.string(),
             v.description(
-              "GitHub repository ref or explicit filesystem source: absolute path, ./path, ../path, ~/path, fs:<path>, or file:// URL.",
+              "GitHub repository ref, canonical gh:<owner>/<repo>/<source-path> skill ID, or explicit filesystem source: absolute path, ./path, ../path, ~/path, fs:<path>, or file:// URL.",
             ),
           ),
           global: v.optional(v.boolean(), false),
@@ -123,6 +124,7 @@ export const schema = {
       description: "Install GitHub or filesystem skills, or restore links from the scope manifest",
       examples: [
         `skill install "{ repo: ['ethan-huo/agents/cx'], global: true }"`,
+        `skill install "{ repo: ['gh:ethan-huo/agents/skills/cx'], global: true }"`,
         `skill install "{ repo: ['ethan-huo/agents'], skills: 'cx,fp-thinking' }"`,
         `skill install "{ repo: ['Owl-Listener/designer-skills'], map: true }"`,
         `skill install "{ repo: ['/Users/me/code/agents/skills'], skills: 'cx' }"`,
@@ -136,7 +138,7 @@ export const schema = {
               v.pipe(
                 v.string(),
                 v.description(
-                  "GitHub repository ref or explicit filesystem source; at most one source is accepted.",
+                  "GitHub repository ref, canonical gh: skill ID, or explicit filesystem source; at most one source is accepted.",
                 ),
               ),
             ),
@@ -161,7 +163,10 @@ export const schema = {
     .meta({
       description:
         "Remove installed GitHub or filesystem sources and skills; global GitHub repo removal also purges cache and favorites",
-      examples: [`skill remove "{ repo: ['ethan-huo/agents/cx'], global: true }"`],
+      examples: [
+        `skill remove "{ repo: ['gh:ethan-huo/agents/skills/cx'], global: true }"`,
+        `skill remove "{ repo: ['fs:/Users/me/code/agents/skills/cx'] }"`,
+      ],
     })
     .input(
       s(

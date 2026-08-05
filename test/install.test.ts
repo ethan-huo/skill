@@ -203,9 +203,22 @@ describe("install helpers", () => {
 
     await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
     await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
+    await writeFile(
+      join(targetRoot, "manifest.json"),
+      `${JSON.stringify({
+        version: 3,
+        items: [
+          {
+            type: "skills",
+            repo: "ethan-huo/agents",
+            skills: [{ id: "cx", source: "skills/cx" }],
+          },
+        ],
+      })}\n`,
+    );
 
     expect(await listInstalledSkills(root)).toContainEqual({
-      id: "ethan-huo/agents/cx",
+      id: "gh:ethan-huo/agents/skills/cx",
       owner: "ethan-huo",
       repo: "agents",
       relativeDir: "cx",

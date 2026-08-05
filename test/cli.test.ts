@@ -69,7 +69,7 @@ describe("argc v7 CLI contract", () => {
       );
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("kind: skills");
-      expect(result.stdout).toContain("- cx");
+      expect(result.stdout).toContain(`- fs:${await realpath(source)}`);
       const entries = await readdir(join(project, ".agents", "skills"), {
         withFileTypes: true,
       });
