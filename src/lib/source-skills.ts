@@ -56,8 +56,15 @@ export async function updateSourceRepo(options: {
     (await discoverSkills(sourceRoot)).map((skill) => ({ id: skill.relativeDir }));
   const latestGroups = await discoverSkillGroups(cloneDir);
   const latestIds = latestGroups.map((group) => group.relativeDir);
-  const cachedIds = installedSkills.map((skill) => skill.id);
-  const diff = diffSkillSets(cachedIds, latestIds);
+  const installedIds = installedSkills.map((skill) => skill.id);
+  const diff = diffSkillSets(installedIds, latestIds);
+  // The public diff describes installed manifest state, while cache GC must also see
+  // orphaned materializations left by older manifests or other project scopes.
+  const sourceDirectory = await stat(sourceRoot).catch(() => null);
+  const cachedIds = sourceDirectory?.isDirectory()
+    ? (await discoverSkills(sourceRoot)).map((skill) => skill.relativeDir)
+    : [];
+  const staleCachedIds = diffSkillSets(cachedIds, latestIds).removed;
   const updated = new Set(diff.updated);
   const resolvedCandidates: SkillCandidate[] = [];
 
@@ -75,7 +82,7 @@ export async function updateSourceRepo(options: {
     await upsertInstalledSkills(cloneDir, sourceRoot, resolvedCandidates);
   }
 
-  for (const skill of diff.removed) {
+  for (const skill of staleCachedIds) {
     await rm(join(sourceRoot, skill), { force: true, recursive: true });
   }
 

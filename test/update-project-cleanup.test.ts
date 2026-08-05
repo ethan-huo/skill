@@ -1,10 +1,11 @@
-import { lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
 import { syncVisibleLinks } from "../src/commands/update";
+import { getVisibleSkillDirName } from "../src/lib/paths";
 import type { RepoRef } from "../src/types";
 
 const repo = {
@@ -101,4 +102,147 @@ describe("project update cleanup", () => {
       }
     }
   });
+
+  test("runUpdate collects disappeared repo cache while preserving manifests and valid links", async () => {
+    const root = join(tmpdir(), `skill-update-repo-cache-${crypto.randomUUID()}`);
+    const owner = `owner-${crypto.randomUUID()}`;
+    const project = join(root, "project");
+    const remote = join(root, "remote");
+    const trackedRepo = { ...repo, owner, display: `${owner}/abc` };
+    const sourceRoot = join(root, ".agents", ".skills", owner, "abc");
+    const globalRoot = join(root, ".agents", "skills");
+    const projectRoot = join(project, ".agents", "skills");
+    const visibleSkillDir = getVisibleSkillDirName(trackedRepo, "ask-matt");
+    const globalLink = join(globalRoot, visibleSkillDir);
+    const projectLink = join(projectRoot, visibleSkillDir);
+    const manifest = {
+      version: 3,
+      items: [
+        {
+          type: "skills",
+          repo: `${owner}/abc`,
+          skills: [{ id: "ask-matt", source: "skills/ask-matt" }],
+        },
+      ],
+    };
+
+    try {
+      await mkdir(join(remote, "skills", "ask-matt"), { recursive: true });
+      await mkdir(join(remote, "skills", "writing-for-agents"), { recursive: true });
+      await writeFile(
+        join(remote, "skills", "ask-matt", "SKILL.md"),
+        "---\nname: ask-matt\n---\nupstream-current",
+      );
+      await writeFile(
+        join(remote, "skills", "writing-for-agents", "SKILL.md"),
+        "---\nname: writing-for-agents\n---\nupstream-new",
+      );
+      await runGit(["init", remote]);
+      await runGit(["-C", remote, "add", "."]);
+      await runGit([
+        "-C",
+        remote,
+        "-c",
+        "user.name=Skill Test",
+        "-c",
+        "user.email=skill-test@example.com",
+        "commit",
+        "-m",
+        "add upstream skills",
+      ]);
+
+      await mkdir(join(sourceRoot, "ask-matt"), { recursive: true });
+      await mkdir(join(sourceRoot, "writing-great-skills"), { recursive: true });
+      await writeFile(
+        join(sourceRoot, "ask-matt", "SKILL.md"),
+        "---\nname: ask-matt\n---\ncached-old",
+      );
+      await writeFile(
+        join(sourceRoot, "writing-great-skills", "SKILL.md"),
+        "---\nname: writing-great-skills\n---\ncached-removed",
+      );
+      await mkdir(globalRoot, { recursive: true });
+      await mkdir(projectRoot, { recursive: true });
+      await writeFile(join(globalRoot, "manifest.json"), JSON.stringify(manifest));
+      await writeFile(join(projectRoot, "manifest.json"), JSON.stringify(manifest));
+      await symlink(join(sourceRoot, "ask-matt"), globalLink, "dir");
+      await symlink(join(sourceRoot, "ask-matt"), projectLink, "dir");
+
+      const result = await runUpdateInSubprocess({ project, root, owner, remote });
+
+      expect(result.repos).toEqual([
+        {
+          repo: `${owner}/abc`,
+          updated: ["ask-matt"],
+          removed: [],
+          added: ["writing-for-agents"],
+        },
+      ]);
+      expect(await stat(join(sourceRoot, "writing-great-skills")).catch(() => null)).toBeNull();
+      expect(await stat(join(sourceRoot, "writing-for-agents")).catch(() => null)).toBeNull();
+      expect(await readFile(join(sourceRoot, "ask-matt", "SKILL.md"), "utf8")).toContain(
+        "upstream-current",
+      );
+      expect((await lstat(globalLink)).isSymbolicLink()).toBe(true);
+      expect((await lstat(projectLink)).isSymbolicLink()).toBe(true);
+      expect(JSON.parse(await readFile(join(globalRoot, "manifest.json"), "utf8"))).toEqual(
+        manifest,
+      );
+      expect(JSON.parse(await readFile(join(projectRoot, "manifest.json"), "utf8"))).toEqual(
+        manifest,
+      );
+    } finally {
+      await rm(root, { force: true, recursive: true });
+      await rm(join(tmpdir(), "skill-clones", owner), { force: true, recursive: true });
+    }
+  });
 });
+
+async function runGit(args: string[]): Promise<void> {
+  const command = Bun.spawn(["git", ...args], { stdout: "pipe", stderr: "pipe" });
+  const [exitCode, stderr] = await Promise.all([
+    command.exited,
+    new Response(command.stderr).text(),
+  ]);
+  if (exitCode !== 0) {
+    throw new Error(stderr.trim() || `git ${args.join(" ")} failed`);
+  }
+}
+
+async function runUpdateInSubprocess(options: {
+  project: string;
+  root: string;
+  owner: string;
+  remote: string;
+}) {
+  const { project, root, owner, remote } = options;
+  const updateModule = join(import.meta.dir, "..", "src", "commands", "update.ts");
+  const script = [
+    `import { runUpdate } from ${JSON.stringify(updateModule)};`,
+    "const result = await runUpdate({ input: { concurrency: 1, progress: false } });",
+    "console.log(JSON.stringify(result));",
+  ].join("\n");
+  const command = Bun.spawn(["bun", "-e", script], {
+    cwd: project,
+    env: {
+      ...process.env,
+      HOME: root,
+      GIT_ALLOW_PROTOCOL: "file",
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: `url.file://${remote}.insteadOf`,
+      GIT_CONFIG_VALUE_0: `https://github.com/${owner}/abc.git`,
+    },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [exitCode, stdout, stderr] = await Promise.all([
+    command.exited,
+    new Response(command.stdout).text(),
+    new Response(command.stderr).text(),
+  ]);
+  if (exitCode !== 0) {
+    throw new Error(stderr.trim() || "runUpdate subprocess failed");
+  }
+
+  return JSON.parse(stdout);
+}

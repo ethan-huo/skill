@@ -48,6 +48,50 @@ describe("source skills", () => {
     expect((await lstat(join(visibleRoot, "cx.agents.ethan-huo"))).isSymbolicLink()).toBe(true);
   });
 
+  test("garbage-collects disappeared cache entries outside the installed manifest", async () => {
+    const root = join(tmpdir(), `skill-source-orphan-gc-${crypto.randomUUID()}`);
+    const cloneDir = join(root, "clone");
+    const sourceBase = join(root, ".agents", ".skills");
+    const sourceRoot = join(sourceBase, "mattpocock", "skills");
+    const otherRepoRoot = join(sourceBase, "other", "skills");
+
+    await writeSkill(cloneDir, "skills/ask-matt", "ask-matt", "upstream-current");
+    await writeSkill(cloneDir, "skills/still-upstream", "still-upstream", "upstream-unselected");
+    await writeSkill(cloneDir, "skills/writing-for-agents", "writing-for-agents", "upstream-new");
+    await writeSkill(sourceRoot, "ask-matt", "ask-matt", "cached-current");
+    await writeSkill(sourceRoot, "still-upstream", "still-upstream", "cached-unselected");
+    await writeSkill(sourceRoot, "writing-great-skills", "writing-great-skills", "cached-removed");
+    await writeSkill(otherRepoRoot, "user-owned", "user-owned", "keep-other-repo");
+    await writeFile(join(sourceRoot, "README.md"), "keep repo-local user file");
+
+    const result = await updateSourceRepo({
+      cloneDir,
+      sourceRoot,
+      installedSkills: [{ id: "ask-matt", source: "skills/ask-matt" }],
+    });
+
+    expect(result).toEqual({
+      diff: {
+        updated: ["ask-matt"],
+        removed: [],
+        added: ["still-upstream", "writing-for-agents"],
+      },
+      resolvedSkills: [{ id: "ask-matt", source: "skills/ask-matt" }],
+    });
+    expect(await readFile(join(sourceRoot, "ask-matt", "SKILL.md"), "utf8")).toContain(
+      "upstream-current",
+    );
+    expect(await readFile(join(sourceRoot, "still-upstream", "SKILL.md"), "utf8")).toContain(
+      "cached-unselected",
+    );
+    expect(await stat(join(sourceRoot, "writing-great-skills")).catch(() => null)).toBeNull();
+    expect(await stat(join(sourceRoot, "writing-for-agents")).catch(() => null)).toBeNull();
+    expect(await readFile(join(sourceRoot, "README.md"), "utf8")).toBe("keep repo-local user file");
+    expect(await readFile(join(otherRepoRoot, "user-owned", "SKILL.md"), "utf8")).toContain(
+      "keep-other-repo",
+    );
+  });
+
   test("repairs malformed frontmatter during source updates", async () => {
     const root = join(tmpdir(), `skill-source-repair-${crypto.randomUUID()}`);
     const cloneDir = join(root, "clone");
@@ -197,4 +241,10 @@ async function writeVariant(root: string, variant: string, body: string): Promis
   const skillDir = join(root, "apps", "skills", variant, "annotate");
   await mkdir(skillDir, { recursive: true });
   await writeFile(join(skillDir, "SKILL.md"), `---\nname: annotate\n---\n${body}`);
+}
+
+async function writeSkill(root: string, path: string, name: string, body: string): Promise<void> {
+  const skillDir = join(root, path);
+  await mkdir(skillDir, { recursive: true });
+  await writeFile(join(skillDir, "SKILL.md"), `---\nname: ${name}\n---\n${body}`);
 }
