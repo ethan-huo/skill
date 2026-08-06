@@ -5,6 +5,9 @@ import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 
 import { removeSourceRepo, updateSourceRepo } from "../src/lib/source-skills";
+import { parseRepoRef } from "../src/lib/repo-ref";
+
+const repo = parseRepoRef("ethan-huo/agents");
 
 describe("source skills", () => {
   test("updates hidden source cache without replacing visible links", async () => {
@@ -31,6 +34,7 @@ describe("source skills", () => {
 
     const result = await updateSourceRepo({
       cloneDir,
+      repo,
       sourceRoot,
     });
 
@@ -66,6 +70,7 @@ describe("source skills", () => {
 
     const result = await updateSourceRepo({
       cloneDir,
+      repo,
       sourceRoot,
       installedSkills: [{ id: "ask-matt", source: "skills/ask-matt" }],
     });
@@ -118,6 +123,7 @@ describe("source skills", () => {
 
     await updateSourceRepo({
       cloneDir,
+      repo,
       sourceRoot,
     });
 
@@ -136,6 +142,7 @@ describe("source skills", () => {
 
     const result = await updateSourceRepo({
       cloneDir,
+      repo,
       sourceRoot,
       installedSkills: [
         {
@@ -162,6 +169,7 @@ describe("source skills", () => {
 
     const result = await updateSourceRepo({
       cloneDir,
+      repo,
       sourceRoot,
       installedSkills: [{ id: "annotate" }],
     });
@@ -180,6 +188,7 @@ describe("source skills", () => {
     await expect(
       updateSourceRepo({
         cloneDir,
+        repo,
         sourceRoot,
         installedSkills: [
           {
@@ -201,6 +210,7 @@ describe("source skills", () => {
 
     const result = await updateSourceRepo({
       cloneDir,
+      repo,
       sourceRoot,
       installedSkills: [
         {

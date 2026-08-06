@@ -3,7 +3,12 @@ import { rm } from "node:fs/promises";
 import { ensureGlobalClaudeSkillsLink, ensureProjectClaudeSkillsLink } from "./claude-skills";
 import { discoverSkillGroups } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
-import { linkInstalledSkills, removeVisibleRepoSkills, upsertInstalledSkills } from "./install";
+import {
+  linkInstalledSkills,
+  removeVisibleRepoSkills,
+  removeVisibleSkillAliases,
+  upsertInstalledSkills,
+} from "./install";
 import { listInstalledSkills } from "./installed-skills";
 import {
   getLegacyVisibleMapRoot,
@@ -11,11 +16,14 @@ import {
   getInstallScope,
   getSourceInstallRoot,
   getVisibleMapRoot,
+  getVisibleSkillDirName,
 } from "./paths";
 import {
   addScopeManifestMap,
   addScopeManifestSkills,
+  assertScopeManifestSkillsAvailable,
   getProjectManifestMapRepos,
+  getProjectManifestSkills,
   readScopeManifest,
 } from "./project-manifest";
 import { selectSkills } from "./select-skills";
@@ -59,7 +67,7 @@ export async function installRepoSkills(options: {
   const installRoot = getSkillsBaseDir(scope, options.cwd);
 
   if (selectedMode === "map") {
-    await removeVisibleRepoSkills(installRoot, options.repo);
+    await removeScopeRepoSkillAliases("local", options.cwd, options.repo);
     const result = await writeProjectSkillMap({
       cloneDir,
       cwd: options.cwd,
@@ -160,19 +168,32 @@ export async function installGlobalSkills(options: {
   repo: RepoRef;
   selectedSkills: SkillCandidate[];
 }): Promise<{ installRoot: string }> {
+  const manifestSkills = options.selectedSkills.map((skill) => ({
+    id: skill.relativeDir,
+    source: skill.sourceDir,
+  }));
+  await assertNoConflictingOtherScopeSkills(
+    options.cwd,
+    "global",
+    options.repo,
+    options.selectedSkills,
+  );
+  await assertScopeManifestSkillsAvailable(
+    "global",
+    options.cwd,
+    `${options.repo.owner}/${options.repo.repo}`,
+    manifestSkills,
+  );
   const sourceRoot = getSourceInstallRoot(options.repo);
   const installRoot = getSkillsBaseDir("global", options.cwd);
-  await upsertInstalledSkills(options.cloneDir, sourceRoot, options.selectedSkills);
+  await upsertInstalledSkills(options.cloneDir, sourceRoot, options.repo, options.selectedSkills);
   await linkInstalledSkills(sourceRoot, installRoot, options.repo, options.selectedSkills);
   await (options.ensureClaudeSkillsLink ?? ensureGlobalClaudeSkillsLink)(options.cwd);
   await addScopeManifestSkills(
     "global",
     options.cwd,
     `${options.repo.owner}/${options.repo.repo}`,
-    options.selectedSkills.map((skill) => ({
-      id: skill.relativeDir,
-      source: skill.sourceDir,
-    })),
+    manifestSkills,
   );
 
   return { installRoot };
@@ -185,10 +206,20 @@ export async function installLocalProjectSkills(options: {
   selectedSkills: SkillCandidate[];
 }): Promise<{ installRoot: string }> {
   await assertNoConflictingGlobalSkills(options.cwd, "local", options.repo, options.selectedSkills);
+  const manifestSkills = options.selectedSkills.map((skill) => ({
+    id: skill.relativeDir,
+    source: skill.sourceDir,
+  }));
+  await assertScopeManifestSkillsAvailable(
+    "local",
+    options.cwd,
+    `${options.repo.owner}/${options.repo.repo}`,
+    manifestSkills,
+  );
 
   const sourceRoot = getSourceInstallRoot(options.repo);
   const installRoot = getSkillsBaseDir("local", options.cwd);
-  await upsertInstalledSkills(options.cloneDir, sourceRoot, options.selectedSkills);
+  await upsertInstalledSkills(options.cloneDir, sourceRoot, options.repo, options.selectedSkills);
   await removeProjectMapAliases(options.cwd, options.repo);
   await linkInstalledSkills(sourceRoot, installRoot, options.repo, options.selectedSkills);
   await ensureProjectClaudeSkillsLink(options.cwd);
@@ -196,10 +227,7 @@ export async function installLocalProjectSkills(options: {
     "local",
     options.cwd,
     `${options.repo.owner}/${options.repo.repo}`,
-    options.selectedSkills.map((skill) => ({
-      id: skill.relativeDir,
-      source: skill.sourceDir,
-    })),
+    manifestSkills,
   );
 
   return { installRoot };
@@ -210,23 +238,74 @@ async function removeProjectMapAliases(cwd: string, repo: RepoRef): Promise<void
   await rm(getLegacyVisibleMapRoot("local", cwd, repo), { force: true, recursive: true });
 }
 
+async function removeScopeRepoSkillAliases(
+  scope: InstallScope,
+  cwd: string,
+  repo: RepoRef,
+): Promise<void> {
+  const repoId = `${repo.owner}/${repo.repo}`;
+  const installedSkills = getProjectManifestSkills(await readScopeManifest(scope, cwd)).filter(
+    (skill) => skill.repo === repoId,
+  );
+  const skillsRoot = getSkillsBaseDir(scope, cwd);
+  for (const skill of installedSkills) {
+    await removeVisibleSkillAliases(skillsRoot, repo, skill.id);
+  }
+  // Pre-manifest aliases and the source-scoped map still need structural cleanup.
+  await removeVisibleRepoSkills(skillsRoot, repo);
+}
+
 export function getConflictingGlobalSkillIds(
   installedSkills: Awaited<ReturnType<typeof listInstalledSkills>>,
   repo: RepoRef,
   selectedSkills: SkillCandidate[],
 ): string[] {
-  const selected = new Set(selectedSkills.map((skill) => skill.relativeDir));
+  const selected = new Set(
+    selectedSkills.map((skill) => getVisibleSkillDirName(repo, skill.relativeDir)),
+  );
 
   return installedSkills
     .filter(
       (skill) =>
         skill.scope === "global" &&
-        skill.owner === repo.owner &&
-        skill.repo === repo.repo &&
-        selected.has(skill.relativeDir),
+        selected.has(getVisibleSkillDirName(toInstalledRepo(skill), skill.relativeDir)),
     )
     .map((skill) => skill.id)
     .sort();
+}
+
+async function assertNoConflictingOtherScopeSkills(
+  cwd: string,
+  scope: InstallScope,
+  repo: RepoRef,
+  selectedSkills: SkillCandidate[],
+): Promise<void> {
+  const otherScope = scope === "global" ? "local" : "global";
+  const selected = new Set(
+    selectedSkills.map((skill) => getVisibleSkillDirName(repo, skill.relativeDir)),
+  );
+  const conflicts = (await listInstalledSkills(cwd))
+    .filter(
+      (skill) =>
+        skill.scope === otherScope &&
+        selected.has(getVisibleSkillDirName(toInstalledRepo(skill), skill.relativeDir)),
+    )
+    .map((skill) => skill.id)
+    .sort();
+  if (conflicts.length > 0) {
+    throw new Error(
+      `${otherScope === "global" ? "Global" : "Project"} install already contains selected skill(s): ${conflicts.join(", ")}. Remove them before installing the same skill ${scope === "global" ? "globally" : "locally"}.`,
+    );
+  }
+}
+
+function toInstalledRepo(skill: InstalledSkill): RepoRef {
+  return {
+    owner: skill.owner,
+    repo: skill.repo,
+    cloneUrl: "",
+    display: `${skill.owner}/${skill.repo}`,
+  };
 }
 
 export function getInstalledInitialSelectors(

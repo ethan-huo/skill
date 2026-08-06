@@ -1,12 +1,11 @@
 import { installRepoSkills } from "../lib/add-skills";
-import { installFilesystemSkills } from "../lib/filesystem-skills";
 import {
   installProjectRepoMap,
   restoreGlobalSkills,
   restoreProjectSkills,
 } from "../lib/project-skills";
 import { resolveSourceTarget } from "../lib/source-ref";
-import { formatFilesystemSkillId, formatGitHubSkillId } from "../lib/skill-ref";
+import { formatGitHubSkillId } from "../lib/skill-ref";
 import { parseSkillSelectors } from "../lib/skill-selector";
 import type { InstallInput } from "../types";
 
@@ -30,11 +29,8 @@ export async function runInstall(args: { input: InstallInput }) {
     );
   }
 
-  const target = await resolveSourceTarget(input.repo[0]!, process.cwd());
+  const target = resolveSourceTarget(input.repo[0]!);
   if (input.map) {
-    if (target.kind === "filesystem") {
-      throw new Error("Install --map supports GitHub repository sources only.");
-    }
     if (target.skill || target.sourcePath || normalizeSelectors(input.skills).length > 0) {
       throw new Error("Install --map accepts a repository ref only; do not pass a skill selector.");
     }
@@ -48,23 +44,6 @@ export async function runInstall(args: { input: InstallInput }) {
       repo: target.repo.display,
       installRoot,
       skills: mappedSkills.map((skill) => skill.relativeDir),
-    };
-  }
-
-  if (target.kind === "filesystem") {
-    const result = await installFilesystemSkills({
-      cwd: process.cwd(),
-      global: input.global,
-      source: target,
-      selectors: normalizeSelectors(input.skills),
-    });
-    return {
-      kind: "skills" as const,
-      repo: target.repo.display,
-      installRoot: result.installRoot,
-      skills: result.selectedSkills.map((skill) =>
-        formatFilesystemSkillId(`${target.path}/${skill.sourceDir}`),
-      ),
     };
   }
 

@@ -84,9 +84,9 @@ describe("project manifest", () => {
     expect(await readFile(join(root, ".agents", "skills", ".gitignore"), "utf8")).toBe(
       [
         "# BEGIN skill managed entries",
-        "/cx.agents.ethan-huo",
-        "/fp-thinking.agents.ethan-huo",
-        "/map.designer-skills.owl-listener",
+        "/cx-ethan-huo",
+        "/fp-thinking-ethan-huo",
+        "/map-designer-skills-owl-listener",
         "# END skill managed entries",
         "",
       ].join("\n"),
@@ -123,7 +123,7 @@ describe("project manifest", () => {
         "/private-notes",
         "",
         "# BEGIN skill managed entries",
-        "/new-skill.repo.owner",
+        "/new-skill-owner",
         "# END skill managed entries",
         "",
         "!/keep-this-rule",
@@ -159,6 +159,20 @@ describe("project manifest", () => {
       }),
     ).rejects.toThrow("Invalid skill managed block");
     await expect(readFile(join(skillsRoot, "manifest.json"), "utf8")).rejects.toThrow();
+  });
+
+  test("rejects skills from different sources that claim the same visible folder", async () => {
+    const root = join(tmpdir(), `skill-project-manifest-conflict-${crypto.randomUUID()}`);
+
+    await expect(
+      writeScopeManifest("local", root, {
+        version: 3,
+        items: [
+          { type: "skills", repo: "owner/first", skills: [{ id: "cx" }] },
+          { type: "skills", repo: "owner/second", skills: [{ id: "cx" }] },
+        ],
+      }),
+    ).rejects.toThrow('Skill folder "cx-owner" is already claimed');
   });
 
   test("uses the same manifest shape for global scope", async () => {

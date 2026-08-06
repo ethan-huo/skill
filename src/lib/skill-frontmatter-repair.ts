@@ -14,6 +14,21 @@ export async function repairSkillFrontmatterFile(skillFile: string): Promise<boo
   return true;
 }
 
+export async function normalizeSkillFrontmatterFile(
+  skillFile: string,
+  name: string,
+): Promise<boolean> {
+  const contents = await readFile(skillFile, "utf8");
+  const repaired = repairSkillFrontmatter(contents);
+  const normalized = rewriteSkillName(repaired, name);
+  if (normalized === contents) {
+    return false;
+  }
+
+  await writeFile(skillFile, normalized);
+  return true;
+}
+
 export function repairSkillFrontmatter(contents: string): string {
   const match = FRONTMATTER_PATTERN.exec(contents);
   if (!match) {
@@ -32,6 +47,20 @@ export function repairSkillFrontmatter(contents: string): string {
 
   const yaml = Bun.YAML.stringify(repaired, null, 2).trimEnd();
   return `---\n${yaml}\n---${match[2]!}${contents.slice(match[0].length)}`;
+}
+
+export function rewriteSkillName(contents: string, name: string): string {
+  const match = FRONTMATTER_PATTERN.exec(contents);
+  if (!match) {
+    throw new Error("SKILL.md must start with YAML frontmatter.");
+  }
+  const frontmatter = match[1]!;
+  if (!/^name:[^\r\n]*$/m.test(frontmatter)) {
+    throw new Error("SKILL.md frontmatter must contain a top-level name field.");
+  }
+  // A surgical replacement preserves author-owned comments and formatting in otherwise valid YAML.
+  const rewritten = frontmatter.replace(/^name:[^\r\n]*$/m, `name: ${name}`);
+  return `${contents.slice(0, match.index)}---\n${rewritten}\n---${match[2]!}${contents.slice(match[0].length)}`;
 }
 
 function canParseYaml(frontmatter: string): boolean {

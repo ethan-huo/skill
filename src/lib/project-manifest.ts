@@ -202,6 +202,15 @@ export async function addScopeManifestSkills(
   await writeScopeManifest(scope, cwd, addSkillsToManifest(manifest, repoId, skills));
 }
 
+export async function assertScopeManifestSkillsAvailable(
+  scope: InstallScope,
+  cwd: string,
+  repoId: string,
+  skills: ManifestSkill[],
+): Promise<void> {
+  addSkillsToManifest(await readScopeManifest(scope, cwd), repoId, skills);
+}
+
 export async function addProjectManifestSkills(
   cwd: string,
   repoId: string,
@@ -431,7 +440,30 @@ function normalizeProjectManifest(manifest: ProjectManifest): ProjectManifest {
     items.push({ type: "map", repo });
   }
 
+  assertUniqueVisibleSkillNames(items);
+
   return { version: 3, items };
+}
+
+function assertUniqueVisibleSkillNames(items: ProjectManifestItem[]): void {
+  const visibleNames = new Map<string, string>();
+  for (const item of items) {
+    if (item.type !== "skills") {
+      continue;
+    }
+    const repo = parseRepoRef(item.repo);
+    for (const skill of item.skills) {
+      const visibleName = getVisibleSkillDirName(repo, skill.id);
+      const sourceId = `${item.repo}/${skill.id}`;
+      const existing = visibleNames.get(visibleName);
+      if (existing && existing !== sourceId) {
+        throw new Error(
+          `Skill folder "${visibleName}" is already claimed by ${existing}; cannot also install ${sourceId}. Remove the existing skill first.`,
+        );
+      }
+      visibleNames.set(visibleName, sourceId);
+    }
+  }
 }
 
 function isProjectManifestV1(data: unknown): data is ProjectManifestV1 {

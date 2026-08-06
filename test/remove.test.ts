@@ -21,8 +21,8 @@ describe("remove command", () => {
     const root = join(tmpdir(), `skill-remove-manifest-${crypto.randomUUID()}`);
     const sourceRoot = join(root, ".agents", ".skills", "repo", "abc");
     const visibleRoot = join(root, ".agents", "skills");
-    const firstLink = join(visibleRoot, "a.abc.repo");
-    const secondLink = join(visibleRoot, "b.abc.repo");
+    const firstLink = join(visibleRoot, "a");
+    const secondLink = join(visibleRoot, "b");
 
     await mkdir(join(sourceRoot, "a"), { recursive: true });
     await mkdir(join(sourceRoot, "b"), { recursive: true });
@@ -46,7 +46,7 @@ describe("remove command", () => {
     const root = join(tmpdir(), `skill-remove-last-manifest-${crypto.randomUUID()}`);
     const sourceRoot = join(root, ".agents", ".skills", "repo", "abc");
     const visibleRoot = join(root, ".agents", "skills");
-    const skillLink = join(visibleRoot, "a.abc.repo");
+    const skillLink = join(visibleRoot, "a");
 
     await mkdir(join(sourceRoot, "a"), { recursive: true });
     await mkdir(visibleRoot, { recursive: true });
@@ -63,7 +63,7 @@ describe("remove command", () => {
   test("removes a GitHub skill by its canonical source ID", async () => {
     const root = join(tmpdir(), `skill-remove-canonical-${crypto.randomUUID()}`);
     const sourceRoot = join(root, ".agents", ".skills", "repo", "abc", "a");
-    const skillLink = join(root, ".agents", "skills", "a.abc.repo");
+    const skillLink = join(root, ".agents", "skills", "a");
 
     await mkdir(sourceRoot, { recursive: true });
     await mkdir(join(root, ".agents", "skills"), { recursive: true });
@@ -97,7 +97,7 @@ describe("remove command", () => {
     await mkdir(visibleRoot, { recursive: true });
     await symlink(
       join(root, ".agents", ".skills", "repo", "abc", "a"),
-      join(visibleRoot, "a.abc.repo"),
+      join(visibleRoot, "a"),
       "dir",
     );
     await writeManifest(root, [
@@ -153,7 +153,7 @@ describe("remove command", () => {
     const previousHome = process.env.HOME;
     const sourceRoot = join(root, ".agents", ".skills", "repo", "abc");
     const visibleRoot = join(root, ".agents", "skills");
-    const skillLink = join(visibleRoot, "a.abc.repo");
+    const skillLink = join(visibleRoot, "a");
     process.env.HOME = root;
 
     try {

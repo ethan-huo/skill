@@ -1,10 +1,11 @@
 import { readdir, readlink, stat } from "node:fs/promises";
-import { isAbsolute, join } from "node:path";
+import { join } from "node:path";
 
-import { getSkillsBaseDir } from "./paths";
+import { getSkillsBaseDir, getVisibleSkillDirName } from "./paths";
 import { getProjectManifestSkills, readScopeManifest } from "./project-manifest";
 import { readSkillFrontmatterMetadata } from "./skill-frontmatter";
 import { formatManifestSkillId } from "./skill-ref";
+import { parseRepoRef } from "./repo-ref";
 import type { InstallScope, InstalledSkill } from "../types";
 
 export async function listInstalledSkills(cwd: string): Promise<InstalledSkill[]> {
@@ -25,11 +26,15 @@ async function listSkillsForScope(
   baseDir: string,
   cwd: string,
 ): Promise<InstalledSkill[]> {
-  const manifestSkills = new Map(
-    getProjectManifestSkills(await readScopeManifest(scope, cwd)).map((skill) => [
-      `${skill.repo}/${skill.id}`,
+  const manifestSkills = getProjectManifestSkills(await readScopeManifest(scope, cwd));
+  const manifestSkillsByFolder = new Map(
+    manifestSkills.map((skill) => [
+      getVisibleSkillDirName(parseRepoRef(skill.repo), skill.id),
       skill,
     ]),
+  );
+  const manifestSkillsById = new Map(
+    manifestSkills.map((skill) => [`${skill.repo}/${skill.id}`, skill]),
   );
   const entries = await readdir(baseDir, { withFileTypes: true }).catch(() => []);
   const skills: InstalledSkill[] = [];
@@ -41,7 +46,10 @@ async function listSkillsForScope(
     const installRoot = join(baseDir, entry.name);
     const linkTarget = await readlink(installRoot).catch(() => "");
     const cachedSource = parseSourceSkillLinkTarget(linkTarget);
-    const parsed = cachedSource ?? parseVisibleSkillDirName(entry.name);
+    const recorded = manifestSkillsByFolder.get(entry.name);
+    const parsed = recorded
+      ? { ...parseManifestRepo(recorded.repo), skill: recorded.id }
+      : (cachedSource ?? parseVisibleSkillDirName(entry.name));
     if (parsed === null) {
       continue;
     }
@@ -55,7 +63,7 @@ async function listSkillsForScope(
       () => ({ name: "", description: "" }),
     );
     const repoId = `${parsed.owner}/${parsed.repo}`;
-    const manifestSkill = manifestSkills.get(`${repoId}/${parsed.skill}`);
+    const manifestSkill = manifestSkillsById.get(`${repoId}/${parsed.skill}`);
     skills.push({
       id: manifestSkill
         ? formatManifestSkillId(repoId, manifestSkill)
@@ -67,12 +75,13 @@ async function listSkillsForScope(
       description: frontmatter.description,
       scope,
       installRoot,
-      source: cachedSource === null && isAbsolute(linkTarget) ? linkTarget : undefined,
     });
   }
 
   return skills;
 }
+
+const parseManifestRepo = parseRepoRef;
 
 function parseSourceSkillLinkTarget(
   target: string,

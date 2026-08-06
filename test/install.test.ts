@@ -1,4 +1,4 @@
-import { lstat, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -34,7 +34,7 @@ describe("install helpers", () => {
       "---\nname: adapt\ndescription: Adapt skill\n---\n",
     );
 
-    await replaceInstalledSkills(repoDir, target, [
+    await replaceInstalledSkills(repoDir, target, repo, [
       {
         relativeDir: "adapt",
         sourceDir: ".codex/skills/adapt",
@@ -42,7 +42,9 @@ describe("install helpers", () => {
       },
     ]);
 
-    expect(await readFile(join(target, "adapt", "SKILL.md"), "utf8")).toContain("name: adapt");
+    expect(await readFile(join(target, "adapt", "SKILL.md"), "utf8")).toContain(
+      "name: adapt-ethan-huo",
+    );
     expect(await stat(join(target, ".codex")).catch(() => null)).toBeNull();
   });
 
@@ -56,7 +58,7 @@ describe("install helpers", () => {
     await writeFile(join(repoDir, "reference.md"), "supporting material");
     await writeFile(join(repoDir, ".git", "HEAD"), "ref: refs/heads/main\n");
 
-    await upsertInstalledSkills(repoDir, target, [
+    await upsertInstalledSkills(repoDir, target, repo, [
       {
         relativeDir: "root",
         sourceDir: ".",
@@ -64,7 +66,9 @@ describe("install helpers", () => {
       },
     ]);
 
-    expect(await readFile(join(target, "root", "SKILL.md"), "utf8")).toContain("humanizer");
+    expect(await readFile(join(target, "root", "SKILL.md"), "utf8")).toContain(
+      "name: root-ethan-huo",
+    );
     expect(await readFile(join(target, "root", "reference.md"), "utf8")).toBe(
       "supporting material",
     );
@@ -101,12 +105,12 @@ describe("install helpers", () => {
     await mkdir(join(repoDir, "skills", "cx"), { recursive: true });
     await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\n");
 
-    await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
+    await upsertInstalledSkills(repoDir, sourceRoot, repo, selectedSkills);
     await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
 
-    expect((await lstat(join(targetRoot, "cx.agents.ethan-huo"))).isSymbolicLink()).toBe(true);
-    expect(await readFile(join(targetRoot, "cx.agents.ethan-huo", "SKILL.md"), "utf8")).toContain(
-      "name: cx",
+    expect((await lstat(join(targetRoot, "cx-ethan-huo"))).isSymbolicLink()).toBe(true);
+    expect(await readFile(join(targetRoot, "cx-ethan-huo", "SKILL.md"), "utf8")).toContain(
+      "name: cx-ethan-huo",
     );
   });
 
@@ -138,7 +142,7 @@ describe("install helpers", () => {
       ].join("\n"),
     );
 
-    await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
+    await upsertInstalledSkills(repoDir, sourceRoot, repo, selectedSkills);
 
     const contents = await readFile(join(sourceRoot, "efficient-frontier", "SKILL.md"), "utf8");
     const frontmatter = /^---\n([\s\S]*?)\n---/.exec(contents)?.[1] ?? "";
@@ -171,12 +175,12 @@ describe("install helpers", () => {
       "---\nname: taste\n---\n",
     );
 
-    await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
+    await upsertInstalledSkills(repoDir, sourceRoot, repo, selectedSkills);
+    await symlink(join(sourceRoot, "design", "taste"), join(targetRoot, "design.taste"), "dir");
     await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
 
-    expect((await lstat(join(targetRoot, "design.taste.agents.ethan-huo"))).isSymbolicLink()).toBe(
-      true,
-    );
+    expect((await lstat(join(targetRoot, "design-taste-ethan-huo"))).isSymbolicLink()).toBe(true);
+    expect(await lstat(join(targetRoot, "design.taste")).catch(() => null)).toBeNull();
     expect(
       await stat(join(targetRoot, "ethan-huo.agents.design", "taste")).catch(() => null),
     ).toBeNull();
@@ -201,7 +205,7 @@ describe("install helpers", () => {
       "---\nname: cx\ndescription: CX helper\n---\n",
     );
 
-    await upsertInstalledSkills(repoDir, sourceRoot, selectedSkills);
+    await upsertInstalledSkills(repoDir, sourceRoot, repo, selectedSkills);
     await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
     await writeFile(
       join(targetRoot, "manifest.json"),
@@ -222,10 +226,10 @@ describe("install helpers", () => {
       owner: "ethan-huo",
       repo: "agents",
       relativeDir: "cx",
-      name: "cx",
+      name: "cx-ethan-huo",
       description: "CX helper",
       scope: "local",
-      installRoot: join(targetRoot, "cx.agents.ethan-huo"),
+      installRoot: join(targetRoot, "cx-ethan-huo"),
     });
   });
 

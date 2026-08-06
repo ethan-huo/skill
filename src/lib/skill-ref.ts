@@ -1,5 +1,3 @@
-import { isAbsolute, normalize } from "node:path";
-
 import { parseRepoRef } from "./repo-ref";
 import type { ManifestSkill } from "./project-manifest";
 import type { RepoRef } from "../types";
@@ -11,19 +9,11 @@ export type CanonicalGitHubSkillRef = {
 };
 
 export function formatManifestSkillId(repoId: string, skill: ManifestSkill): string {
-  if (skill.source && isAbsolute(skill.source)) {
-    return formatFilesystemSkillId(skill.source);
-  }
-
   return formatGitHubSkillId(parseRepoRef(repoId), skill.source ?? skill.id);
 }
 
 export function formatGitHubSkillId(repo: RepoRef, sourcePath: string): string {
   return `gh:${repo.owner}/${repo.repo}/${normalizeGitHubSourcePath(sourcePath)}`;
-}
-
-export function formatFilesystemSkillId(path: string): string {
-  return `fs:${normalize(path)}`;
 }
 
 export function parseCanonicalGitHubSkillRef(value: string): CanonicalGitHubSkillRef | null {

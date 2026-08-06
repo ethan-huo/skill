@@ -47,7 +47,7 @@ describe("add skills", () => {
     ]);
   });
 
-  test("detects only overlapping global skills for the same repo", () => {
+  test("detects overlapping global folder IDs regardless of source", () => {
     expect(
       getConflictingGlobalSkillIds(
         [
@@ -220,6 +220,8 @@ describe("add skills", () => {
 
   test("project install effects write hidden source links, manifest, and claude root link", async () => {
     const root = join(tmpdir(), `skill-project-effects-${crypto.randomUUID()}`);
+    const previousHome = process.env.HOME;
+    process.env.HOME = root;
     const repoDir = join(root, "repo");
     const projectRoot = join(root, "project");
     const isolatedRepo = {
@@ -253,8 +255,12 @@ describe("add skills", () => {
         await readFile(join(projectRoot, ".agents", "skills", "manifest.json"), "utf8"),
       ).toContain(`"repo": "${isolatedRepo.owner}/agents"`);
     } finally {
-      await rm(getSourceInstallRoot(isolatedRepo), { force: true, recursive: true });
-      await rm(dirname(getSourceInstallRoot(isolatedRepo)), { force: true, recursive: true });
+      if (previousHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = previousHome;
+      }
+      await rm(root, { force: true, recursive: true });
     }
   });
 

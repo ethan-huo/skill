@@ -1,59 +1,93 @@
 #!/usr/bin/env bun
-import { lstat, mkdir, readdir, rename, rm, stat } from "node:fs/promises";
+import { lstat, readFile, readlink, rename, rm } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
+
+import {
+  getLegacyVisibleSkillDirName,
+  getSourceScopedVisibleSkillDirName,
+  getVisibleSkillDirName,
+} from "../src/lib/paths";
+import { parseRepoRef } from "../src/lib/repo-ref";
+import type { ProjectManifest, ProjectManifestSkillsItem } from "../src/lib/project-manifest";
 
 const skillsRoot = await resolveSkillsRoot(Bun.argv[2]);
+const manifest = await readManifest(skillsRoot);
+const planned = manifest.items
+  .filter((item): item is ProjectManifestSkillsItem => item.type === "skills")
+  .flatMap((item) => {
+    const repo = parseRepoRef(item.repo);
+    return item.skills.map((skill) => ({
+      id: skill.id,
+      repo,
+      visibleName: getVisibleSkillDirName(repo, skill.id),
+    }));
+  });
 
-const owners = await readdir(skillsRoot, { withFileTypes: true }).catch(() => []);
+assertUniqueVisibleNames(planned);
+
 let migrated = 0;
-
-for (const ownerEntry of owners) {
-  if (!ownerEntry.isDirectory()) {
-    continue;
+for (const skill of planned) {
+  const visiblePath = join(skillsRoot, skill.visibleName);
+  const aliases = [
+    ...new Set([
+      getSourceScopedVisibleSkillDirName(skill.repo, skill.id),
+      getLegacyVisibleSkillDirName(skill.repo, skill.id),
+      getLegacyBareVisibleSkillDirName(skill.id),
+    ]),
+  ].map((name) => join(skillsRoot, name));
+  const existingAliases = [];
+  for (const alias of aliases) {
+    if (await lstat(alias).catch(() => null)) {
+      existingAliases.push(alias);
+    }
   }
 
-  const ownerDir = join(skillsRoot, ownerEntry.name);
-  if (await hasSkillFile(ownerDir)) {
-    continue;
-  }
-
-  const repos = await readdir(ownerDir, { withFileTypes: true }).catch(() => []);
-
-  for (const repoEntry of repos) {
-    if (!repoEntry.isDirectory()) {
-      continue;
+  const visible = await lstat(visiblePath).catch(() => null);
+  if (visible) {
+    if (!visible.isSymbolicLink()) {
+      throw new Error(`Normalized skill folder is occupied by a non-link: ${visiblePath}`);
     }
-
-    const repoDir = join(ownerDir, repoEntry.name);
-    const skills = await collectLegacySkills(repoDir);
-    if (skills.length === 0) {
-      continue;
-    }
-
-    for (const skillEntry of skills) {
-      const nextPath = join(skillsRoot, `${ownerEntry.name}.${repoEntry.name}.${skillEntry.name}`);
-      await rm(nextPath, { force: true, recursive: true });
-      await mkdir(dirname(nextPath), { recursive: true });
-      await rename(skillEntry.path, nextPath);
+    const visibleTarget = await readlink(visiblePath);
+    for (const alias of existingAliases) {
+      if (!(await lstat(alias)).isSymbolicLink()) {
+        throw new Error(`Legacy skill alias is occupied by a non-link: ${alias}`);
+      }
+      await rm(alias);
       migrated += 1;
-      console.log(`${skillEntry.path} -> ${nextPath}`);
+      console.log(`${alias} removed; current link is ${visiblePath} -> ${visibleTarget}`);
     }
-
-    await rm(repoDir, { force: true, recursive: true }).catch(() => {});
+    continue;
   }
 
-  const remaining = await readdir(ownerDir).catch(() => []);
-  if (remaining.length === 0) {
-    await rm(ownerDir, { force: true, recursive: true });
+  if (existingAliases.length === 0) {
+    throw new Error(
+      `Manifest skill has no visible link to migrate: ${skill.repo.display}/${skill.id}`,
+    );
   }
+  if (existingAliases.length > 1) {
+    const targets = new Set(await Promise.all(existingAliases.map((alias) => readlink(alias))));
+    if (targets.size !== 1) {
+      throw new Error(`Conflicting legacy aliases exist for ${skill.repo.display}/${skill.id}.`);
+    }
+  }
+
+  const [sourceAlias, ...duplicateAliases] = existingAliases;
+  await rename(sourceAlias!, visiblePath);
+  for (const alias of duplicateAliases) {
+    await rm(alias);
+  }
+  migrated += existingAliases.length;
+  console.log(`${sourceAlias} -> ${visiblePath}`);
 }
 
-const root = await lstat(skillsRoot).catch(() => null);
-if (!root?.isDirectory()) {
-  console.log(`Skills root does not exist: ${skillsRoot}`);
-} else {
-  console.log(`Migrated ${migrated} skill link(s) in ${skillsRoot}.`);
+console.log(`Normalized ${migrated} skill link(s) in ${skillsRoot}.`);
+
+function getLegacyBareVisibleSkillDirName(skill: string): string {
+  return skill
+    .split("/")
+    .map((segment) => segment.toLowerCase())
+    .join(".");
 }
 
 async function resolveSkillsRoot(input: string | undefined): Promise<string> {
@@ -64,52 +98,32 @@ async function resolveSkillsRoot(input: string | undefined): Promise<string> {
   const target = resolve(input);
   const projectSkillsRoot = join(target, ".agents", "skills");
   const projectSkills = await lstat(projectSkillsRoot).catch(() => null);
-  if (projectSkills?.isDirectory()) {
-    return projectSkillsRoot;
-  }
-
-  return target;
+  return projectSkills?.isDirectory() ? projectSkillsRoot : target;
 }
 
-async function collectLegacySkills(root: string): Promise<{ name: string; path: string }[]> {
-  const directEntries = await readdir(root, { withFileTypes: true }).catch(() => []);
-  const directSkills: { name: string; path: string }[] = [];
-
-  for (const entry of directEntries) {
-    if (!entry.isDirectory() && !entry.isSymbolicLink()) {
-      continue;
-    }
-
-    const path = join(root, entry.name);
-    if (await hasSkillFile(path)) {
-      directSkills.push({ name: entry.name, path });
-    }
+async function readManifest(skillsRoot: string): Promise<ProjectManifest> {
+  const manifestPath = join(skillsRoot, "manifest.json");
+  const data = JSON.parse(await readFile(manifestPath, "utf8")) as Partial<ProjectManifest>;
+  if (data.version !== 3 || !Array.isArray(data.items)) {
+    throw new Error(`A version 3 manifest is required for safe migration: ${manifestPath}`);
   }
-
-  if (directSkills.length > 0) {
-    return directSkills;
-  }
-
-  // Some early installs mirrored upstream `skills/<folder>` before IDs were normalized.
-  const nestedRoot = join(root, "skills");
-  const nestedEntries = await readdir(nestedRoot, { withFileTypes: true }).catch(() => []);
-  const nestedSkills: { name: string; path: string }[] = [];
-
-  for (const entry of nestedEntries) {
-    if (!entry.isDirectory() && !entry.isSymbolicLink()) {
-      continue;
-    }
-
-    const path = join(nestedRoot, entry.name);
-    if (await hasSkillFile(path)) {
-      nestedSkills.push({ name: entry.name, path });
-    }
-  }
-
-  return nestedSkills;
+  return data as ProjectManifest;
 }
 
-async function hasSkillFile(path: string): Promise<boolean> {
-  const skillFile = await stat(join(path, "SKILL.md")).catch(() => null);
-  return skillFile?.isFile() ?? false;
+function assertUniqueVisibleNames(planned: Array<{ id: string; visibleName: string }>): void {
+  const ids = new Map<string, string>();
+  for (const skill of planned) {
+    const existing = ids.get(skill.visibleName);
+    if (existing && existing !== skill.id) {
+      throw new Error(
+        `Manifest skills ${existing} and ${skill.id} both claim ${skill.visibleName}; resolve the conflict before migration.`,
+      );
+    }
+    if (existing) {
+      throw new Error(
+        `Multiple sources claim skill folder ${skill.visibleName}; resolve the manifest conflict before migration.`,
+      );
+    }
+    ids.set(skill.visibleName, skill.id);
+  }
 }

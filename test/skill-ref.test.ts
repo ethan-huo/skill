@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-  formatFilesystemSkillId,
   formatGitHubSkillId,
   formatManifestSkillId,
   parseCanonicalGitHubSkillRef,
@@ -21,13 +20,12 @@ describe("canonical skill refs", () => {
     });
   });
 
-  test("uses the absolute filesystem skill path instead of its internal cache key", () => {
+  test("formats manifest skills as canonical GitHub source refs", () => {
     expect(
-      formatManifestSkillId("fs/agents-4bf1235d61", {
+      formatManifestSkillId("celados/agents", {
         id: "fullstack",
-        source: "/Users/dio/workspace/projects/agents/skills/fullstack",
+        source: "skills/fullstack",
       }),
-    ).toBe("fs:/Users/dio/workspace/projects/agents/skills/fullstack");
-    expect(formatFilesystemSkillId("/tmp/skills/../skills/cx")).toBe("fs:/tmp/skills/cx");
+    ).toBe("gh:celados/agents/skills/fullstack");
   });
 });

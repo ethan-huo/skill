@@ -47,10 +47,11 @@ export async function listSourceRepos(): Promise<SourceRepo[]> {
 
 export async function updateSourceRepo(options: {
   cloneDir: string;
+  repo: RepoRef;
   sourceRoot: string;
   installedSkills?: ManifestSkill[];
 }): Promise<{ diff: UpdateDiff; resolvedSkills: ManifestSkill[] }> {
-  const { cloneDir, sourceRoot } = options;
+  const { cloneDir, repo, sourceRoot } = options;
   const installedSkills =
     options.installedSkills ??
     (await discoverSkills(sourceRoot)).map((skill) => ({ id: skill.relativeDir }));
@@ -79,7 +80,7 @@ export async function updateSourceRepo(options: {
   }
 
   if (resolvedCandidates.length > 0) {
-    await upsertInstalledSkills(cloneDir, sourceRoot, resolvedCandidates);
+    await upsertInstalledSkills(cloneDir, sourceRoot, repo, resolvedCandidates);
   }
 
   for (const skill of staleCachedIds) {

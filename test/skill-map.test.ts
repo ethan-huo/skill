@@ -22,7 +22,7 @@ describe("skill map", () => {
     const cwd = join(root, "project");
     await mkdir(join(cloneDir, "skills", "taste"), { recursive: true });
     const legacyMapRoot = join(cwd, ".agents", "skills", "Owl-Listener.designer-skills.map");
-    const mapRoot = join(cwd, ".agents", "skills", "map.designer-skills.owl-listener");
+    const mapRoot = join(cwd, ".agents", "skills", "map-designer-skills-owl-listener");
     await mkdir(legacyMapRoot, { recursive: true });
     await writeFile(
       join(cloneDir, "skills", "taste", "SKILL.md"),
@@ -78,7 +78,7 @@ describe("skill map", () => {
     ).toBe(
       [
         "---",
-        'name: "map.designer-skills.owl-listener"',
+        'name: "map-designer-skills-owl-listener"',
         'description: "Design skill collection"',
         "---",
         "",

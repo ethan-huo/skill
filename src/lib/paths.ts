@@ -20,11 +20,15 @@ export function getManifestPath(scope: InstallScope, cwd: string): string {
 }
 
 export function getVisibleSkillDirName(repo: RepoRef, skill: string): string {
+  return formatSkillPackageName(skill, repo.owner);
+}
+
+export function getSourceScopedVisibleSkillDirName(repo: RepoRef, skill: string): string {
   return `${normalizeSkillPath(skill)}.${normalizeSegment(repo.repo)}.${normalizeSegment(repo.owner)}`;
 }
 
 export function getVisibleMapDirName(repo: RepoRef): string {
-  return `map.${normalizeSegment(repo.repo)}.${normalizeSegment(repo.owner)}`;
+  return formatSkillPackageName("map", repo.repo, repo.owner);
 }
 
 export function getLegacyVisibleSkillDirName(repo: RepoRef, skill: string): string {
@@ -46,6 +50,15 @@ export function getVisibleSkillRoot(
   skill: string,
 ): string {
   return join(getSkillsBaseDir(scope, cwd), getVisibleSkillDirName(repo, skill));
+}
+
+export function getSourceScopedVisibleSkillRoot(
+  scope: InstallScope,
+  cwd: string,
+  repo: RepoRef,
+  skill: string,
+): string {
+  return join(getSkillsBaseDir(scope, cwd), getSourceScopedVisibleSkillDirName(repo, skill));
 }
 
 export function getVisibleMapRoot(scope: InstallScope, cwd: string, repo: RepoRef): string {
@@ -86,14 +99,30 @@ export function getProjectManifestPath(cwd: string): string {
 }
 
 function normalizeSkillPath(skill: string): string {
-  return skill
-    .split("/")
-    .map((segment) => normalizeSegment(segment))
-    .join(".");
+  return normalizeSkillNamePart(skill);
 }
 
 function normalizeSegment(segment: string): string {
   return segment.toLowerCase();
+}
+
+function formatSkillPackageName(...parts: string[]): string {
+  const name = parts.map(normalizeSkillNamePart).join("-");
+  if (name.length > 64) {
+    throw new Error(`Generated skill name exceeds the 64-character specification limit: ${name}`);
+  }
+  return name;
+}
+
+function normalizeSkillNamePart(value: string): string {
+  const normalized = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (!normalized) {
+    throw new Error(`Cannot generate a valid skill name from: ${value}`);
+  }
+  return normalized;
 }
 
 function getHomeDir(): string {
