@@ -30,7 +30,8 @@ export async function runAdd(args: { input: AddInput }) {
     kind: "skills" as const,
     repo: repo.display,
     installRoot: result.installRoot,
-    skills: result.selectedSkills.map((skill) => formatGitHubSkillId(repo, skill.sourceDir)),
+    skills: result.installedSkills.map((skill) => formatGitHubSkillId(repo, skill.sourceDir)),
+    skipped: result.skipped,
   };
 }
 

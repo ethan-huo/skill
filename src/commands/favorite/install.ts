@@ -66,7 +66,8 @@ export async function runFavoriteInstall(args: { input: FavoriteInstallInput }) 
       kind: "skills" as const,
       repo: group.repo.display,
       installRoot: result.installRoot,
-      skills: result.selectedSkills.map((skill) => skill.relativeDir),
+      skills: result.installedSkills.map((skill) => skill.relativeDir),
+      skipped: result.skipped,
     });
   }
 

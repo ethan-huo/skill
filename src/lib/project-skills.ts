@@ -48,14 +48,14 @@ export async function installProjectRepoSkills(options: {
     return { kind: "map", installRoot: result.installRoot, mappedSkills: result.mappedSkills };
   }
 
-  const { installRoot } = await installLocalProjectSkills({
+  const result = await installLocalProjectSkills({
     cloneDir,
     cwd: options.cwd,
     repo: options.repo,
     selectedSkills,
   });
 
-  return { kind: "skills", installRoot, selectedSkills };
+  return { kind: "skills", ...result };
 }
 
 export async function installProjectRepoMap(options: {

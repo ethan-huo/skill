@@ -176,7 +176,7 @@ The positional and flag forms below remain the shorter human-facing surface.
 - project-scope `skill update` regenerates map items recorded in `.agents/skills/manifest.json`
 - versionless and version 2 manifests migrate to version 3; new installs persist each logical skill ID with its exact upstream source path
 - repeated installs reuse shallow clone caches keyed by the remote `HEAD` hash
-- local and global installs reject any selected skill whose normalized visible folder is already claimed in the other scope, regardless of source
+- local and global installs skip selected skills whose normalized visible folder is already claimed in the other scope, install the remaining selection, and report each skip with a canonical skill ID plus a stable reason
 - installs link selected skills from `~/.agents/.skills` and record repo-scoped manifest items in the target scope's manifest
 - project-scope `skill add` and `skill install <ref>` share the same install effects; `--global` targets the global manifest and visible root
 - project installs ensure `{cwd}/.claude/skills -> ../.agents/skills`, and global installs ensure `~/.claude/skills -> ~/.agents/skills`, unless the Claude `skills` path already resolves to a valid directory
