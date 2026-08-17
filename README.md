@@ -220,7 +220,7 @@ Favorites:
 
 ## Agent Integration
 
-This repository ships with an installable agent-facing skill at [skills/skill/SKILL.md](skills/skill/SKILL.md).
+This repository ships with an agent-facing skill. [src/SKILL.md](src/SKILL.md) is the source of truth, served by `skill @skill`. [skills/skill/SKILL.md](skills/skill/SKILL.md) is the harness stub for trigger selection.
 
 That skill is intentionally narrower than this README. It teaches agents the main workflow:
 

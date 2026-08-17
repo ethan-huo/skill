@@ -1,6 +1,7 @@
 #!/usr/bin/env -S bun --no-env-file
 import { cli } from "argc";
 import packageJson from "../package.json" with { type: "json" };
+import { embedSkill } from "./skill.embed.ts" with { type: "macro" };
 
 import { runAdd } from "./commands/add";
 import { runFavoriteAdd } from "./commands/favorite/add";
@@ -20,6 +21,7 @@ const app = cli(schema, {
   name: "skill",
   version: packageJson.version,
   description: "Install and remove agent skills from GitHub repositories.",
+  skill: embedSkill(),
 });
 
 const argv = normalizeArgv(process.argv.slice(2));
