@@ -55,6 +55,15 @@ describe("argc v7 CLI contract", () => {
     expect(result.stdout).toContain("estimatedTokens:");
   });
 
+  test("accepts --no-color on human command syntax", async () => {
+    const result = await runSkill(["list", "--no-color"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("summary:");
+    expect(result.stdout).not.toContain("\x1b[");
+  });
+
   test("renders YAML scalars with terminal colors", () => {
     const rendered = colorizeYaml("skills:\n  - id: gh:owner/repo/skill\nsummary:\n  count: 3\n");
 

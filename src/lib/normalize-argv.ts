@@ -18,15 +18,17 @@ export function normalizeArgv(argv: string[]): string[] {
 }
 
 function normalizeAliases(argv: string[]): string[] {
-  return argv.map((arg) => {
-    if (arg === "-g") {
-      return "--global";
-    }
-    if (arg === "--no-progress") {
-      return "--progress=false";
-    }
-    return arg;
-  });
+  return argv
+    .filter((arg) => arg !== "--no-color")
+    .map((arg) => {
+      if (arg === "-g") {
+        return "--global";
+      }
+      if (arg === "--no-progress") {
+        return "--progress=false";
+      }
+      return arg;
+    });
 }
 
 function normalizeCommandPath(argv: string[]): string[] {

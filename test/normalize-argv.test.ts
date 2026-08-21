@@ -43,4 +43,8 @@ describe("CLI argv normalization", () => {
     expect(normalizeArgv(["update", "--no-progress"])).toEqual(["update", "--progress=false"]);
     expect(normalizeArgv(["remove", "-g"])).toEqual(["remove", "--global"]);
   });
+
+  test("consumes the global no-color flag before argc parses input", () => {
+    expect(normalizeArgv(["list", "--no-color"])).toEqual(["list"]);
+  });
 });
