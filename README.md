@@ -151,13 +151,15 @@ The positional and flag forms below remain the shorter human-facing surface.
 
 ### Search And Inventory
 
-| Command                          | Purpose                                                                |
-| -------------------------------- | ---------------------------------------------------------------------- |
-| `skill find <query>`             | Search published skills on `skills.sh`                                 |
-| `skill list`                     | List installed skills and estimate frontmatter name/description tokens |
-| `skill update`                   | Refresh shared source caches and reconcile global plus project links   |
-| `skill update --concurrency <n>` | Run repo updates in parallel (default `8`, `1` matches old behavior)   |
-| `skill update --no-progress`     | Disable the live progress grid (auto-disabled on non-TTY/CI)           |
+| Command              | Purpose                                                                |
+| -------------------- | ---------------------------------------------------------------------- |
+| `skill find <query>` | Search published skills on `skills.sh`                                 |
+| `skill list`         | List installed skills and estimate frontmatter name/description tokens |
+
+| `skill update` | Refresh shared source caches and reconcile global plus project links |
+| `skill update --concurrency <n>` | Run repo updates in parallel (default `8`, `1` matches old behavior) |
+| `skill update --no-progress` | Disable the live progress grid (auto-disabled on non-TTY/CI) |
+Human-facing output is ANSI-highlighted when stdout is an interactive terminal. YAML keys, list markers, and scalar types receive lightweight colors; Markdown and schema output keep argc's existing formatting. Piped output, `NO_COLOR=1`, `TERM=dumb`, and `--no-color` remain byte-plain for agents and scripts.
 
 ## How Installation Works
 

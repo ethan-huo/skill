@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
-
+import { colorizeYaml } from "../src/lib/human-output";
 const repositoryRoot = import.meta.dir.replace(/\/test$/, "");
 
 async function runSkill(args: string[], cwd = repositoryRoot, env: Record<string, string> = {}) {
@@ -53,6 +53,35 @@ describe("argc v7 CLI contract", () => {
     expect(result.stdout).toContain("skills:");
     expect(result.stdout).toContain("summary:");
     expect(result.stdout).toContain("estimatedTokens:");
+  });
+
+  test("renders YAML scalars with terminal colors", () => {
+    const rendered = colorizeYaml("skills:\n  - id: gh:owner/repo/skill\nsummary:\n  count: 3\n");
+
+    expect(rendered).toContain("\x1b[36m 3\x1b[0m");
+  });
+
+  test("enables colored output when the CLI runs inside a PTY", async () => {
+    let output = "";
+    await using terminal = new Bun.Terminal({
+      cols: 120,
+      rows: 40,
+      data(_terminal, data) {
+        output += data;
+      },
+    });
+    const process = Bun.spawn(["bun", "run", join(repositoryRoot, "src", "cli.ts"), "list"], {
+      cwd: repositoryRoot,
+      env: {
+        ...Bun.env,
+        NO_COLOR: "",
+        TERM: "xterm-256color",
+      },
+      terminal,
+    });
+
+    expect(await process.exited).toBe(0);
+    expect(output).toContain("\x1b[2mskills:\x1b[0m");
   });
 
   test("add rejects local paths through the real CLI", async () => {

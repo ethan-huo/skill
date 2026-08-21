@@ -14,6 +14,7 @@ import { runInstall } from "./commands/install";
 import { runList } from "./commands/list";
 import { runRemove } from "./commands/remove";
 import { runUpdate } from "./commands/update";
+import { installHumanOutput } from "./lib/human-output";
 import { normalizeArgv } from "./lib/normalize-argv";
 import { schema } from "./schema";
 
@@ -25,6 +26,7 @@ const app = cli(schema, {
 });
 
 const argv = normalizeArgv(process.argv.slice(2));
+installHumanOutput();
 
 const handlers = {
   add: runAdd,
