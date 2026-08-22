@@ -1,4 +1,4 @@
-import { fmt } from "argc/terminal";
+import { fmt } from "@celados/argc/terminal";
 
 import { listFavorites, removeFavorites } from "../../lib/favorites";
 import { searchableMultiselect } from "../../lib/prompt";

@@ -1,5 +1,5 @@
 #!/usr/bin/env -S bun --no-env-file
-import { cli } from "argc";
+import { cli } from "@celados/argc";
 import packageJson from "../package.json" with { type: "json" };
 import { embedSkill } from "./skill.embed.ts" with { type: "macro" };
 

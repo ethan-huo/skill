@@ -1,4 +1,4 @@
-import { fmt } from "argc/terminal";
+import { fmt } from "@celados/argc/terminal";
 
 /**
  * Multi-line live progress grid. One row per task; spinner + stage label tick

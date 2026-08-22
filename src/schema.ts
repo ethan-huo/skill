@@ -1,5 +1,5 @@
 import { toStandardJsonSchema } from "@valibot/to-json-schema";
-import { c, group } from "argc";
+import { c, group } from "@celados/argc";
 import * as v from "valibot";
 
 const s = toStandardJsonSchema;
