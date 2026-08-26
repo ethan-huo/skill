@@ -8,7 +8,7 @@ on:
 
 jobs:
   release:
-    runs-on: celados-linux
+    runs-on: ubuntu-latest
     permissions:
       contents: write
 
