@@ -8,6 +8,7 @@ This repo publishes GitHub Releases from version tags. It does not use npm publi
 - Release tags must use `v<package.json version>`, for example `v0.1.7`.
 - `.github/workflows/release.yml` validates that the pushed tag exactly matches `package.json`.
 - The release workflow runs `bun install`, `bun run check`, and `bun run build`.
+- Private `@celados` dependencies use the repository Actions secret `NPM_TOKEN`.
 - `scripts/build.sh` bundles the CLI into `dist/skill`.
 - The workflow creates a non-draft, non-prerelease GitHub Release and uploads `dist/skill`.
 

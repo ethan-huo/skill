@@ -8,7 +8,7 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: celados-linux
     permissions:
       contents: write
 
@@ -19,7 +19,16 @@ jobs:
         with:
           bun-version: latest
 
-      - run: bun install
+      - name: Configure private registry
+        run: |
+          printf '%s\n' \
+            '@celados:registry=https://npm.celados.com' \
+            '//npm.celados.com/:_authToken=${NODE_AUTH_TOKEN}' > .npmrc
+
+      - name: Install
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: bun install --frozen-lockfile
       - run: bun run check
       - run: bun run build
 
