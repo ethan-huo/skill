@@ -43,11 +43,11 @@ describe("discoverSkills", () => {
     ]);
   });
 
-  test("collapses byte-identical repeated skill bundles", async () => {
+  test("ignores hidden configuration roots and collapses visible duplicates", async () => {
     const root = await mkTempDir();
-    await writeSkill(root, ".claude/skills/adapt");
     await writeSkill(root, ".agents/skills/adapt");
     await writeSkill(root, ".codex/skills/adapt");
+    await writeSkill(root, "catalog/skills/adapt");
     await writeSkill(root, "source/skills/adapt");
     await writeSkill(root, ".cursor/skills/optimize");
 
@@ -55,7 +55,7 @@ describe("discoverSkills", () => {
     expect(skills).toEqual([
       {
         relativeDir: "adapt",
-        sourceDir: ".codex/skills/adapt",
+        sourceDir: "catalog/skills/adapt",
         displayLabel: "adapt",
       },
     ]);
@@ -64,7 +64,7 @@ describe("discoverSkills", () => {
   test("keeps different same-name bundles as ordered variants", async () => {
     const root = await mkTempDir();
     await writeSkill(root, "apps/skills/core/adapt", "core");
-    await writeSkill(root, "apps/skills/claude/adapt", "claude");
+    await writeSkill(root, "apps/skills/codex/adapt", "codex");
 
     expect(await discoverSkillGroups(root)).toEqual([
       {
@@ -73,9 +73,9 @@ describe("discoverSkills", () => {
         candidates: [
           {
             relativeDir: "adapt",
-            sourceDir: "apps/skills/claude/adapt",
+            sourceDir: "apps/skills/codex/adapt",
             displayLabel: "adapt",
-            variant: "claude",
+            variant: "codex",
           },
           {
             relativeDir: "adapt",
@@ -91,12 +91,12 @@ describe("discoverSkills", () => {
   test("uses the nearest distinctive parent segment as the variant label", async () => {
     const root = await mkTempDir();
     await writeSkill(root, "apps/skills/core/adapt", "core");
-    await writeSkill(root, "apps/skills/claude/adapt", "claude");
+    await writeSkill(root, "apps/skills/codex/adapt", "codex");
     await writeSkill(root, "apps/kiro-cli/skills/adapt", "kiro");
 
     const groups = await discoverSkillGroups(root);
     expect(groups[0]!.candidates.map((candidate) => candidate.variant)).toEqual([
-      "claude",
+      "codex",
       "core",
       "kiro-cli",
     ]);

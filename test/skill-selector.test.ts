@@ -4,16 +4,16 @@ import { parseSkillSelectors } from "../src/lib/skill-selector";
 
 describe("skill selector expressions", () => {
   test("parses unqualified, qualified, and grouped selectors", () => {
-    expect(parseSkillSelectors("abc, core/{dec,efg}, claude/last")).toEqual([
+    expect(parseSkillSelectors("abc, core/{dec,efg}, codex/last")).toEqual([
       { skill: "abc" },
       { skill: "dec", variant: "core" },
       { skill: "efg", variant: "core" },
-      { skill: "last", variant: "claude" },
+      { skill: "last", variant: "codex" },
     ]);
   });
 
   test("rejects duplicate logical skills across variants", () => {
-    expect(() => parseSkillSelectors("core/abc,claude/abc")).toThrow(
+    expect(() => parseSkillSelectors("core/abc,codex/abc")).toThrow(
       'Skill "abc" is selected more than once',
     );
   });

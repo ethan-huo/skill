@@ -36,7 +36,7 @@ Prefer non-interactive installs whenever you already know the exact skill IDs:
 skill add "{ repo: 'owner/repo/skill' }"
 skill add "{ repo: 'gh:owner/repo/path/to/skill' }"
 skill add "{ repo: 'owner/repo', skills: 'skill-a,skill-b' }"
-skill add "{ repo: 'owner/repo', skills: 'core/{skill-a,skill-b},claude/skill-c' }"
+skill add "{ repo: 'owner/repo', skills: 'core/{skill-a,skill-b},codex/skill-c' }"
 ```
 
 `skill list` exposes skills as `gh:<owner>/<repo>/<source-path>`; that canonical form can be

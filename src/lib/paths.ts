@@ -86,14 +86,6 @@ export function getSourceInstallRoot(repo: Pick<RepoRef, "owner" | "repo">): str
   return join(getSourceSkillsBaseDir(), repo.owner, repo.repo);
 }
 
-export function getProjectClaudeRoot(cwd: string): string {
-  return join(cwd, ".claude");
-}
-
-export function getGlobalClaudeRoot(): string {
-  return join(getHomeDir(), ".claude");
-}
-
 export function getProjectManifestPath(cwd: string): string {
   return getManifestPath("local", cwd);
 }

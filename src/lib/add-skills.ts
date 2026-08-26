@@ -1,6 +1,5 @@
 import { rm } from "node:fs/promises";
 
-import { ensureGlobalClaudeSkillsLink, ensureProjectClaudeSkillsLink } from "./claude-skills";
 import { discoverSkillGroups } from "./discover-skills";
 import { shallowCloneRepo } from "./git";
 import {
@@ -80,7 +79,6 @@ export async function installRepoSkills(options: {
       cwd: options.cwd,
       repo: options.repo,
     });
-    await ensureProjectClaudeSkillsLink(options.cwd);
     await addScopeManifestMap("local", options.cwd, `${options.repo.owner}/${options.repo.repo}`);
     return { kind: "map", installRoot: result.installRoot, mappedSkills: result.mappedSkills };
   }
@@ -171,7 +169,6 @@ export async function selectRepoSkills(options: {
 export async function installGlobalSkills(options: {
   cloneDir: string;
   cwd: string;
-  ensureClaudeSkillsLink?: (cwd: string) => Promise<string>;
   repo: RepoRef;
   selectedSkills: SkillCandidate[];
 }): Promise<SkillsInstallEffectResult> {
@@ -199,7 +196,6 @@ export async function installGlobalSkills(options: {
   const sourceRoot = getSourceInstallRoot(options.repo);
   await upsertInstalledSkills(options.cloneDir, sourceRoot, options.repo, installedSkills);
   await linkInstalledSkills(sourceRoot, installRoot, options.repo, installedSkills);
-  await (options.ensureClaudeSkillsLink ?? ensureGlobalClaudeSkillsLink)(options.cwd);
   await addScopeManifestSkills(
     "global",
     options.cwd,
@@ -242,7 +238,6 @@ export async function installLocalProjectSkills(options: {
   await upsertInstalledSkills(options.cloneDir, sourceRoot, options.repo, installedSkills);
   await removeProjectMapAliases(options.cwd, options.repo);
   await linkInstalledSkills(sourceRoot, installRoot, options.repo, installedSkills);
-  await ensureProjectClaudeSkillsLink(options.cwd);
   await addScopeManifestSkills(
     "local",
     options.cwd,

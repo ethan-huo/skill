@@ -10,9 +10,9 @@ const groups = [
     candidates: [
       {
         relativeDir: "annotate",
-        sourceDir: "apps/skills/claude/annotate",
+        sourceDir: "apps/skills/codex/annotate",
         displayLabel: "annotate",
-        variant: "claude",
+        variant: "codex",
       },
       {
         relativeDir: "annotate",
@@ -41,7 +41,7 @@ describe("skill selection", () => {
       selectSkills("owner/repo", groups, {
         selectors: [{ skill: "annotate" }],
       }),
-    ).rejects.toThrow("claude/annotate or core/annotate");
+    ).rejects.toThrow("codex/annotate or core/annotate");
   });
 
   test("rejects a variant that does not provide the selected skill", async () => {
@@ -59,9 +59,9 @@ describe("skill selection", () => {
       candidates: [
         {
           relativeDir: "review",
-          sourceDir: "apps/skills/claude/review",
+          sourceDir: "apps/skills/codex/review",
           displayLabel: "review",
-          variant: "claude",
+          variant: "codex",
         },
         {
           relativeDir: "review",
@@ -91,7 +91,7 @@ describe("skill selection", () => {
     expect(prompts).toEqual([
       {
         message: "Choose a variant for 2 selected skills",
-        variants: ["claude", "core"],
+        variants: ["codex", "core"],
       },
     ]);
     expect(result).toEqual({

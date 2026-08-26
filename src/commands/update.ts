@@ -1,4 +1,3 @@
-import { ensureGlobalClaudeSkillsLink, ensureProjectClaudeSkillsLink } from "../lib/claude-skills";
 import { pMapLimit } from "../lib/concurrency";
 import { shallowCloneRepo } from "../lib/git";
 import { linkInstalledSkills, removeVisibleSkillAliases } from "../lib/install";
@@ -358,8 +357,6 @@ export async function syncVisibleLinks(options: {
       await removeVisibleSkillAliases(getSkillsBaseDir("global", cwd), repo, skill);
     }
 
-    await ensureGlobalClaudeSkillsLink(cwd);
-
     if (removedGlobalSkills.length > 0) {
       const manifest = await readScopeManifest("global", cwd);
       await writeScopeManifest(
@@ -377,7 +374,6 @@ export async function syncVisibleLinks(options: {
     return;
   }
 
-  await ensureProjectClaudeSkillsLink(cwd);
   const removedProjectSkills = filterInstalled(removed, projectInstalledIds);
   await removeProjectSkillLinks(cwd, repo, removedProjectSkills);
 

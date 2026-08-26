@@ -5,19 +5,6 @@ import { validateSkillSelectorName } from "./skill-selector";
 import type { SkillCandidate, SkillGroup } from "../types";
 
 const IGNORED_SEGMENTS = new Set([".git", "node_modules", "dist", "build", ".next", "target"]);
-const IGNORED_ROOTS = new Set([
-  ".agents",
-  ".claude",
-  ".claude-plugin",
-  ".cursor",
-  ".gemini",
-  ".kiro",
-  ".opencode",
-  ".pi",
-  ".rovodev",
-  ".trae",
-  ".trae-cn",
-]);
 const ROOT_SKILL_ID = "root";
 
 export async function discoverSkills(repoDir: string): Promise<SkillCandidate[]> {
@@ -198,9 +185,8 @@ function toPortableRelative(rootDir: string, targetDir: string): string {
 
 function shouldIgnore(relativeDir: string): boolean {
   const segments = relativeDir.split("/");
-  return (
-    segments.some((segment) => IGNORED_SEGMENTS.has(segment)) || IGNORED_ROOTS.has(segments[0]!)
-  );
+  // Hidden roots are tool-owned configuration, not portable skill catalogs.
+  return segments[0]?.startsWith(".") || segments.some((segment) => IGNORED_SEGMENTS.has(segment));
 }
 
 function compareCandidate(left: SkillCandidate, right: SkillCandidate): number {

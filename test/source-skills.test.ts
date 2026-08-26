@@ -137,7 +137,7 @@ describe("source skills", () => {
     const root = join(tmpdir(), `skill-source-variant-${crypto.randomUUID()}`);
     const cloneDir = join(root, "clone");
     const sourceRoot = join(root, "source");
-    await writeVariant(cloneDir, "claude", "claude");
+    await writeVariant(cloneDir, "codex", "codex");
     await writeVariant(cloneDir, "core", "core");
 
     const result = await updateSourceRepo({
@@ -147,22 +147,22 @@ describe("source skills", () => {
       installedSkills: [
         {
           id: "annotate",
-          source: "apps/skills/claude/annotate",
+          source: "apps/skills/codex/annotate",
         },
       ],
     });
 
     expect(result.resolvedSkills).toEqual([
-      { id: "annotate", source: "apps/skills/claude/annotate" },
+      { id: "annotate", source: "apps/skills/codex/annotate" },
     ]);
-    expect(await readFile(join(sourceRoot, "annotate", "SKILL.md"), "utf8")).toContain("claude");
+    expect(await readFile(join(sourceRoot, "annotate", "SKILL.md"), "utf8")).toContain("codex");
   });
 
   test("migrates a legacy manifest source only when cached content matches exactly", async () => {
     const root = join(tmpdir(), `skill-source-legacy-variant-${crypto.randomUUID()}`);
     const cloneDir = join(root, "clone");
     const sourceRoot = join(root, "source");
-    await writeVariant(cloneDir, "claude", "claude");
+    await writeVariant(cloneDir, "codex", "codex");
     await writeVariant(cloneDir, "core", "core");
     await mkdir(join(sourceRoot, "annotate"), { recursive: true });
     await writeFile(join(sourceRoot, "annotate", "SKILL.md"), "---\nname: annotate\n---\ncore");
@@ -193,7 +193,7 @@ describe("source skills", () => {
         installedSkills: [
           {
             id: "annotate",
-            source: "apps/skills/claude/annotate",
+            source: "apps/skills/codex/annotate",
           },
         ],
       }),

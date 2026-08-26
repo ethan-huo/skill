@@ -22,7 +22,7 @@ This repo publishes GitHub Releases from version tags. It does not use npm publi
    bun run build
    ```
 
-   Use a clean `HOME` when local global skill or Claude state could affect tests.
+   Use a clean `HOME` when local global skill state could affect tests.
 
 4. Commit only the intended files.
 5. Tag the same commit with `v<version>`.

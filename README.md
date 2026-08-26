@@ -46,7 +46,7 @@ For most real usage, start from favorites and install only what the current proj
 skill install owner/repo/skill
 skill install gh:owner/repo/path/to/skill
 skill install owner/repo --skills 'skill-a,skill-b'
-skill install owner/repo --skills 'core/{skill-a,skill-b},claude/skill-c'
+skill install owner/repo --skills 'core/{skill-a,skill-b},codex/skill-c'
 skill install owner/repo --map
 skill list
 ```
@@ -181,7 +181,6 @@ Human-facing output is ANSI-highlighted when stdout is an interactive terminal. 
 - local and global installs skip selected skills whose normalized visible folder is already claimed in the other scope, install the remaining selection, and report each skip with a canonical skill ID plus a stable reason
 - installs link selected skills from `~/.agents/.skills` and record repo-scoped manifest items in the target scope's manifest
 - project-scope `skill add` and `skill install <ref>` share the same install effects; `--global` targets the global manifest and visible root
-- project installs ensure `{cwd}/.claude/skills -> ../.agents/skills`, and global installs ensure `~/.claude/skills -> ~/.agents/skills`, unless the Claude `skills` path already resolves to a valid directory
 - `skill update` updates the union of repos recorded in the global manifest and current project's manifest, then reconciles both visible roots
 - `skill update` runs all source repos in parallel (default 8 in flight), renders a live progress grid on stderr, and returns stable-order YAML records for repo diffs, regenerated maps, and failures on stdout
 - `skill update` migrates source-scoped and legacy visible aliases to manifest-backed skill IDs
