@@ -221,7 +221,7 @@ Favorites:
 
 ## Agent Integration
 
-This repository ships with an agent-facing skill. [src/SKILL.md](src/SKILL.md)
+This repository ships with an agent-facing skill. [src/index.md](src/index.md)
 is the source of truth, served by `skill @skill`.
 [skills/skill/SKILL.md](skills/skill/SKILL.md) routes matching intent directly
 to that command; its body is only a harness fallback.
