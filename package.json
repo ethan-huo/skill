@@ -13,7 +13,7 @@
     "fmt:check": "bunx oxfmt --check .",
     "migrate:global-skills": "bun run scripts/migrate-skill-links.ts",
     "migrate:skills": "bun run scripts/migrate-skill-links.ts",
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsc --noEmit",
     "test": "bun test",
     "check": "bun run fmt:check && bun run typecheck && bun test"
   },
@@ -26,9 +26,8 @@
   },
   "devDependencies": {
     "@types/bun": "^1.3.12",
-    "@typescript/native-preview": "^7.0.0-dev.20260421.2",
     "oxfmt": "^0.46.0",
-    "typescript": "npm:@typescript/typescript6@^6.0.0"
+    "typescript": "^7.0.2"
   },
   "engines": {
     "bun": ">=1.3.0"
