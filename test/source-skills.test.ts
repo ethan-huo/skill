@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
+import { resolveInstalledSkillSource } from "../src/lib/install";
 import { removeSourceRepo, updateSourceRepo } from "../src/lib/source-skills";
 import { parseRepoRef } from "../src/lib/repo-ref";
 
@@ -46,8 +47,9 @@ describe("source skills", () => {
       },
       resolvedSkills: [{ id: "cx", source: "skills/cx" }],
     });
-    expect(await readFile(join(sourceRoot, "cx", "SKILL.md"), "utf8")).toContain("new");
-    expect(await stat(join(sourceRoot, "old-skill")).catch(() => null)).toBeNull();
+    expect(await readCachedSkill(sourceRoot, "cx")).toContain("new");
+    // Removed legacy materializations are retained until snapshot GC can prove no scope links them.
+    expect((await stat(join(sourceRoot, "old-skill"))).isDirectory()).toBe(true);
     expect(await stat(join(sourceRoot, "new-skill")).catch(() => null)).toBeNull();
     expect((await lstat(join(visibleRoot, "cx.agents.ethan-huo"))).isSymbolicLink()).toBe(true);
   });
@@ -83,13 +85,11 @@ describe("source skills", () => {
       },
       resolvedSkills: [{ id: "ask-matt", source: "skills/ask-matt" }],
     });
-    expect(await readFile(join(sourceRoot, "ask-matt", "SKILL.md"), "utf8")).toContain(
-      "upstream-current",
-    );
+    expect(await readCachedSkill(sourceRoot, "ask-matt")).toContain("upstream-current");
     expect(await readFile(join(sourceRoot, "still-upstream", "SKILL.md"), "utf8")).toContain(
       "cached-unselected",
     );
-    expect(await stat(join(sourceRoot, "writing-great-skills")).catch(() => null)).toBeNull();
+    expect((await stat(join(sourceRoot, "writing-great-skills"))).isDirectory()).toBe(true);
     expect(await stat(join(sourceRoot, "writing-for-agents")).catch(() => null)).toBeNull();
     expect(await readFile(join(sourceRoot, "README.md"), "utf8")).toBe("keep repo-local user file");
     expect(await readFile(join(otherRepoRoot, "user-owned", "SKILL.md"), "utf8")).toContain(
@@ -127,7 +127,7 @@ describe("source skills", () => {
       sourceRoot,
     });
 
-    const contents = await readFile(join(sourceRoot, "efficient-frontier", "SKILL.md"), "utf8");
+    const contents = await readCachedSkill(sourceRoot, "efficient-frontier");
     const frontmatter = /^---\n([\s\S]*?)\n---/.exec(contents)?.[1] ?? "";
     expect(() => Bun.YAML.parse(frontmatter)).not.toThrow();
     expect(contents).toContain("# Efficient Frontier");
@@ -155,7 +155,7 @@ describe("source skills", () => {
     expect(result.resolvedSkills).toEqual([
       { id: "annotate", source: "apps/skills/codex/annotate" },
     ]);
-    expect(await readFile(join(sourceRoot, "annotate", "SKILL.md"), "utf8")).toContain("codex");
+    expect(await readCachedSkill(sourceRoot, "annotate")).toContain("codex");
   });
 
   test("migrates a legacy manifest source only when cached content matches exactly", async () => {
@@ -257,4 +257,9 @@ async function writeSkill(root: string, path: string, name: string, body: string
   const skillDir = join(root, path);
   await mkdir(skillDir, { recursive: true });
   await writeFile(join(skillDir, "SKILL.md"), `---\nname: ${name}\n---\n${body}`);
+}
+
+async function readCachedSkill(sourceRoot: string, skill: string): Promise<string> {
+  const installedRoot = await resolveInstalledSkillSource(sourceRoot, skill);
+  return readFile(join(installedRoot, "SKILL.md"), "utf8");
 }

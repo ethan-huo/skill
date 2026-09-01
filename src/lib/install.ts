@@ -10,9 +10,10 @@ import {
   stat,
   symlink,
 } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { discoverSkills } from "./discover-skills";
+import { discoverSkills, fingerprintSkillDirectory } from "./discover-skills";
 import {
   getLegacyVisibleSkillDirName,
   getSourceScopedVisibleSkillDirName,
@@ -61,18 +62,49 @@ export async function upsertInstalledSkills(
   repo: RepoRef,
   selectedSkills: SkillCandidate[],
 ): Promise<void> {
-  await mkdir(targetRoot, { recursive: true });
-
   for (const skill of selectedSkills) {
     const sourceDir = join(repoDir, skill.sourceDir);
-    const destDir = join(targetRoot, skill.relativeDir);
-    await mkdir(dirname(destDir), { recursive: true });
-    await rm(destDir, { force: true, recursive: true });
-    await copySkillDirectory(sourceDir, destDir);
-    await normalizeSkillFrontmatterFile(
-      join(destDir, "SKILL.md"),
-      getVisibleSkillDirName(repo, skill.relativeDir),
-    );
+    const candidateDir = await mkdtemp(join(tmpdir(), "skill-materialized-"));
+
+    try {
+      await copySkillDirectory(sourceDir, candidateDir);
+      await normalizeSkillFrontmatterFile(
+        join(candidateDir, "SKILL.md"),
+        getVisibleSkillDirName(repo, skill.relativeDir),
+      );
+
+      const revision = await fingerprintSkillDirectory(candidateDir);
+      const snapshotParent = join(targetRoot, ".snapshots", skill.relativeDir);
+      const snapshotDir = join(snapshotParent, revision);
+      if (!(await stat(snapshotDir).catch(() => null))?.isDirectory()) {
+        await publishSnapshot(candidateDir, snapshotParent, snapshotDir);
+      }
+
+      const currentLink = join(targetRoot, ".current", skill.relativeDir);
+      await replaceSymlinkAtomically(currentLink, snapshotDir, join(targetRoot, ".snapshots"));
+    } finally {
+      await rm(candidateDir, { force: true, recursive: true });
+    }
+  }
+}
+
+async function publishSnapshot(
+  candidateDir: string,
+  snapshotParent: string,
+  snapshotDir: string,
+): Promise<void> {
+  await mkdir(snapshotParent, { recursive: true });
+  const stagingDir = await mkdtemp(join(snapshotParent, ".tmp-"));
+
+  try {
+    await cp(candidateDir, stagingDir, { recursive: true });
+    await rename(stagingDir, snapshotDir);
+  } catch (error) {
+    await rm(stagingDir, { force: true, recursive: true });
+    if ((await stat(snapshotDir).catch(() => null))?.isDirectory()) {
+      return;
+    }
+    throw error;
   }
 }
 
@@ -93,7 +125,7 @@ export async function linkInstalledSkills(
   await mkdir(targetRoot, { recursive: true });
 
   for (const skill of selectedSkills) {
-    const sourceDir = join(sourceRoot, skill.relativeDir);
+    const sourceDir = await resolveInstalledSkillSource(sourceRoot, skill.relativeDir);
     const destDir = join(targetRoot, getVisibleSkillDirName(repo, skill.relativeDir));
     const sourceScopedDestDir = join(
       targetRoot,
@@ -101,13 +133,26 @@ export async function linkInstalledSkills(
     );
     const legacyDestDir = join(targetRoot, getLegacyVisibleSkillDirName(repo, skill.relativeDir));
     const bareDestDir = join(targetRoot, normalizeSkillPathForLegacyBareAlias(skill.relativeDir));
-    await assertLinkCanBeReplaced(destDir, sourceDir);
+    await assertLinkCanBeReplaced(destDir, sourceRoot);
     await rm(sourceScopedDestDir, { force: true, recursive: true });
     await rm(legacyDestDir, { force: true, recursive: true });
     await removeLegacyLink(bareDestDir);
-    await rm(destDir, { force: true, recursive: true });
-    await symlink(sourceDir, destDir, "dir");
+    await replaceSymlinkAtomically(destDir, sourceDir, sourceRoot);
   }
+}
+
+export async function resolveInstalledSkillSource(
+  sourceRoot: string,
+  skill: string,
+): Promise<string> {
+  const currentLink = join(sourceRoot, ".current", skill);
+  const current = await lstat(currentLink).catch(() => null);
+  if (current?.isSymbolicLink()) {
+    const target = await readlink(currentLink);
+    return isAbsolute(target) ? target : resolve(dirname(currentLink), target);
+  }
+
+  return join(sourceRoot, skill);
 }
 
 export async function linkSkillDirectories(
@@ -125,12 +170,11 @@ export async function linkSkillDirectories(
     );
     const legacyDestDir = join(targetRoot, getLegacyVisibleSkillDirName(repo, skill.relativeDir));
     const bareDestDir = join(targetRoot, normalizeSkillPathForLegacyBareAlias(skill.relativeDir));
-    await assertLinkCanBeReplaced(destDir, skill.sourcePath);
+    await assertLinkCanBeReplaced(destDir, dirname(skill.sourcePath));
     await rm(sourceScopedDestDir, { force: true, recursive: true });
     await rm(legacyDestDir, { force: true, recursive: true });
     await removeLegacyLink(bareDestDir);
-    await rm(destDir, { force: true, recursive: true });
-    await symlink(skill.sourcePath, destDir, "dir");
+    await replaceSymlinkAtomically(destDir, skill.sourcePath, dirname(skill.sourcePath));
   }
 }
 
@@ -141,16 +185,52 @@ async function removeLegacyLink(path: string): Promise<void> {
   }
 }
 
-async function assertLinkCanBeReplaced(path: string, sourcePath: string): Promise<void> {
+async function assertLinkCanBeReplaced(path: string, allowedRoot: string): Promise<void> {
   const existing = await lstat(path).catch(() => null);
   if (existing === null) {
     return;
   }
   const target = existing.isSymbolicLink() ? await readlink(path) : null;
-  if (target === sourcePath) {
+  const resolvedTarget = target === null ? null : resolve(dirname(path), target);
+  if (resolvedTarget !== null && isPathInside(resolvedTarget, allowedRoot)) {
     return;
   }
   throw new Error(`Skill folder is already occupied: ${path}. Remove it before installing.`);
+}
+
+async function replaceSymlinkAtomically(
+  path: string,
+  target: string,
+  allowedRoot: string,
+): Promise<void> {
+  const existing = await lstat(path).catch(() => null);
+  if (existing !== null) {
+    if (!existing.isSymbolicLink()) {
+      throw new Error(`Skill folder is already occupied: ${path}. Remove it before installing.`);
+    }
+    const existingTarget = resolve(dirname(path), await readlink(path));
+    if (existingTarget === target) {
+      return;
+    }
+    if (!isPathInside(existingTarget, allowedRoot)) {
+      throw new Error(`Skill folder is already occupied: ${path}. Remove it before installing.`);
+    }
+  }
+
+  await mkdir(dirname(path), { recursive: true });
+  const temporaryLink = join(dirname(path), `.${basename(path)}.tmp-${crypto.randomUUID()}`);
+  try {
+    await symlink(target, temporaryLink, "dir");
+    await rename(temporaryLink, path);
+  } catch (error) {
+    await rm(temporaryLink, { force: true });
+    throw error;
+  }
+}
+
+function isPathInside(path: string, root: string): boolean {
+  const pathFromRoot = relative(resolve(root), resolve(path));
+  return pathFromRoot === "" || (!pathFromRoot.startsWith("..") && !isAbsolute(pathFromRoot));
 }
 
 export async function removeVisibleRepoSkills(targetRoot: string, repo: RepoRef): Promise<boolean> {

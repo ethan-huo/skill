@@ -2,7 +2,7 @@ import { readdir, rm, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { discoverSkillGroups, discoverSkills, fingerprintSkillDirectory } from "./discover-skills";
-import { pruneEmptyParents, upsertInstalledSkills } from "./install";
+import { pruneEmptyParents, resolveInstalledSkillSource, upsertInstalledSkills } from "./install";
 import { getSourceInstallRoot, getSourceSkillsBaseDir } from "./paths";
 import { diffSkillSets } from "./update-diff";
 import type { ManifestSkill } from "./project-manifest";
@@ -59,13 +59,6 @@ export async function updateSourceRepo(options: {
   const latestIds = latestGroups.map((group) => group.relativeDir);
   const installedIds = installedSkills.map((skill) => skill.id);
   const diff = diffSkillSets(installedIds, latestIds);
-  // The public diff describes installed manifest state, while cache GC must also see
-  // orphaned materializations left by older manifests or other project scopes.
-  const sourceDirectory = await stat(sourceRoot).catch(() => null);
-  const cachedIds = sourceDirectory?.isDirectory()
-    ? (await discoverSkills(sourceRoot)).map((skill) => skill.relativeDir)
-    : [];
-  const staleCachedIds = diffSkillSets(cachedIds, latestIds).removed;
   const updated = new Set(diff.updated);
   const resolvedCandidates: SkillCandidate[] = [];
 
@@ -83,10 +76,8 @@ export async function updateSourceRepo(options: {
     await upsertInstalledSkills(cloneDir, sourceRoot, repo, resolvedCandidates);
   }
 
-  for (const skill of staleCachedIds) {
-    await rm(join(sourceRoot, skill), { force: true, recursive: true });
-  }
-
+  // Snapshot retention is intentionally separate: a visible link in another scope may
+  // still reference an old revision until that scope has completed its atomic switch.
   await pruneEmptyParents(sourceRoot, getSourceSkillsBaseDir());
   return {
     diff,
@@ -157,9 +148,8 @@ async function findCandidatesMatchingCache(
   candidates: SkillCandidate[],
   skillId: string,
 ): Promise<SkillCandidate[]> {
-  const cachedFingerprint = await fingerprintSkillDirectory(join(sourceRoot, skillId)).catch(
-    () => null,
-  );
+  const cachedSource = await resolveInstalledSkillSource(sourceRoot, skillId);
+  const cachedFingerprint = await fingerprintSkillDirectory(cachedSource).catch(() => null);
   if (cachedFingerprint === null) {
     return [];
   }

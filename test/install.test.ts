@@ -1,4 +1,14 @@
-import { lstat, mkdir, readdir, readFile, stat, symlink, writeFile } from "node:fs/promises";
+import {
+  lstat,
+  mkdir,
+  readdir,
+  readFile,
+  readlink,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -10,6 +20,7 @@ import {
   removeInstalledSkill,
   removeVisibleRepoSkills,
   replaceInstalledSkills,
+  resolveInstalledSkillSource,
   upsertInstalledSkills,
 } from "../src/lib/install";
 import { listInstalledSkills } from "../src/lib/installed-skills";
@@ -66,13 +77,12 @@ describe("install helpers", () => {
       },
     ]);
 
-    expect(await readFile(join(target, "root", "SKILL.md"), "utf8")).toContain(
+    const installedRoot = await resolveInstalledSkillSource(target, "root");
+    expect(await readFile(join(installedRoot, "SKILL.md"), "utf8")).toContain(
       "name: root-ethan-huo",
     );
-    expect(await readFile(join(target, "root", "reference.md"), "utf8")).toBe(
-      "supporting material",
-    );
-    expect(await stat(join(target, "root", ".git")).catch(() => null)).toBeNull();
+    expect(await readFile(join(installedRoot, "reference.md"), "utf8")).toBe("supporting material");
+    expect(await stat(join(installedRoot, ".git")).catch(() => null)).toBeNull();
   });
 
   test("removes installed directory trees", async () => {
@@ -114,6 +124,125 @@ describe("install helpers", () => {
     );
   });
 
+  test("keeps visible skills readable while atomically switching immutable snapshots", async () => {
+    const root = join(tmpdir(), `skill-atomic-update-${crypto.randomUUID()}`);
+    const repoDir = join(root, "repo");
+    const sourceRoot = join(root, ".agents", ".skills", "ethan-huo", "agents");
+    const targetRoot = join(root, ".agents", "skills");
+    const visibleSkill = join(targetRoot, "cx-ethan-huo");
+    const selectedSkills = [
+      {
+        relativeDir: "cx",
+        sourceDir: "skills/cx",
+        displayLabel: "cx",
+      },
+    ];
+
+    await mkdir(join(repoDir, "skills", "cx"), { recursive: true });
+    await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\nold");
+    await upsertInstalledSkills(repoDir, sourceRoot, repo, selectedSkills);
+    await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
+    const oldSnapshot = await readlink(visibleSkill);
+
+    await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\nnew");
+    const readFailures: unknown[] = [];
+    let reading = true;
+    const reader = (async () => {
+      while (reading) {
+        try {
+          await readFile(join(visibleSkill, "SKILL.md"), "utf8");
+        } catch (error) {
+          readFailures.push(error);
+        }
+      }
+    })();
+
+    await upsertInstalledSkills(repoDir, sourceRoot, repo, selectedSkills);
+    await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
+    reading = false;
+    await reader;
+
+    const newSnapshot = await readlink(visibleSkill);
+    expect(readFailures).toEqual([]);
+    expect(newSnapshot).not.toBe(oldSnapshot);
+    expect(await readFile(join(oldSnapshot, "SKILL.md"), "utf8")).toContain("old");
+    expect(await readFile(join(newSnapshot, "SKILL.md"), "utf8")).toContain("new");
+
+    const linkBeforeNoop = await lstat(visibleSkill);
+    const snapshotBeforeNoop = await stat(newSnapshot);
+    await upsertInstalledSkills(repoDir, sourceRoot, repo, selectedSkills);
+    await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
+    const linkAfterNoop = await lstat(visibleSkill);
+    const snapshotAfterNoop = await stat(newSnapshot);
+    expect(await readlink(visibleSkill)).toBe(newSnapshot);
+    expect(linkAfterNoop.ino).toBe(linkBeforeNoop.ino);
+    expect(linkAfterNoop.mtimeMs).toBe(linkBeforeNoop.mtimeMs);
+    expect(snapshotAfterNoop.ino).toBe(snapshotBeforeNoop.ino);
+    expect(snapshotAfterNoop.mtimeMs).toBe(snapshotBeforeNoop.mtimeMs);
+  });
+
+  test("keeps the existing visible snapshot when candidate materialization fails", async () => {
+    const root = join(tmpdir(), `skill-interrupted-update-${crypto.randomUUID()}`);
+    const repoDir = join(root, "repo");
+    const sourceRoot = join(root, ".agents", ".skills", "ethan-huo", "agents");
+    const targetRoot = join(root, ".agents", "skills");
+    const visibleSkill = join(targetRoot, "cx-ethan-huo");
+    const selectedSkills = [
+      {
+        relativeDir: "cx",
+        sourceDir: "skills/cx",
+        displayLabel: "cx",
+      },
+    ];
+
+    await mkdir(join(repoDir, "skills", "cx"), { recursive: true });
+    await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\nstable");
+    await upsertInstalledSkills(repoDir, sourceRoot, repo, selectedSkills);
+    await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
+    const stableSnapshot = await readlink(visibleSkill);
+
+    await rm(join(repoDir, "skills", "cx", "SKILL.md"));
+    await expect(
+      upsertInstalledSkills(repoDir, sourceRoot, repo, selectedSkills),
+    ).rejects.toThrow();
+
+    expect(await readlink(visibleSkill)).toBe(stableSnapshot);
+    expect(await readFile(join(visibleSkill, "SKILL.md"), "utf8")).toContain("stable");
+  });
+
+  test("changes revisions when a materialized resource symlink changes", async () => {
+    const root = join(tmpdir(), `skill-symlink-revision-${crypto.randomUUID()}`);
+    const repoDir = join(root, "repo");
+    const skillDir = join(repoDir, "skills", "cx");
+    const sourceRoot = join(root, ".agents", ".skills", "ethan-huo", "agents");
+    const targetRoot = join(root, ".agents", "skills");
+    const visibleSkill = join(targetRoot, "cx-ethan-huo");
+    const selectedSkills = [
+      {
+        relativeDir: "cx",
+        sourceDir: "skills/cx",
+        displayLabel: "cx",
+      },
+    ];
+
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(join(skillDir, "SKILL.md"), "---\nname: cx\n---\nstable");
+    await writeFile(join(skillDir, "v1.txt"), "one");
+    await writeFile(join(skillDir, "v2.txt"), "two");
+    await symlink("v1.txt", join(skillDir, "resource.txt"));
+    await upsertInstalledSkills(repoDir, sourceRoot, repo, selectedSkills);
+    await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
+    const firstSnapshot = await readlink(visibleSkill);
+
+    await rm(join(skillDir, "resource.txt"));
+    await symlink("v2.txt", join(skillDir, "resource.txt"));
+    await upsertInstalledSkills(repoDir, sourceRoot, repo, selectedSkills);
+    await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
+
+    expect(await readlink(visibleSkill)).not.toBe(firstSnapshot);
+    expect(await readFile(join(visibleSkill, "resource.txt"), "utf8")).toBe("two");
+  });
+
   test("repairs malformed skill frontmatter while installing source copies", async () => {
     const root = join(tmpdir(), `skill-repair-${crypto.randomUUID()}`);
     const repoDir = join(root, "repo");
@@ -144,7 +273,8 @@ describe("install helpers", () => {
 
     await upsertInstalledSkills(repoDir, sourceRoot, repo, selectedSkills);
 
-    const contents = await readFile(join(sourceRoot, "efficient-frontier", "SKILL.md"), "utf8");
+    const installedRoot = await resolveInstalledSkillSource(sourceRoot, "efficient-frontier");
+    const contents = await readFile(join(installedRoot, "SKILL.md"), "utf8");
     const frontmatter = /^---\n([\s\S]*?)\n---/.exec(contents)?.[1] ?? "";
     const parsed = Bun.YAML.parse(frontmatter) as {
       description?: string;

@@ -178,13 +178,13 @@ describe("project update cleanup", () => {
           added: ["writing-for-agents"],
         },
       ]);
-      expect(await stat(join(sourceRoot, "writing-great-skills")).catch(() => null)).toBeNull();
+      // Source cleanup is deferred because another scope may still link the old revision.
+      expect((await stat(join(sourceRoot, "writing-great-skills"))).isDirectory()).toBe(true);
       expect(await stat(join(sourceRoot, "writing-for-agents")).catch(() => null)).toBeNull();
-      expect(await readFile(join(sourceRoot, "ask-matt", "SKILL.md"), "utf8")).toContain(
-        "upstream-current",
-      );
       expect((await lstat(globalLink)).isSymbolicLink()).toBe(true);
       expect((await lstat(projectLink)).isSymbolicLink()).toBe(true);
+      expect(await readFile(join(globalLink, "SKILL.md"), "utf8")).toContain("upstream-current");
+      expect(await readFile(join(projectLink, "SKILL.md"), "utf8")).toContain("upstream-current");
       expect(JSON.parse(await readFile(join(globalRoot, "manifest.json"), "utf8"))).toEqual(
         manifest,
       );

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readdir, readlink } from "node:fs/promises";
 import { basename, dirname, join, posix, relative } from "node:path";
 
 import { validateSkillSelectorName } from "./skill-selector";
@@ -64,27 +65,39 @@ export function groupSkillCandidates(candidates: SkillCandidate[]): SkillGroup[]
 }
 
 export async function fingerprintSkillDirectory(skillDir: string): Promise<string> {
-  const files = [
-    ...(await Array.fromAsync(
-      new Bun.Glob("**/*").scan({
-        cwd: skillDir,
-        onlyFiles: true,
-        dot: true,
-        followSymlinks: false,
-      }),
-    )),
-  ].sort();
   const hash = createHash("sha256");
-  for (const file of files) {
-    if (file.split(posix.sep).includes(".git")) {
+  await hashSkillDirectoryEntries(hash, skillDir, "");
+  return hash.digest("hex");
+}
+
+async function hashSkillDirectoryEntries(
+  hash: ReturnType<typeof createHash>,
+  skillDir: string,
+  relativeDir: string,
+): Promise<void> {
+  const entries = await readdir(join(skillDir, relativeDir), { withFileTypes: true });
+  entries.sort((left, right) => left.name.localeCompare(right.name));
+
+  for (const entry of entries) {
+    if (entry.name === ".git") {
       continue;
     }
-    hash.update(file);
-    hash.update("\0");
-    hash.update(new Uint8Array(await Bun.file(join(skillDir, file)).arrayBuffer()));
+
+    const entryPath = posix.join(relativeDir, entry.name);
+    if (entry.isDirectory()) {
+      hash.update(`directory\0${entryPath}\0`);
+      await hashSkillDirectoryEntries(hash, skillDir, entryPath);
+      continue;
+    }
+    if (entry.isSymbolicLink()) {
+      hash.update(`symlink\0${entryPath}\0${await readlink(join(skillDir, entryPath))}\0`);
+      continue;
+    }
+
+    hash.update(`file\0${entryPath}\0`);
+    hash.update(new Uint8Array(await Bun.file(join(skillDir, entryPath)).arrayBuffer()));
     hash.update("\0");
   }
-  return hash.digest("hex");
 }
 
 async function collapseIdenticalCandidates(
