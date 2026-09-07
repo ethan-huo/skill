@@ -1,6 +1,6 @@
 {
   "name": "skill",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Install and remove agent skills from GitHub repositories.",
   "bin": {
     "skill": "./src/cli.ts"
@@ -18,7 +18,7 @@
     "check": "bun run fmt:check && bun run typecheck && bun test"
   },
   "dependencies": {
-    "@celados/argc": "^7.11.0",
+    "@celados/argc": "^7.11.1",
     "@clack/core": "1.4.3",
     "@clack/prompts": "1.7.0",
     "@valibot/to-json-schema": "^1.6.0",
