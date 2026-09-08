@@ -26,7 +26,6 @@ import { searchableMultiselect } from "../lib/prompt";
 import { resolveSourceTarget } from "../lib/source-ref";
 import { formatManifestSkillId } from "../lib/skill-ref";
 import { parseRepoRef } from "../lib/repo-ref";
-import { removeSourceRepo } from "../lib/source-skills";
 import type { RemoveInput } from "../types";
 
 type RemovePrompt = (options: {
@@ -85,10 +84,9 @@ async function removeRef(ref: string, global: boolean) {
         )
       ).some(Boolean) || (await removeVisibleRepoSkills(skillsBaseDir, repo));
   const removedManifest = await removeManifestRef(scope, cwd, `${repo.owner}/${repo.repo}`, skill);
-  const removedSource = global && !skill ? await removeSourceRepo(repo) : false;
   const removedFavorites = global && !skill ? await removeFavoritesForRepo(repo) : [];
 
-  if (!removed && !removedManifest && !removedSource && removedFavorites.length === 0) {
+  if (!removed && !removedManifest && removedFavorites.length === 0) {
     throw new Error(`Nothing installed at ${targetPath}`);
   }
 
@@ -105,7 +103,6 @@ async function removeRef(ref: string, global: boolean) {
   const removedTargets = [
     removed ? `${scope} skills` : null,
     removedManifest ? "project manifest" : null,
-    removedSource ? "shared source" : null,
     removedFavorites.length > 0 ? "favorites" : null,
   ].filter((target): target is string => target !== null);
   return {

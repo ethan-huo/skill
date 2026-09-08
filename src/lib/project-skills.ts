@@ -374,7 +374,6 @@ function groupManifestEntries(
 
 async function removeProjectSkill(repo: RepoRef, cwd: string, skill: string): Promise<void> {
   await removeVisibleSkillAliases(getSkillsBaseDir("local", cwd), repo, skill);
-  await rm(join(getSourceInstallRoot(repo), skill), { force: true, recursive: true });
 }
 
 async function removeProjectRepoSkillAliases(cwd: string, repo: RepoRef): Promise<void> {

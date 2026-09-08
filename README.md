@@ -179,8 +179,10 @@ Human-facing output is ANSI-highlighted when stdout is an interactive terminal. 
 - versionless and version 2 manifests migrate to version 3; new installs persist each logical skill ID with its exact upstream source path
 - repeated installs reuse shallow clone caches keyed by the remote `HEAD` hash
 - local and global installs skip selected skills whose normalized visible folder is already claimed in the other scope, install the remaining selection, and report each skip with a canonical skill ID plus a stable reason
-- normalized skill bundles are published as content-addressed immutable snapshots; unchanged installs reuse the existing revision without touching visible links or snapshot timestamps
-- installs atomically switch each visible skill symlink to its complete snapshot, so filesystem watchers observe either the old revision or the new revision rather than a missing or partially copied directory
+- each skill has one stable shared directory; updating it from any project immediately updates every project that links to it
+- unchanged normalized bundles leave source directories and visible links untouched
+- updates stage and normalize complete bundles beside the destination, atomically exchange directories on macOS/Linux, and delete the old contents; filesystems without atomic exchange fail without replacing the installed bundle
+- old snapshot directories migrate to redirects to the shared directory, preserving existing project pointers without retaining historical contents; new installs never create snapshots or `.current` pointers
 - installs record repo-scoped manifest items in the target scope's manifest
 - project-scope `skill add` and `skill install <ref>` share the same install effects; `--global` targets the global manifest and visible root
 - `skill update` updates the union of repos recorded in the global manifest and current project's manifest, then reconciles both visible roots
@@ -189,14 +191,14 @@ Human-facing output is ANSI-highlighted when stdout is an interactive terminal. 
 - project-scope `skill update` removes visible links for upstream skills that disappeared, including stale symlinks whose source target is already gone
 - interactive `skill remove` includes repo maps recorded in the target scope manifest alongside visible skill links
 - `skill remove` removes matching visible aliases and manifest entries from the target scope; empty repo skill items are pruned
-- `skill remove owner/repo --global` removes that shared source cache and all matching favorite refs, so future `skill update` runs stop tracking the repo
+- `skill remove owner/repo --global` removes global links, manifest entries, and matching favorite refs; shared source directories remain available to other projects
 
 Install roots:
 
 - local visible links: `{cwd}/.agents/skills/{skill-path}-{owner}/`
 - global visible links: `~/.agents/skills/{skill-path}-{owner}/`
 - local map skills: `{cwd}/.agents/skills/map-{repo}-{owner}/`
-- shared immutable snapshots: `~/.agents/.skills/{owner}/{repo}/.snapshots/{skill-path}/{sha256}/`
+- shared current skill directories: `~/.agents/.skills/{owner}/{repo}/{skill-path}/`
 - local manifest: `{cwd}/.agents/skills/manifest.json` stores versioned `skills` with exact source paths and `map` items, not visible link names
 - local manifest writes maintain an exact-name block in `{cwd}/.agents/skills/.gitignore`; entries outside that block, including user-created skills, are preserved
 - generated ignore rules prevent new links from entering Git but do not untrack links already present in the index; existing projects must remove those generated entries from the index once

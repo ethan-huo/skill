@@ -48,13 +48,13 @@ describe("source skills", () => {
       resolvedSkills: [{ id: "cx", source: "skills/cx" }],
     });
     expect(await readCachedSkill(sourceRoot, "cx")).toContain("new");
-    // Removed legacy materializations are retained until snapshot GC can prove no scope links them.
+    // Other projects may still own sources outside this update selection.
     expect((await stat(join(sourceRoot, "old-skill"))).isDirectory()).toBe(true);
     expect(await stat(join(sourceRoot, "new-skill")).catch(() => null)).toBeNull();
     expect((await lstat(join(visibleRoot, "cx.agents.ethan-huo"))).isSymbolicLink()).toBe(true);
   });
 
-  test("garbage-collects disappeared cache entries outside the installed manifest", async () => {
+  test("preserves cache entries outside the installed manifest", async () => {
     const root = join(tmpdir(), `skill-source-orphan-gc-${crypto.randomUUID()}`);
     const cloneDir = join(root, "clone");
     const sourceBase = join(root, ".agents", ".skills");

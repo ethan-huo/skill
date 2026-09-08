@@ -148,6 +148,29 @@ describe("remove command", () => {
     expect(await readManifest(root)).toEqual({ version: 3, items: [] });
   });
 
+  test("global repo removal preserves the source used by other projects", async () => {
+    const root = join(tmpdir(), `skill-remove-shared-${crypto.randomUUID()}`);
+    const previousHome = process.env.HOME;
+    process.env.HOME = root;
+    try {
+      const source = join(root, ".agents", ".skills", "repo", "abc", "a");
+      const visible = join(root, ".agents", "skills");
+      await mkdir(source, { recursive: true });
+      await mkdir(visible, { recursive: true });
+      await writeFile(join(source, "SKILL.md"), "shared");
+      await symlink(source, join(visible, "a-repo"));
+      await symlink(source, join(root, "other-project"));
+      await writeManifest(root, [{ type: "skills", repo: "repo/abc", skills: ["a"] }]);
+      process.chdir(root);
+      await runRemove({ input: { repo: ["repo/abc"], global: true } });
+      expect(await readFile(join(root, "other-project", "SKILL.md"), "utf8")).toBe("shared");
+      expect(await readManifest(root)).toEqual({ version: 3, items: [] });
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+    }
+  });
+
   test("removes a selected global skill from visible links and manifest", async () => {
     const root = join(tmpdir(), `skill-remove-global-manifest-${crypto.randomUUID()}`);
     const previousHome = process.env.HOME;

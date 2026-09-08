@@ -124,7 +124,7 @@ describe("install helpers", () => {
     );
   });
 
-  test("keeps visible skills readable while atomically switching immutable snapshots", async () => {
+  test("updates every project through one stable directory without interrupting reads", async () => {
     const root = join(tmpdir(), `skill-atomic-update-${crypto.randomUUID()}`);
     const repoDir = join(root, "repo");
     const sourceRoot = join(root, ".agents", ".skills", "ethan-huo", "agents");
@@ -142,6 +142,8 @@ describe("install helpers", () => {
     await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\nold");
     await upsertInstalledSkills(repoDir, sourceRoot, repo, selectedSkills);
     await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
+    const otherProject = join(root, "project-b", ".agents", "skills");
+    await linkInstalledSkills(sourceRoot, otherProject, repo, selectedSkills);
     const oldSnapshot = await readlink(visibleSkill);
 
     await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\nnew");
@@ -162,10 +164,12 @@ describe("install helpers", () => {
     reading = false;
     await reader;
 
+    expect(await readFile(join(otherProject, "cx-ethan-huo", "SKILL.md"), "utf8")).toContain("new");
+    expect(await lstat(join(sourceRoot, ".snapshots")).catch(() => null)).toBeNull();
     const newSnapshot = await readlink(visibleSkill);
     expect(readFailures).toEqual([]);
-    expect(newSnapshot).not.toBe(oldSnapshot);
-    expect(await readFile(join(oldSnapshot, "SKILL.md"), "utf8")).toContain("old");
+    expect(newSnapshot).toBe(oldSnapshot);
+    expect(await readFile(join(oldSnapshot, "SKILL.md"), "utf8")).toContain("new");
     expect(await readFile(join(newSnapshot, "SKILL.md"), "utf8")).toContain("new");
 
     const linkBeforeNoop = await lstat(visibleSkill);
@@ -210,7 +214,43 @@ describe("install helpers", () => {
     expect(await readFile(join(visibleSkill, "SKILL.md"), "utf8")).toContain("stable");
   });
 
-  test("changes revisions when a materialized resource symlink changes", async () => {
+  test("migrates old project snapshot pointers to the shared current content", async () => {
+    const root = join(tmpdir(), `skill-migration-${crypto.randomUUID()}`);
+    const sourceRoot = join(root, "source");
+    const repoDir = join(root, "repo");
+    const snapshotParent = join(sourceRoot, ".snapshots", "cx");
+    const oldSnapshot = join(snapshotParent, "a".repeat(64));
+    const currentSnapshot = join(snapshotParent, "b".repeat(64));
+    const selected = [{ relativeDir: "cx", sourceDir: "cx", displayLabel: "cx" }];
+    for (const directory of [oldSnapshot, currentSnapshot, join(repoDir, "cx")]) {
+      await mkdir(directory, { recursive: true });
+      await writeFile(join(directory, "SKILL.md"), "---\nname: cx\n---\nlatest");
+    }
+    await writeFile(join(oldSnapshot, "old-only.txt"), "obsolete");
+    await mkdir(join(sourceRoot, ".current"));
+    await symlink(currentSnapshot, join(sourceRoot, ".current", "cx"));
+    const projectB = join(root, "project-b");
+    const projectC = join(root, "project-c");
+    await symlink(oldSnapshot, projectB);
+    await symlink(currentSnapshot, projectC);
+
+    await upsertInstalledSkills(repoDir, sourceRoot, repo, selected);
+    for (const path of [oldSnapshot, currentSnapshot]) {
+      expect((await lstat(path)).isSymbolicLink()).toBe(true);
+      expect(await readlink(path)).toBe(join(sourceRoot, "cx"));
+    }
+    expect(await lstat(join(sourceRoot, ".current")).catch(() => null)).toBeNull();
+    expect(await stat(join(projectB, "old-only.txt")).catch(() => null)).toBeNull();
+    await writeFile(join(repoDir, "cx", "SKILL.md"), "---\nname: cx\n---\nnext");
+    await upsertInstalledSkills(repoDir, sourceRoot, repo, selected);
+    for (const project of [projectB, projectC]) {
+      expect(await readFile(join(project, "SKILL.md"), "utf8")).toContain("next");
+    }
+    expect((await readdir(sourceRoot)).sort()).toEqual([".snapshots", "cx"]);
+    await rm(root, { recursive: true, force: true });
+  });
+
+  test("updates resources without changing the installed path", async () => {
     const root = join(tmpdir(), `skill-symlink-revision-${crypto.randomUUID()}`);
     const repoDir = join(root, "repo");
     const skillDir = join(repoDir, "skills", "cx");
@@ -239,7 +279,7 @@ describe("install helpers", () => {
     await upsertInstalledSkills(repoDir, sourceRoot, repo, selectedSkills);
     await linkInstalledSkills(sourceRoot, targetRoot, repo, selectedSkills);
 
-    expect(await readlink(visibleSkill)).not.toBe(firstSnapshot);
+    expect(await readlink(visibleSkill)).toBe(firstSnapshot);
     expect(await readFile(join(visibleSkill, "resource.txt"), "utf8")).toBe("two");
   });
 

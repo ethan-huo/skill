@@ -7,13 +7,11 @@ import {
   readlink,
   rename,
   rm,
-  stat,
   symlink,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { discoverSkills, fingerprintSkillDirectory } from "./discover-skills";
+import { fingerprintSkillDirectory } from "./discover-skills";
 import {
   getLegacyVisibleSkillDirName,
   getSourceScopedVisibleSkillDirName,
@@ -21,6 +19,7 @@ import {
   getVisibleRepoDirPrefix,
   getVisibleSkillDirName,
 } from "./paths";
+import { exchangePaths } from "./exchange-paths";
 import { normalizeSkillFrontmatterFile } from "./skill-frontmatter-repair";
 import type { RepoRef, SkillCandidate } from "../types";
 
@@ -64,7 +63,9 @@ export async function upsertInstalledSkills(
 ): Promise<void> {
   for (const skill of selectedSkills) {
     const sourceDir = join(repoDir, skill.sourceDir);
-    const candidateDir = await mkdtemp(join(tmpdir(), "skill-materialized-"));
+    const installedDir = join(targetRoot, skill.relativeDir);
+    await mkdir(dirname(installedDir), { recursive: true });
+    const candidateDir = await mkdtemp(join(dirname(installedDir), ".install-"));
 
     try {
       await copySkillDirectory(sourceDir, candidateDir);
@@ -72,40 +73,45 @@ export async function upsertInstalledSkills(
         join(candidateDir, "SKILL.md"),
         getVisibleSkillDirName(repo, skill.relativeDir),
       );
-
-      const revision = await fingerprintSkillDirectory(candidateDir);
-      const snapshotParent = join(targetRoot, ".snapshots", skill.relativeDir);
-      const snapshotDir = join(snapshotParent, revision);
-      if (!(await stat(snapshotDir).catch(() => null))?.isDirectory()) {
-        await publishSnapshot(candidateDir, snapshotParent, snapshotDir);
+      const previous = await lstat(installedDir).catch(() => null);
+      const unchanged =
+        previous?.isDirectory() &&
+        (await fingerprintSkillDirectory(candidateDir)) ===
+          (await fingerprintSkillDirectory(installedDir));
+      if (!unchanged) {
+        if (previous) {
+          exchangePaths(candidateDir, installedDir);
+        } else {
+          await rename(candidateDir, installedDir);
+        }
       }
-
-      const currentLink = join(targetRoot, ".current", skill.relativeDir);
-      await replaceSymlinkAtomically(currentLink, snapshotDir, join(targetRoot, ".snapshots"));
+      await migrateSnapshotLinks(targetRoot, skill.relativeDir);
     } finally {
+      // After exchange this is the old bundle; no historical content is retained.
       await rm(candidateDir, { force: true, recursive: true });
     }
   }
 }
 
-async function publishSnapshot(
-  candidateDir: string,
-  snapshotParent: string,
-  snapshotDir: string,
-): Promise<void> {
-  await mkdir(snapshotParent, { recursive: true });
-  const stagingDir = await mkdtemp(join(snapshotParent, ".tmp-"));
-
-  try {
-    await cp(candidateDir, stagingDir, { recursive: true });
-    await rename(stagingDir, snapshotDir);
-  } catch (error) {
-    await rm(stagingDir, { force: true, recursive: true });
-    if ((await stat(snapshotDir).catch(() => null))?.isDirectory()) {
-      return;
+async function migrateSnapshotLinks(sourceRoot: string, skill: string): Promise<void> {
+  const installedDir = join(sourceRoot, skill);
+  const snapshotParent = join(sourceRoot, ".snapshots", skill);
+  const entries = await readdir(snapshotParent, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    if (!/^[a-f0-9]{64}$/.test(entry.name) || !entry.isDirectory()) continue;
+    const snapshot = join(snapshotParent, entry.name);
+    const redirect = join(snapshotParent, `.migrate-${crypto.randomUUID()}`);
+    // Existing projects outside this invocation still link to these exact paths.
+    // Retain only a redirect, so even those projects immediately follow updates.
+    await symlink(installedDir, redirect, "dir");
+    try {
+      exchangePaths(redirect, snapshot);
+    } finally {
+      await rm(redirect, { recursive: true, force: true });
     }
-    throw error;
   }
+  await rm(join(sourceRoot, ".current", skill), { force: true });
+  await pruneEmptyParents(dirname(join(sourceRoot, ".current", skill)), sourceRoot);
 }
 
 async function copySkillDirectory(sourceDir: string, destDir: string): Promise<void> {
@@ -125,7 +131,7 @@ export async function linkInstalledSkills(
   await mkdir(targetRoot, { recursive: true });
 
   for (const skill of selectedSkills) {
-    const sourceDir = await resolveInstalledSkillSource(sourceRoot, skill.relativeDir);
+    const sourceDir = join(sourceRoot, skill.relativeDir);
     const destDir = join(targetRoot, getVisibleSkillDirName(repo, skill.relativeDir));
     const sourceScopedDestDir = join(
       targetRoot,
@@ -145,14 +151,14 @@ export async function resolveInstalledSkillSource(
   sourceRoot: string,
   skill: string,
 ): Promise<string> {
+  const installedDir = join(sourceRoot, skill);
+  if ((await lstat(installedDir).catch(() => null))?.isDirectory()) return installedDir;
+  // Read the previous layout only to resolve variant identity before migration.
   const currentLink = join(sourceRoot, ".current", skill);
-  const current = await lstat(currentLink).catch(() => null);
-  if (current?.isSymbolicLink()) {
-    const target = await readlink(currentLink);
-    return isAbsolute(target) ? target : resolve(dirname(currentLink), target);
+  if ((await lstat(currentLink).catch(() => null))?.isSymbolicLink()) {
+    return resolve(dirname(currentLink), await readlink(currentLink));
   }
-
-  return join(sourceRoot, skill);
+  return installedDir;
 }
 
 export async function linkSkillDirectories(

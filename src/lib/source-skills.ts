@@ -76,8 +76,8 @@ export async function updateSourceRepo(options: {
     await upsertInstalledSkills(cloneDir, sourceRoot, repo, resolvedCandidates);
   }
 
-  // Snapshot retention is intentionally separate: a visible link in another scope may
-  // still reference an old revision until that scope has completed its atomic switch.
+  // Unselected sources may belong to another project; updating this scope must not
+  // uninstall them. Selected sources are shared and update in place.
   await pruneEmptyParents(sourceRoot, getSourceSkillsBaseDir());
   return {
     diff,
