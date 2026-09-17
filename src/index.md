@@ -22,7 +22,7 @@ to learn the exact input type instead of guessing it from memory.
 2. Start from favorites, not search.
    Use `skill favorite.list` to inspect the user's curated refs.
 3. Pick a small set of relevant skills from the user's favorites.
-   Prefer canonical IDs from `skill list`, such as `gh:owner/repo/path/to/skill`, when they already exist.
+   Use `skill list` to inspect installed skills and read their `file` paths before installing duplicates.
 4. Install locally by default.
    Use `--global` only when the user explicitly wants a cross-project install.
 5. Verify the result.
@@ -39,8 +39,14 @@ skill add "{ repo: 'owner/repo', skills: 'skill-a,skill-b' }"
 skill add "{ repo: 'owner/repo', skills: 'core/{skill-a,skill-b},codex/skill-c' }"
 ```
 
-`skill list` exposes skills as `gh:<owner>/<repo>/<source-path>`; that canonical form can be
-passed back to add, install, or remove.
+`skill list` returns `file`, `name`, and `description` for each installed skill.
+`file` is the absolute path to the installed `SKILL.md`. Both scopes are included by
+default; filter with `skill list --scope global`, `skill list --scope local`, or
+structured input such as `skill list "{ scope: 'global' }"`. The summary counts and
+estimates tokens for the filtered results only.
+
+Canonical GitHub IDs (`gh:<owner>/<repo>/<source-path>`) remain accepted by add,
+install, and remove.
 
 Use a repo map when the repo is a broad skill catalog and you do not need specific local bundles:
 

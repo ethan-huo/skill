@@ -43,6 +43,10 @@ export type InstallInput = {
   global: boolean;
 };
 
+export type ListInput = {
+  scope?: InstallScope;
+};
+
 export type FindInput = {
   query: string;
   limit?: number;

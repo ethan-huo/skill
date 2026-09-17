@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -53,6 +53,68 @@ describe("argc v7 CLI contract", () => {
     expect(result.stdout).toContain("skills:");
     expect(result.stdout).toContain("summary:");
     expect(result.stdout).toContain("estimatedTokens:");
+  });
+
+  test("list exposes readable absolute SKILL.md paths for local and global skills", async () => {
+    const root = join(tmpdir(), `skill-cli-list-${crypto.randomUUID()}`);
+    const project = join(root, "project");
+    const home = join(root, "home");
+    const source = join(root, "source");
+    const content = "---\nname: example\ndescription: Example skill\n---\n";
+    try {
+      await mkdir(source, { recursive: true });
+      await writeFile(join(source, "SKILL.md"), content);
+      for (const base of [project, home]) {
+        const skills = join(base, ".agents", "skills");
+        await mkdir(skills, { recursive: true });
+        await symlink(source, join(skills, "example.repo.owner"));
+      }
+      const localFile = join(
+        await realpath(project),
+        ".agents",
+        "skills",
+        "example.repo.owner",
+        "SKILL.md",
+      );
+      const globalFile = join(home, ".agents", "skills", "example.repo.owner", "SKILL.md");
+      for (const [args, files] of [
+        [["list"], [globalFile, localFile]],
+        [["list", "--scope", "local"], [localFile]],
+        [["list", "--scope", "global"], [globalFile]],
+        [["list", "{ scope: 'global' }"], [globalFile]],
+      ] as const) {
+        const result = await runSkill([...args], project, { HOME: home });
+        expect(result.exitCode).toBe(0);
+        expect(result.stderr).toBe("");
+        expect(Bun.YAML.parse(result.stdout)).toEqual({
+          skills: files.map((file) => ({ file, name: "example", description: "Example skill" })),
+          summary: { count: files.length, estimatedTokens: 6 * files.length },
+        });
+        for (const file of files) {
+          expect(await readFile(file, "utf8")).toBe(content);
+        }
+      }
+      await rm(join(project, ".agents", "skills", "example.repo.owner"));
+      const empty = await runSkill(["list", "--scope", "local"], project, { HOME: home });
+      expect(empty.exitCode).toBe(0);
+      expect(Bun.YAML.parse(empty.stdout)).toEqual({
+        skills: [],
+        summary: { count: 0, estimatedTokens: 0 },
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("list rejects unsupported scopes", async () => {
+    for (const args of [
+      ["list", "--scope", "all"],
+      ["list", "{ scope: 'all' }"],
+    ]) {
+      const result = await runSkill(args);
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain("scope");
+    }
   });
 
   test("accepts --no-color on human command syntax", async () => {

@@ -174,9 +174,9 @@ export const schema = {
 
   list: c
     .meta({
-      description: "List local and global installed skills",
+      description: "List local and global installed skills with absolute SKILL.md file paths",
     })
-    .input(s(v.object({}))),
+    .input(s(v.object({ scope: v.optional(v.picklist(["global", "local"])) }))),
 
   update: c
     .meta({

@@ -113,7 +113,7 @@ The positional and flag forms below remain the shorter human-facing surface.
 | Command                                              | Purpose                                                      |
 | ---------------------------------------------------- | ------------------------------------------------------------ |
 | `skill add owner/repo/skill`                         | Install one known skill directly                             |
-| `skill add gh:owner/repo/path/to/skill`              | Install one exact GitHub skill ID from `skill list`          |
+| `skill add gh:owner/repo/path/to/skill`              | Install one exact GitHub skill ID                            |
 | `skill add owner/repo --skills 'a,b'`                | Install multiple skills from one repo without prompts        |
 | `skill add owner/repo --skills 'core/{a,b},other/c'` | Select exact variants without expanding repeated selectors   |
 | `skill add owner/repo`                               | Interactive selection when the repo contains multiple skills |
@@ -131,7 +131,7 @@ The positional and flag forms below remain the shorter human-facing surface.
 | `skill install`                           | Rebuild project links and maps from `.agents/skills/manifest.json` |
 | `skill install --global`                  | Rebuild global links from `~/.agents/skills/manifest.json`         |
 | `skill install owner/repo/skill`          | Install a shared source and link one skill into this project       |
-| `skill install gh:owner/repo/path/skill`  | Round-trip an exact GitHub ID emitted by `skill list`              |
+| `skill install gh:owner/repo/path/skill`  | Install one exact GitHub skill ID                                  |
 | `skill install owner/repo/skill --global` | Install a shared source and link one skill globally                |
 | `skill install owner/repo --skills 'a,b'` | Link multiple selected skills into this project                    |
 | `skill install owner/repo --map`          | Generate one repo-level map skill with ctx-read routing rows       |
@@ -159,6 +159,13 @@ The positional and flag forms below remain the shorter human-facing surface.
 | `skill update` | Refresh shared source caches and reconcile global plus project links |
 | `skill update --concurrency <n>` | Run repo updates in parallel (default `8`, `1` matches old behavior) |
 | `skill update --no-progress` | Disable the live progress grid (auto-disabled on non-TTY/CI) |
+
+`skill list` returns only `file`, `name`, and `description` for each skill. `file` is
+the absolute path to its installed `SKILL.md` through the visible skill link.
+Use `skill list --scope global` or `skill list --scope local` to filter; omit
+`--scope` to include both. Structured input also accepts `skill list "{ scope: 'global' }"`.
+The summary count and estimated tokens describe only the returned skills.
+
 Human-facing output is ANSI-highlighted when stdout is an interactive terminal. YAML keys, list markers, and scalar types receive lightweight colors; Markdown and schema output keep argc's existing formatting. Piped output, `NO_COLOR=1`, `TERM=dumb`, and `--no-color` remain byte-plain for agents and scripts.
 
 ## How Installation Works
