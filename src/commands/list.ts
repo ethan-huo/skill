@@ -10,7 +10,6 @@ export async function runList(args: { input: ListInput }) {
   return {
     skills: skills.map((skill) => ({
       file: resolve(skill.installRoot, "SKILL.md"),
-      name: skill.name,
       description: skill.description,
     })),
     summary: {

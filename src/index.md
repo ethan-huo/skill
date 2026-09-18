@@ -39,7 +39,7 @@ skill add "{ repo: 'owner/repo', skills: 'skill-a,skill-b' }"
 skill add "{ repo: 'owner/repo', skills: 'core/{skill-a,skill-b},codex/skill-c' }"
 ```
 
-`skill list` returns `file`, `name`, and `description` for each installed skill.
+`skill list` returns `file` and `description` for each installed skill.
 `file` is the absolute path to the installed `SKILL.md`. Both scopes are included by
 default; filter with `skill list --scope global`, `skill list --scope local`, or
 structured input such as `skill list "{ scope: 'global' }"`. The summary counts and

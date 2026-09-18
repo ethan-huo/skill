@@ -87,7 +87,7 @@ describe("argc v7 CLI contract", () => {
         expect(result.exitCode).toBe(0);
         expect(result.stderr).toBe("");
         expect(Bun.YAML.parse(result.stdout)).toEqual({
-          skills: files.map((file) => ({ file, name: "example", description: "Example skill" })),
+          skills: files.map((file) => ({ file, description: "Example skill" })),
           summary: { count: files.length, estimatedTokens: 6 * files.length },
         });
         for (const file of files) {

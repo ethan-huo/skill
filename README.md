@@ -160,7 +160,7 @@ The positional and flag forms below remain the shorter human-facing surface.
 | `skill update --concurrency <n>` | Run repo updates in parallel (default `8`, `1` matches old behavior) |
 | `skill update --no-progress` | Disable the live progress grid (auto-disabled on non-TTY/CI) |
 
-`skill list` returns only `file`, `name`, and `description` for each skill. `file` is
+`skill list` returns only `file` and `description` for each skill. `file` is
 the absolute path to its installed `SKILL.md` through the visible skill link.
 Use `skill list --scope global` or `skill list --scope local` to filter; omit
 `--scope` to include both. Structured input also accepts `skill list "{ scope: 'global' }"`.
