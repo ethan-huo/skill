@@ -70,6 +70,14 @@ Use a map when the user wants coverage from a repo that has multiple skills and 
 
 Interactive project installs offer a repo map alongside individual skills. The two modes are mutually exclusive. Non-interactive installs must choose explicitly with `--map` or `--skills`.
 
+A map needs a description, or the resulting skill never triggers. The description comes from the GitHub repo description; when that is empty, pass your own:
+
+```bash
+skill install "{ repo: ['better-auth/skills'], map: true, description: 'When setting up Better Auth: server config, plugins, sessions, 2FA' }"
+```
+
+The description is pinned in `.agents/skills/manifest.json` at install time, so `skill update` keeps it instead of re-reading GitHub. Change it by re-installing with a new `description`.
+
 Project-scope `skill update` regenerates maps recorded in `.agents/skills/manifest.json`.
 
 ## When To Use `find`
@@ -106,3 +114,4 @@ Use maintenance commands when the user asks for maintenance. Do not churn instal
 - If `favorite add` or `favorite refresh` fails because `gh` is not authenticated, tell the user to run `gh auth login` and retry.
 - If non-interactive install hits multiple logical skills or variants, rerun with `--skills 'skill,variant/{skill,...}'` or use `--map` when a repo-level index is the right outcome.
 - If local install conflicts with an existing global install of the same repo, ask whether the global install should remain the source of truth.
+- If a map install fails with "has no description", write one yourself from the repo's skills and rerun with `description: '<when to use these skills>'`.

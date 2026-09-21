@@ -15,6 +15,7 @@ export async function runAdd(args: { input: AddInput }) {
     repo,
     selectors,
     sourcePath: target.sourcePath,
+    description: input.description,
   });
 
   if (result.kind === "map") {

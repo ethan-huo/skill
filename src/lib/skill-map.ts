@@ -2,7 +2,6 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { discoverSkills } from "./discover-skills";
-import { fetchRepoDescription } from "./github";
 import { getLegacyVisibleMapRoot, getVisibleMapRoot, getVisibleMapDirName } from "./paths";
 import { readSkillFrontmatterMetadata } from "./skill-frontmatter";
 import type { RepoRef, SkillCandidate } from "../types";
@@ -13,19 +12,7 @@ export async function writeProjectSkillMap(options: {
   cloneDir: string;
   cwd: string;
   repo: RepoRef;
-}): Promise<{ installRoot: string; mappedSkills: SkillCandidate[] }> {
-  const repoDescription = await fetchRepoDescription(options.repo).catch(() => "");
-  return writeProjectSkillMapFromClone({
-    ...options,
-    repoDescription,
-  });
-}
-
-export async function writeProjectSkillMapFromClone(options: {
-  cloneDir: string;
-  cwd: string;
-  repo: RepoRef;
-  repoDescription: string;
+  description: string;
 }): Promise<{ installRoot: string; mappedSkills: SkillCandidate[] }> {
   const cloneDir = options.cloneDir;
   const repo = options.repo;
@@ -39,7 +26,7 @@ export async function writeProjectSkillMapFromClone(options: {
   const contents = await renderSkillMap({
     cloneDir,
     repo,
-    repoDescription: options.repoDescription,
+    description: options.description,
     skills: mappedSkills,
   });
 
@@ -52,13 +39,13 @@ export async function writeProjectSkillMapFromClone(options: {
 export async function renderSkillMap(options: {
   cloneDir: string;
   repo: RepoRef;
-  repoDescription: string;
+  description: string;
   skills: SkillCandidate[];
 }): Promise<string> {
   const lines = [
     "---",
     `name: ${JSON.stringify(getVisibleMapDirName(options.repo))}`,
-    `description: ${JSON.stringify(options.repoDescription)}`,
+    `description: ${JSON.stringify(options.description)}`,
     "---",
     "",
     `Source: \`github://${options.repo.owner}/${options.repo.repo}\``,

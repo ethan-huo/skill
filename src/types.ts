@@ -34,6 +34,7 @@ export type AddInput = {
   repo: string;
   global: boolean;
   skills: string;
+  description: string;
 };
 
 export type InstallInput = {
@@ -41,6 +42,7 @@ export type InstallInput = {
   skills: string;
   map: boolean;
   global: boolean;
+  description: string;
 };
 
 export type ListInput = {

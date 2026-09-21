@@ -43,6 +43,7 @@ export type ProjectManifestSkillsItem = {
 export type ProjectManifestMapItem = {
   type: "map";
   repo: string;
+  description?: string;
 };
 
 export type ProjectManifestItem = ProjectManifestSkillsItem | ProjectManifestMapItem;
@@ -224,14 +225,19 @@ export async function addScopeManifestMap(
   scope: InstallScope,
   cwd: string,
   repoId: string,
+  description: string,
 ): Promise<void> {
   const manifest = await readScopeManifest(scope, cwd);
-  await writeScopeManifest(scope, cwd, addMapToManifest(manifest, repoId));
+  await writeScopeManifest(scope, cwd, addMapToManifest(manifest, repoId, description));
 }
 
-export async function addProjectManifestMap(cwd: string, repoId: string): Promise<void> {
+export async function addProjectManifestMap(
+  cwd: string,
+  repoId: string,
+  description: string,
+): Promise<void> {
   const manifest = await readProjectManifest(cwd);
-  await writeProjectManifest(cwd, addMapToManifest(manifest, repoId));
+  await writeProjectManifest(cwd, addMapToManifest(manifest, repoId, description));
 }
 
 export function getProjectManifestSkillIds(manifest: ProjectManifest): string[] {
@@ -261,6 +267,12 @@ export function getProjectManifestSkills(
         left.id.localeCompare(right.id) ||
         (left.source ?? "").localeCompare(right.source ?? ""),
     );
+}
+
+export function getProjectManifestMaps(manifest: ProjectManifest): ProjectManifestMapItem[] {
+  return manifest.items
+    .filter((item): item is ProjectManifestMapItem => item.type === "map")
+    .sort((left, right) => left.repo.localeCompare(right.repo));
 }
 
 export function getProjectManifestMapRepos(manifest: ProjectManifest): string[] {
@@ -357,12 +369,16 @@ function addSkillsToManifest(
   return normalizeProjectManifest({ version: 3, items: nextItems });
 }
 
-function addMapToManifest(manifest: ProjectManifest, repoId: string): ProjectManifest {
+function addMapToManifest(
+  manifest: ProjectManifest,
+  repoId: string,
+  description: string,
+): ProjectManifest {
   const nextItems = manifest.items.filter((item) => item.repo !== repoId);
 
   return normalizeProjectManifest({
     version: 3,
-    items: [...nextItems, { type: "map", repo: repoId }],
+    items: [...nextItems, { type: "map", repo: repoId, description }],
   });
 }
 
@@ -403,11 +419,11 @@ function migrateProjectManifestV2(manifest: ProjectManifestV2): ProjectManifest 
 
 function normalizeProjectManifest(manifest: ProjectManifest): ProjectManifest {
   const skillsByRepo = new Map<string, Map<string, ManifestSkill>>();
-  const maps = new Set<string>();
+  const maps = new Map<string, string | undefined>();
 
   for (const item of manifest.items) {
     if (item.type === "map") {
-      maps.add(item.repo);
+      maps.set(item.repo, item.description ?? maps.get(item.repo));
       skillsByRepo.delete(item.repo);
       continue;
     }
@@ -436,8 +452,10 @@ function normalizeProjectManifest(manifest: ProjectManifest): ProjectManifest {
     }
   }
 
-  for (const repo of [...maps].sort()) {
-    items.push({ type: "map", repo });
+  for (const [repo, description] of [...maps.entries()].sort((left, right) =>
+    left[0].localeCompare(right[0]),
+  )) {
+    items.push(description ? { type: "map", repo, description } : { type: "map", repo });
   }
 
   assertUniqueVisibleSkillNames(items);

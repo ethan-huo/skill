@@ -11,10 +11,10 @@ export async function fetchRepoDescription(repo: RepoRef): Promise<string> {
     "api",
     `repos/${repo.owner}/${repo.repo}`,
   ])) as GitHubRepoResponse;
-  return sanitizeDescription(typeof payload.description === "string" ? payload.description : "");
+  return normalizeDescription(typeof payload.description === "string" ? payload.description : "");
 }
 
-function sanitizeDescription(value: string): string {
+export function normalizeDescription(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 

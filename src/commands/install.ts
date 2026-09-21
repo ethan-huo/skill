@@ -19,6 +19,10 @@ export async function runInstall(args: { input: InstallInput }) {
     throw new Error("Install --global does not support --map.");
   }
 
+  if (input.description && !input.map) {
+    throw new Error("Install --description only applies to --map.");
+  }
+
   if (input.repo.length === 0) {
     return restoreLinks(input.global);
   }
@@ -38,6 +42,7 @@ export async function runInstall(args: { input: InstallInput }) {
     const { installRoot, mappedSkills } = await installProjectRepoMap({
       cwd: process.cwd(),
       repo: target.repo,
+      description: input.description,
     });
     return {
       kind: "map" as const,

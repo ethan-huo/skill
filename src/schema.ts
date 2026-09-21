@@ -35,6 +35,15 @@ export const schema = {
             ),
             "",
           ),
+          description: v.optional(
+            v.pipe(
+              v.string(),
+              v.description(
+                "Repo map description; required when the repo has no GitHub description.",
+              ),
+            ),
+            "",
+          ),
         }),
       ),
     ),
@@ -126,6 +135,7 @@ export const schema = {
         `skill install "{ repo: ['gh:ethan-huo/agents/skills/cx'], global: true }"`,
         `skill install "{ repo: ['ethan-huo/agents'], skills: 'cx,fp-thinking' }"`,
         `skill install "{ repo: ['Owl-Listener/designer-skills'], map: true }"`,
+        `skill install "{ repo: ['better-auth/skills'], map: true, description: 'Better Auth setup' }"`,
       ],
     })
     .input(
@@ -153,6 +163,15 @@ export const schema = {
           ),
           map: v.optional(v.boolean(), false),
           global: v.optional(v.boolean(), false),
+          description: v.optional(
+            v.pipe(
+              v.string(),
+              v.description(
+                "Repo map description; required when the repo has no GitHub description.",
+              ),
+            ),
+            "",
+          ),
         }),
       ),
     ),

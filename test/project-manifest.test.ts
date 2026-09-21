@@ -61,8 +61,8 @@ describe("project manifest", () => {
       { id: "cx", source: "skills/cx" },
       { id: "cx", source: "skills/cx" },
     ]);
-    await addProjectManifestMap(root, "Owl-Listener/designer-skills");
-    await addProjectManifestMap(root, "Owl-Listener/designer-skills");
+    await addProjectManifestMap(root, "Owl-Listener/designer-skills", "Design skills");
+    await addProjectManifestMap(root, "Owl-Listener/designer-skills", "Design skills");
 
     expect(await readProjectManifest(root)).toEqual({
       version: 3,
@@ -75,7 +75,7 @@ describe("project manifest", () => {
             { id: "fp-thinking", source: "skills/fp-thinking" },
           ],
         },
-        { type: "map", repo: "Owl-Listener/designer-skills" },
+        { type: "map", repo: "Owl-Listener/designer-skills", description: "Design skills" },
       ],
     });
     const raw = await readFile(join(root, ".agents", "skills", "manifest.json"), "utf8");
@@ -223,11 +223,11 @@ describe("project manifest", () => {
       { id: "color-system", source: "skills/color-system" },
       { id: "design-brief", source: "skills/design-brief" },
     ]);
-    await addProjectManifestMap(root, "Owl-Listener/designer-skills");
+    await addProjectManifestMap(root, "Owl-Listener/designer-skills", "Design skills");
 
     expect(await readProjectManifest(root)).toEqual({
       version: 3,
-      items: [{ type: "map", repo: "Owl-Listener/designer-skills" }],
+      items: [{ type: "map", repo: "Owl-Listener/designer-skills", description: "Design skills" }],
     });
 
     await addProjectManifestSkills(root, "Owl-Listener/designer-skills", [

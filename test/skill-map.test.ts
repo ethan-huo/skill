@@ -34,7 +34,7 @@ describe("skill map", () => {
       cloneDir,
       cwd,
       repo,
-      repoDescription: "Design skill collection",
+      description: "Design skill collection",
     });
 
     const mapContents = await readFile(join(mapRoot, "SKILL.md"), "utf8");
@@ -72,7 +72,7 @@ describe("skill map", () => {
       await renderSkillMap({
         cloneDir: root,
         repo,
-        repoDescription: "Design skill collection",
+        description: "Design skill collection",
         skills,
       }),
     ).toBe(
@@ -103,7 +103,7 @@ describe("skill map", () => {
       await renderSkillMap({
         cloneDir: root,
         repo,
-        repoDescription: "Root skill repository",
+        description: "Root skill repository",
         skills: [
           {
             relativeDir: "root",
