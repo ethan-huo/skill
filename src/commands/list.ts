@@ -1,11 +1,13 @@
 import { resolve } from "node:path";
 
-import { listInstalledSkills } from "../lib/installed-skills";
+import { listInstalledMaps, listInstalledSkills } from "../lib/installed-skills";
 import { estimateSkillListTokens } from "../lib/skill-token-estimate";
 import type { ListInput } from "../types";
 
 export async function runList(args: { input: ListInput }) {
-  const installed = await listInstalledSkills(process.cwd());
+  const installed = (
+    await Promise.all([listInstalledSkills(process.cwd()), listInstalledMaps(process.cwd())])
+  ).flat();
   const skills = installed.filter((skill) => !args.input.scope || skill.scope === args.input.scope);
   return {
     skills: skills.map((skill) => ({

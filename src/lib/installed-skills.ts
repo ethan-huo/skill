@@ -1,8 +1,12 @@
 import { readdir, readlink, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { getSkillsBaseDir, getVisibleSkillDirName } from "./paths";
-import { getProjectManifestSkills, readScopeManifest } from "./project-manifest";
+import { getSkillsBaseDir, getVisibleMapRoot, getVisibleSkillDirName } from "./paths";
+import {
+  getProjectManifestMaps,
+  getProjectManifestSkills,
+  readScopeManifest,
+} from "./project-manifest";
 import { readSkillFrontmatterMetadata } from "./skill-frontmatter";
 import { formatManifestSkillId } from "./skill-ref";
 import { parseRepoRef } from "./repo-ref";
@@ -19,6 +23,35 @@ export async function listInstalledSkills(cwd: string): Promise<InstalledSkill[]
     .sort(
       (left, right) => left.id.localeCompare(right.id) || left.scope.localeCompare(right.scope),
     );
+}
+
+// Keep routers out of the individual-skill inventory used by install and remove.
+export async function listInstalledMaps(
+  cwd: string,
+): Promise<Pick<InstalledSkill, "name" | "description" | "scope" | "installRoot">[]> {
+  const maps: Pick<InstalledSkill, "name" | "description" | "scope" | "installRoot">[] = [];
+  for (const scope of ["local", "global"] as const) {
+    const manifest = await readScopeManifest(scope, cwd);
+    for (const item of getProjectManifestMaps(manifest)) {
+      const installRoot = getVisibleMapRoot(scope, cwd, parseRepoRef(item.repo));
+      const file = join(installRoot, "SKILL.md");
+      if (!(await stat(file).catch(() => null))?.isFile()) {
+        continue;
+      }
+      // Match ordinary skills: damaged metadata does not hide an existing entry.
+      const metadata = await readSkillFrontmatterMetadata(file).catch(() => ({
+        name: "",
+        description: "",
+      }));
+      maps.push({
+        ...metadata,
+        description: item.description ?? metadata.description,
+        scope,
+        installRoot,
+      });
+    }
+  }
+  return maps;
 }
 
 async function listSkillsForScope(

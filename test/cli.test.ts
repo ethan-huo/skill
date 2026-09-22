@@ -106,6 +106,93 @@ describe("argc v7 CLI contract", () => {
     }
   });
 
+  test("list counts managed maps once, preserves stored intent, and tolerates damaged metadata", async () => {
+    const root = join(tmpdir(), `skill-cli-maps-${crypto.randomUUID()}`);
+    const project = join(root, "project");
+    const home = join(root, "home");
+    const base = join(project, ".agents", "skills");
+    const map = join(base, "map-repo-owner");
+    try {
+      await mkdir(map, { recursive: true });
+      await mkdir(home, { recursive: true });
+      await writeFile(
+        join(base, "manifest.json"),
+        JSON.stringify({
+          version: 3,
+          items: [{ type: "map", repo: "owner/repo", description: "Stored intent" }],
+        }),
+      );
+      const file = join(await realpath(map), "SKILL.md");
+      const list = async (scope = "local") => {
+        const result = await runSkill(["list", "--scope", scope], project, { HOME: home });
+        expect(result.exitCode).toBe(0);
+        expect(result.stderr).toBe("");
+        return Bun.YAML.parse(result.stdout) as {
+          skills: { file: string; description: string }[];
+          summary: { count: number; estimatedTokens: number };
+        };
+      };
+      await writeFile(file, "---\nname: router\ndescription: Changed intent\n---\n");
+      expect(await list()).toEqual({
+        skills: [{ file, description: "Stored intent" }],
+        summary: { count: 1, estimatedTokens: 6 },
+      });
+      expect(await list("global")).toEqual({
+        skills: [],
+        summary: { count: 0, estimatedTokens: 0 },
+      });
+      const inline = join(base, "map-inline-owner");
+      await mkdir(inline);
+      await writeFile(join(inline, "SKILL.md"), "---\nname: inline\n---\n");
+      const source = join(root, ".skills", "other", "repo", "example");
+      await mkdir(source, { recursive: true });
+      await writeFile(
+        join(source, "SKILL.md"),
+        "---\nname: example\ndescription: Example skill\n---\n",
+      );
+      await symlink(source, join(base, "example.repo.other"));
+      expect((await list()).summary).toEqual({ count: 2, estimatedTokens: 12 });
+      await writeFile(file, "---\nname: [broken\n---\n");
+      expect((await list()).skills).toContainEqual({ file, description: "Stored intent" });
+      await rm(file);
+      expect((await list()).summary).toEqual({ count: 1, estimatedTokens: 6 });
+      await mkdir(file);
+      expect((await list()).summary.count).toBe(1);
+      await rm(file, { recursive: true });
+      await writeFile(file, "---\nname: router\ndescription: Restored intent\n---\n");
+      expect((await list()).summary.count).toBe(2);
+      const removed = await runSkill(["remove", "owner/repo"], project, { HOME: home });
+      expect(removed.exitCode).toBe(0);
+      expect((await list()).summary.count).toBe(1);
+      const globalBase = join(home, ".agents", "skills");
+      const globalMap = join(globalBase, "map-repo-owner");
+      await mkdir(globalMap, { recursive: true });
+      await writeFile(
+        join(globalBase, "manifest.json"),
+        JSON.stringify({
+          version: 3,
+          items: [{ type: "map", repo: "owner/repo" }],
+        }),
+      );
+      await writeFile(
+        join(globalMap, "SKILL.md"),
+        "---\nname: router\ndescription: Legacy intent\n---\n",
+      );
+      expect(await list("global")).toEqual({
+        skills: [{ file: join(globalMap, "SKILL.md"), description: "Legacy intent" }],
+        summary: { count: 1, estimatedTokens: 6 },
+      });
+      expect((await list()).summary.count).toBe(1);
+      const combined = await runSkill(["list"], project, { HOME: home });
+      expect(combined.exitCode).toBe(0);
+      expect(Bun.YAML.parse(combined.stdout)).toMatchObject({
+        summary: { count: 2, estimatedTokens: 12 },
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test("list rejects unsupported scopes", async () => {
     for (const args of [
       ["list", "--scope", "all"],

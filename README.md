@@ -164,6 +164,10 @@ The positional and flag forms below remain the shorter human-facing surface.
 the absolute path to its installed `SKILL.md` through the visible skill link.
 Use `skill list --scope global` or `skill list --scope local` to filter; omit
 `--scope` to include both. Structured input also accepts `skill list "{ scope: 'global' }"`.
+Managed repo maps count as one entry each, using the description pinned in the manifest
+(or frontmatter for older manifests without a description). Unmanaged inline directories
+are excluded. Missing or non-file `SKILL.md` paths are skipped; malformed frontmatter
+keeps the entry with empty metadata, except for the stored map description.
 The summary count and estimated tokens describe only the returned skills.
 
 Human-facing output is ANSI-highlighted when stdout is an interactive terminal. YAML keys, list markers, and scalar types receive lightweight colors; Markdown and schema output keep argc's existing formatting. Piped output, `NO_COLOR=1`, `TERM=dumb`, and `--no-color` remain byte-plain for agents and scripts.

@@ -2,7 +2,7 @@
 type: Issue
 title: skill list 漏列已安装的 repo map
 description: 已成功安装并恢复的 map 未出现在 list 中，导致技能数量与 token 估算低于实际可见入口。
-status: open
+status: closed
 tags: [bug, list, map]
 ---
 
@@ -46,3 +46,11 @@ skill list "{scope:'local'}"
 - 覆盖 map 文件缺失或损坏的行为，明确采用的列表契约。
 
 本 issue 只要求修复 CLI 受管 map 的枚举；是否枚举项目自有 inline 技能是另一项契约，不应借此把普通目录误认成外部安装或改变其管理归属。本会话仅记录问题，修复留待独立会话。
+
+## 修复结果
+
+在 v0.8.1 修复：`list` 独立读取 manifest 中的受管 map，与普通技能合并输出，避免把 router 混入安装和删除操作的独立技能清单。每个 map 只计一项，优先使用 manifest 固定的 description；旧 manifest 没有 description 时读取 frontmatter。
+
+`SKILL.md` 缺失或不是文件时跳过；frontmatter 损坏时保留入口，无法读取的元数据为空，manifest description 仍保留。不枚举未登记的 inline 目录。
+
+回归覆盖 map 单装、混装、scope 过滤、token 估算、损坏和缺失文件及移除。
