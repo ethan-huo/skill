@@ -10,10 +10,9 @@ import {
 } from "./add-skills";
 import { shallowCloneRepo } from "./git";
 import { linkInstalledSkills, removeVisibleRepoSkills, removeVisibleSkillAliases } from "./install";
-import { listInstalledSkills } from "./installed-skills";
-import { getSkillsBaseDir, getSourceInstallRoot } from "./paths";
+import { seedGlobalManifestFromVisibleLinks } from "./installed-skills";
+import { getSkillsBaseDir, getSourceInstallRoot, hasProjectScope } from "./paths";
 import {
-  addScopeManifestSkills,
   addScopeManifestMap,
   getProjectManifestMapRepos,
   getProjectManifestMaps,
@@ -29,7 +28,7 @@ import { formatManifestSkillId } from "./skill-ref";
 import { updateSourceRepo } from "./source-skills";
 import { resolveMapDescription } from "./map-description";
 import { writeProjectSkillMap } from "./skill-map";
-import type { InstalledSkill, RepoRef, SkillCandidate, SkillSelector } from "../types";
+import type { RepoRef, SkillCandidate, SkillSelector } from "../types";
 
 export async function installProjectRepoSkills(options: {
   cwd: string;
@@ -235,26 +234,6 @@ export async function restoreGlobalSkills(cwd: string): Promise<{
   return { restored: restored.sort(), missing: missing.sort() };
 }
 
-export async function seedGlobalManifestFromVisibleLinks(cwd: string): Promise<boolean> {
-  if (hasScopeManifest("global", cwd)) {
-    return false;
-  }
-
-  const installedSkills = (await listInstalledSkills(cwd)).filter(
-    (skill) => skill.scope === "global",
-  );
-
-  if (installedSkills.length === 0) {
-    return false;
-  }
-
-  const grouped = groupManifestSkills(installedSkills);
-  for (const group of grouped.values()) {
-    await addScopeManifestSkills("global", cwd, `${group.owner}/${group.repo}`, group.skills);
-  }
-  return true;
-}
-
 export async function syncProjectMaps(cwd: string): Promise<
   {
     repoId: string;
@@ -369,26 +348,10 @@ export function hasProjectManifest(cwd: string): boolean {
 }
 
 export function hasScopeManifest(scope: "local" | "global", cwd: string): boolean {
-  return existsSync(join(getSkillsBaseDir(scope, cwd), "manifest.json"));
-}
-
-function groupManifestSkills(
-  installedSkills: InstalledSkill[],
-): Map<string, { owner: string; repo: string; skills: ManifestSkill[] }> {
-  const groups = new Map<string, { owner: string; repo: string; skills: ManifestSkill[] }>();
-
-  for (const skill of installedSkills) {
-    const key = `${skill.owner}/${skill.repo}`;
-    const current: { owner: string; repo: string; skills: ManifestSkill[] } = groups.get(key) ?? {
-      owner: skill.owner,
-      repo: skill.repo,
-      skills: [],
-    };
-    current.skills.push({ id: skill.relativeDir });
-    groups.set(key, current);
+  if (scope === "local" && !hasProjectScope(cwd)) {
+    return false;
   }
-
-  return groups;
+  return existsSync(join(getSkillsBaseDir(scope, cwd), "manifest.json"));
 }
 
 function groupManifestEntries(

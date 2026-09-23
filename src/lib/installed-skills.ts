@@ -1,8 +1,16 @@
+import { existsSync } from "node:fs";
 import { readdir, readlink, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { getSkillsBaseDir, getVisibleMapRoot, getVisibleSkillDirName } from "./paths";
 import {
+  getManifestPath,
+  getSkillsBaseDir,
+  getVisibleMapRoot,
+  getVisibleSkillDirName,
+  hasProjectScope,
+} from "./paths";
+import {
+  addScopeManifestSkills,
   getProjectManifestMaps,
   getProjectManifestSkills,
   readScopeManifest,
@@ -10,13 +18,14 @@ import {
 import { readSkillFrontmatterMetadata } from "./skill-frontmatter";
 import { formatManifestSkillId } from "./skill-ref";
 import { parseRepoRef } from "./repo-ref";
+import type { ManifestSkill } from "./project-manifest";
 import type { InstallScope, InstalledSkill } from "../types";
 
 export async function listInstalledSkills(cwd: string): Promise<InstalledSkill[]> {
   const skills = await Promise.all(
-    (["local", "global"] as const).map((scope) =>
-      listSkillsForScope(scope, getSkillsBaseDir(scope, cwd), cwd),
-    ),
+    (["local", "global"] as const)
+      .filter((scope) => scope === "global" || hasProjectScope(cwd))
+      .map((scope) => listSkillsForScope(scope, getSkillsBaseDir(scope, cwd), cwd)),
   );
   return skills
     .flat()
@@ -172,4 +181,46 @@ function parseLegacyVisibleSkillDirName(
     repo: name.slice(firstDot + 1, lastDot),
     skill: name.slice(lastDot + 1),
   };
+}
+
+// Global links can predate the manifest. Record them before the first manifest
+// write; once a manifest exists this never runs again, and unrecorded links
+// would stay visible but outside update and remove.
+export async function seedGlobalManifestFromVisibleLinks(cwd: string): Promise<boolean> {
+  if (existsSync(getManifestPath("global", cwd))) {
+    return false;
+  }
+
+  const installedSkills = (await listInstalledSkills(cwd)).filter(
+    (skill) => skill.scope === "global",
+  );
+
+  if (installedSkills.length === 0) {
+    return false;
+  }
+
+  const grouped = groupManifestSkills(installedSkills);
+  for (const group of grouped.values()) {
+    await addScopeManifestSkills("global", cwd, `${group.owner}/${group.repo}`, group.skills);
+  }
+  return true;
+}
+
+function groupManifestSkills(
+  installedSkills: InstalledSkill[],
+): Map<string, { owner: string; repo: string; skills: ManifestSkill[] }> {
+  const groups = new Map<string, { owner: string; repo: string; skills: ManifestSkill[] }>();
+
+  for (const skill of installedSkills) {
+    const key = `${skill.owner}/${skill.repo}`;
+    const current: { owner: string; repo: string; skills: ManifestSkill[] } = groups.get(key) ?? {
+      owner: skill.owner,
+      repo: skill.repo,
+      skills: [],
+    };
+    current.skills.push({ id: skill.relativeDir });
+    groups.set(key, current);
+  }
+
+  return groups;
 }

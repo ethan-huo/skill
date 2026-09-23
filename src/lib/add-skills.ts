@@ -8,7 +8,7 @@ import {
   removeVisibleSkillAliases,
   upsertInstalledSkills,
 } from "./install";
-import { listInstalledSkills } from "./installed-skills";
+import { listInstalledSkills, seedGlobalManifestFromVisibleLinks } from "./installed-skills";
 import {
   getLegacyVisibleMapRoot,
   getSkillsBaseDir,
@@ -191,6 +191,7 @@ export async function installGlobalSkills(options: {
   selectedSkills: SkillCandidate[];
 }): Promise<SkillsInstallEffectResult> {
   const installRoot = getSkillsBaseDir("global", options.cwd);
+  await seedGlobalManifestFromVisibleLinks(options.cwd);
   const { installedSkills, skipped } = partitionCrossScopeSkills(
     await listInstalledSkills(options.cwd),
     "global",

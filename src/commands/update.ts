@@ -17,10 +17,10 @@ import {
   hasScopeManifest,
   pruneProjectManifestSkills,
   removeProjectSkillLinks,
-  seedGlobalManifestFromVisibleLinks,
   syncProjectMapRepo,
   syncProjectSkillLinks,
 } from "../lib/project-skills";
+import { seedGlobalManifestFromVisibleLinks } from "../lib/installed-skills";
 import { parseRepoRef } from "../lib/repo-ref";
 import { updateSourceRepo } from "../lib/source-skills";
 import { diffSkillSets } from "../lib/update-diff";

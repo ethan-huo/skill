@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import type { InstallScope, RepoRef } from "../types";
 
@@ -12,7 +12,19 @@ export function getSkillsBaseDir(scope: InstallScope, cwd: string): string {
     return join(getHomeDir(), ".agents", "skills");
   }
 
+  if (!hasProjectScope(cwd)) {
+    throw new Error(
+      `${cwd} has no project skill scope: its .agents/skills is the global root. Pass global: true, or run from a project directory.`,
+    );
+  }
   return join(cwd, ".agents", "skills");
+}
+
+// At $HOME the project root and the global root are one directory with one
+// manifest, so every project read or write would silently act on global state.
+// Reads treat the project scope as empty there; writes fail through getSkillsBaseDir.
+export function hasProjectScope(cwd: string): boolean {
+  return resolve(cwd) !== resolve(getHomeDir());
 }
 
 export function getManifestPath(scope: InstallScope, cwd: string): string {

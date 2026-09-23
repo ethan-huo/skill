@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 
 import {
   getManifestPath,
+  hasProjectScope,
   getProjectManifestPath,
   getVisibleMapDirName,
   getVisibleSkillDirName,
@@ -57,6 +58,9 @@ export async function readScopeManifest(
   scope: InstallScope,
   cwd: string,
 ): Promise<ProjectManifest> {
+  if (scope === "local" && !hasProjectScope(cwd)) {
+    return { version: 3, items: [] };
+  }
   return readManifestFile(getManifestPath(scope, cwd), scope);
 }
 

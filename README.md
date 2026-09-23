@@ -54,6 +54,9 @@ skill list
 Agents should prefer this path over broad search when the user's favorites already contain good candidates.
 Project and global installs keep source-scoped items in the scope's `manifest.json` and expose
 one-level links from the shared `~/.agents/.skills` cache.
+`$HOME` has no project scope, because its `.agents/skills` is the global root: project commands
+run there fail and ask for `--global`. Global links that predate the global manifest are
+recorded the first time any command writes it.
 
 ### 2. Install from favorites
 

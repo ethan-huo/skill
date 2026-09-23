@@ -16,8 +16,11 @@ import {
   getSourceInstallRoot,
   getVisibleSkillRoot,
 } from "../src/lib/paths";
+import {
+  listInstalledSkills,
+  seedGlobalManifestFromVisibleLinks,
+} from "../src/lib/installed-skills";
 import { readScopeManifest } from "../src/lib/project-manifest";
-import { seedGlobalManifestFromVisibleLinks } from "../src/lib/project-skills";
 import type { InstalledSkill, RepoRef, SkillCandidate } from "../src/types";
 
 const repo = {
@@ -360,3 +363,105 @@ function makeInstalledSkills(): InstalledSkill[] {
     },
   ];
 }
+
+describe("global manifest bootstrap", () => {
+  test("global add records existing visible links before writing the manifest", async () => {
+    const root = join(tmpdir(), `skill-global-add-seed-${crypto.randomUUID()}`);
+    const previousHome = process.env.HOME;
+    process.env.HOME = root;
+    const legacyRepo = {
+      owner: `legacy-${crypto.randomUUID()}`,
+      repo: "agents",
+      cloneUrl: "https://github.com/legacy/agents.git",
+      display: "legacy/agents",
+    } satisfies RepoRef;
+    const newRepo = {
+      owner: `new-${crypto.randomUUID()}`,
+      repo: "agents",
+      cloneUrl: "https://github.com/new/agents.git",
+      display: "new/agents",
+    } satisfies RepoRef;
+    const repoDir = join(root, "repo");
+
+    try {
+      await mkdir(join(getSourceInstallRoot(legacyRepo), "cx"), { recursive: true });
+      await writeFile(
+        join(getSourceInstallRoot(legacyRepo), "cx", "SKILL.md"),
+        "---\nname: cx\n---\n",
+      );
+      await mkdir(getSkillsBaseDir("global", root), { recursive: true });
+      await symlink(
+        join(getSourceInstallRoot(legacyRepo), "cx"),
+        getVisibleSkillRoot("global", root, legacyRepo, "cx"),
+        "dir",
+      );
+      await mkdir(join(repoDir, "skills", "cx"), { recursive: true });
+      await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\n");
+
+      await installGlobalSkills({
+        cloneDir: repoDir,
+        cwd: join(root, "project"),
+        repo: newRepo,
+        selectedSkills,
+      });
+
+      const repos = (await readScopeManifest("global", root)).items.map((item) => item.repo);
+      expect(repos.sort()).toEqual(
+        [`${legacyRepo.owner}/agents`, `${newRepo.owner}/agents`].sort(),
+      );
+    } finally {
+      await rm(getSourceInstallRoot(legacyRepo), { force: true, recursive: true });
+      await rm(getSourceInstallRoot(newRepo), { force: true, recursive: true });
+      await rm(root, { force: true, recursive: true });
+      if (previousHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = previousHome;
+      }
+    }
+  });
+
+  test("home directory has no project scope", async () => {
+    const root = join(tmpdir(), `skill-home-scope-${crypto.randomUUID()}`);
+    const previousHome = process.env.HOME;
+    process.env.HOME = root;
+    const repoDir = join(root, "repo");
+    const isolatedRepo = {
+      owner: `owner-${crypto.randomUUID()}`,
+      repo: "agents",
+      cloneUrl: "https://github.com/example/agents.git",
+      display: "example/agents",
+    } satisfies RepoRef;
+
+    try {
+      await mkdir(join(repoDir, "skills", "cx"), { recursive: true });
+      await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\n");
+      await installGlobalSkills({
+        cloneDir: repoDir,
+        cwd: root,
+        repo: isolatedRepo,
+        selectedSkills,
+      });
+
+      const installed = await listInstalledSkills(root);
+      expect(installed.map((skill) => skill.scope)).toEqual(["global"]);
+      expect(await readScopeManifest("local", root)).toEqual({ version: 3, items: [] });
+      await expect(
+        installLocalProjectSkills({
+          cloneDir: repoDir,
+          cwd: root,
+          repo: isolatedRepo,
+          selectedSkills,
+        }),
+      ).rejects.toThrow("no project skill scope");
+    } finally {
+      await rm(getSourceInstallRoot(isolatedRepo), { force: true, recursive: true });
+      await rm(root, { force: true, recursive: true });
+      if (previousHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = previousHome;
+      }
+    }
+  });
+});
