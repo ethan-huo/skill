@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { renderSkillMap } from "../src/lib/skill-map";
+import { getMapDescription, renderSkillMap } from "../src/lib/skill-map";
 import { syncProjectMapFromClone } from "../src/lib/project-skills";
 import type { RepoRef, SkillCandidate } from "../src/types";
 
@@ -34,10 +34,10 @@ describe("skill map", () => {
       cloneDir,
       cwd,
       repo,
-      description: "Design skill collection",
     });
 
     const mapContents = await readFile(join(mapRoot, "SKILL.md"), "utf8");
+    expect(mapContents).toContain('description: "designer-skills skills router: taste"');
     expect(mapContents).toContain("Source: `github://Owl-Listener/designer-skills`");
     expect(mapContents).toContain("- When Improve visual taste, read `skills/taste/SKILL.md`.");
     expect(mapContents).not.toContain("stale map");
@@ -72,14 +72,13 @@ describe("skill map", () => {
       await renderSkillMap({
         cloneDir: root,
         repo,
-        description: "Design skill collection",
         skills,
       }),
     ).toBe(
       [
         "---",
         'name: "map-designer-skills-owl-listener"',
-        'description: "Design skill collection"',
+        'description: "designer-skills skills router: color-system"',
         "---",
         "",
         "Source: `github://Owl-Listener/designer-skills`",
@@ -103,7 +102,6 @@ describe("skill map", () => {
       await renderSkillMap({
         cloneDir: root,
         repo,
-        description: "Root skill repository",
         skills: [
           {
             relativeDir: "root",
@@ -113,5 +111,25 @@ describe("skill map", () => {
         ],
       }),
     ).toContain("- When Work from the repository root, read `SKILL.md`.");
+  });
+
+  test("lists every skill name in the derived description within the spec limit", () => {
+    const skill = (name: string) =>
+      ({
+        relativeDir: name,
+        sourceDir: `skills/${name}`,
+        displayLabel: name,
+      }) satisfies SkillCandidate;
+
+    expect(getMapDescription(repo, [])).toBe("designer-skills skills router");
+    expect(getMapDescription(repo, [skill("taste"), skill("color-system"), skill("taste")])).toBe(
+      "designer-skills skills router: taste, color-system",
+    );
+
+    const many = Array.from({ length: 200 }, (_, index) => skill(`skill-${index}`));
+    const description = getMapDescription(repo, many);
+    expect(description.length).toBeLessThanOrEqual(1024);
+    expect(description).toStartWith("designer-skills skills router: skill-0, skill-1, ");
+    expect(description).toMatch(/, \+\d+ more$/);
   });
 });

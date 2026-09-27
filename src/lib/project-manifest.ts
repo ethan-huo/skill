@@ -44,7 +44,6 @@ export type ProjectManifestSkillsItem = {
 export type ProjectManifestMapItem = {
   type: "map";
   repo: string;
-  description?: string;
 };
 
 export type ProjectManifestItem = ProjectManifestSkillsItem | ProjectManifestMapItem;
@@ -229,19 +228,14 @@ export async function addScopeManifestMap(
   scope: InstallScope,
   cwd: string,
   repoId: string,
-  description: string,
 ): Promise<void> {
   const manifest = await readScopeManifest(scope, cwd);
-  await writeScopeManifest(scope, cwd, addMapToManifest(manifest, repoId, description));
+  await writeScopeManifest(scope, cwd, addMapToManifest(manifest, repoId));
 }
 
-export async function addProjectManifestMap(
-  cwd: string,
-  repoId: string,
-  description: string,
-): Promise<void> {
+export async function addProjectManifestMap(cwd: string, repoId: string): Promise<void> {
   const manifest = await readProjectManifest(cwd);
-  await writeProjectManifest(cwd, addMapToManifest(manifest, repoId, description));
+  await writeProjectManifest(cwd, addMapToManifest(manifest, repoId));
 }
 
 export function getProjectManifestSkillIds(manifest: ProjectManifest): string[] {
@@ -373,16 +367,12 @@ function addSkillsToManifest(
   return normalizeProjectManifest({ version: 3, items: nextItems });
 }
 
-function addMapToManifest(
-  manifest: ProjectManifest,
-  repoId: string,
-  description: string,
-): ProjectManifest {
+function addMapToManifest(manifest: ProjectManifest, repoId: string): ProjectManifest {
   const nextItems = manifest.items.filter((item) => item.repo !== repoId);
 
   return normalizeProjectManifest({
     version: 3,
-    items: [...nextItems, { type: "map", repo: repoId, description }],
+    items: [...nextItems, { type: "map", repo: repoId }],
   });
 }
 
@@ -423,11 +413,11 @@ function migrateProjectManifestV2(manifest: ProjectManifestV2): ProjectManifest 
 
 function normalizeProjectManifest(manifest: ProjectManifest): ProjectManifest {
   const skillsByRepo = new Map<string, Map<string, ManifestSkill>>();
-  const maps = new Map<string, string | undefined>();
+  const maps = new Set<string>();
 
   for (const item of manifest.items) {
     if (item.type === "map") {
-      maps.set(item.repo, item.description ?? maps.get(item.repo));
+      maps.add(item.repo);
       skillsByRepo.delete(item.repo);
       continue;
     }
@@ -456,10 +446,9 @@ function normalizeProjectManifest(manifest: ProjectManifest): ProjectManifest {
     }
   }
 
-  for (const [repo, description] of [...maps.entries()].sort((left, right) =>
-    left[0].localeCompare(right[0]),
-  )) {
-    items.push(description ? { type: "map", repo, description } : { type: "map", repo });
+  // Rebuilding map items drops the retired pinned `description` field on the next write.
+  for (const repo of [...maps].sort((left, right) => left.localeCompare(right))) {
+    items.push({ type: "map", repo });
   }
 
   assertUniqueVisibleSkillNames(items);

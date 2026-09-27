@@ -47,7 +47,7 @@ skill install owner/repo/skill
 skill install gh:owner/repo/path/to/skill
 skill install owner/repo --skills 'skill-a,skill-b'
 skill install owner/repo --skills 'core/{skill-a,skill-b},codex/skill-c'
-skill install owner/repo --map --description 'when to use these skills'
+skill install owner/repo --map
 skill list
 ```
 
@@ -129,15 +129,15 @@ The positional and flag forms below remain the shorter human-facing surface.
 
 ### Project Links
 
-| Command                                   | Purpose                                                                                     |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `skill install`                           | Rebuild project links and maps from `.agents/skills/manifest.json`                          |
-| `skill install --global`                  | Rebuild global links from `~/.agents/skills/manifest.json`                                  |
-| `skill install owner/repo/skill`          | Install a shared source and link one skill into this project                                |
-| `skill install gh:owner/repo/path/skill`  | Install one exact GitHub skill ID                                                           |
-| `skill install owner/repo/skill --global` | Install a shared source and link one skill globally                                         |
-| `skill install owner/repo --skills 'a,b'` | Link multiple selected skills into this project                                             |
-| `skill install owner/repo --map`          | Generate one repo-level map skill with ctx-read routing rows; needs a non-empty description |
+| Command                                   | Purpose                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------ |
+| `skill install`                           | Rebuild project links and maps from `.agents/skills/manifest.json` |
+| `skill install --global`                  | Rebuild global links from `~/.agents/skills/manifest.json`         |
+| `skill install owner/repo/skill`          | Install a shared source and link one skill into this project       |
+| `skill install gh:owner/repo/path/skill`  | Install one exact GitHub skill ID                                  |
+| `skill install owner/repo/skill --global` | Install a shared source and link one skill globally                |
+| `skill install owner/repo --skills 'a,b'` | Link multiple selected skills into this project                    |
+| `skill install owner/repo --map`          | Generate one repo-level map skill with ctx-read routing rows       |
 
 ### Favorites
 
@@ -167,10 +167,9 @@ The positional and flag forms below remain the shorter human-facing surface.
 the absolute path to its installed `SKILL.md` through the visible skill link.
 Use `skill list --scope global` or `skill list --scope local` to filter; omit
 `--scope` to include both. Structured input also accepts `skill list "{ scope: 'global' }"`.
-Managed repo maps count as one entry each, using the description pinned in the manifest
-(or frontmatter for older manifests without a description). Unmanaged inline directories
-are excluded. Missing or non-file `SKILL.md` paths are skipped; malformed frontmatter
-keeps the entry with empty metadata, except for the stored map description.
+Managed repo maps count as one entry each, using their `SKILL.md` frontmatter. Unmanaged
+inline directories are excluded. Missing or non-file `SKILL.md` paths are skipped; malformed
+frontmatter keeps the entry with empty metadata.
 The summary count and estimated tokens describe only the returned skills.
 
 Human-facing output is ANSI-highlighted when stdout is an interactive terminal. YAML keys, list markers, and scalar types receive lightweight colors; Markdown and schema output keep argc's existing formatting. Piped output, `NO_COLOR=1`, `TERM=dumb`, and `--no-color` remain byte-plain for agents and scripts.
@@ -186,8 +185,7 @@ Human-facing output is ANSI-highlighted when stdout is an interactive terminal. 
 - `owner/repo/skill` is shorthand for `skill add owner/repo --skills 'skill'`
 - visible skill folders and cached `SKILL.md` names use the Agent Skills-compatible `{skill-path}-{owner}` form; the manifest retains the repo and exact source path, and conflicting sources cannot claim the same visible folder
 - `skill install owner/repo --map` writes `.agents/skills/map-{repo}-{owner}/SKILL.md` with a `ctx read github://owner/repo/<path>` rule and `When ..., read path/SKILL.md` rows
-- a map install resolves its description from `--description`, then the manifest entry, then the GitHub repo description, and fails when all three are empty; `--description` outside `--map` is an error
-- the resolved description is stored in the manifest `map` item, so `skill update` and manifest restores reuse it instead of re-reading GitHub
+- a map's description is derived as `{repo} skills router: <skill-a>, <skill-b>, ...` (truncated with `+N more` at the 1024-character spec limit); it needs no GitHub metadata or caller input, and the manifest `map` item stores only the repo (a legacy pinned `description` is dropped on the next manifest write)
 - interactive project installs show "Install as repo map" above individual skills; selecting either mode disables the other
 - interactive repo skill selection preselects already installed skills from the target scope; `--global` preselects global installs, while project installs preselect project links
 - repo maps and selected skill installs are mutually exclusive per repo; installing one mode removes the other mode from the manifest and visible aliases

@@ -22,11 +22,9 @@ import {
   addScopeManifestSkills,
   assertScopeManifestSkillsAvailable,
   getProjectManifestMapRepos,
-  getProjectManifestMaps,
   getProjectManifestSkills,
   readScopeManifest,
 } from "./project-manifest";
-import { resolveMapDescription } from "./map-description";
 import { selectSkills } from "./select-skills";
 import { writeProjectSkillMap } from "./skill-map";
 import { formatGitHubSkillId } from "./skill-ref";
@@ -68,7 +66,6 @@ export async function installRepoSkills(options: {
   initialSelectors?: string[];
   promptForSelection?: boolean;
   sourcePath?: string;
-  description?: string;
 }): Promise<RepoInstallResult> {
   const scope = getInstallScope(options.global);
   const { cloneDir, selectedSkills, selectedMode } = await selectRepoSkills({
@@ -76,29 +73,14 @@ export async function installRepoSkills(options: {
     global: options.global,
   });
   if (selectedMode === "map") {
-    const description = await resolveMapDescription({
-      repo: options.repo,
-      explicit: options.description,
-      stored: await getInstalledMapDescription(options.cwd, options.repo),
-    });
     await removeScopeRepoSkillAliases("local", options.cwd, options.repo);
     const result = await writeProjectSkillMap({
       cloneDir,
       cwd: options.cwd,
       repo: options.repo,
-      description,
     });
-    await addScopeManifestMap(
-      "local",
-      options.cwd,
-      `${options.repo.owner}/${options.repo.repo}`,
-      description,
-    );
+    await addScopeManifestMap("local", options.cwd, `${options.repo.owner}/${options.repo.repo}`);
     return { kind: "map", installRoot: result.installRoot, mappedSkills: result.mappedSkills };
-  }
-
-  if (options.description !== undefined && options.description !== "") {
-    throw new Error("A description only applies to a repo map install; drop it or select the map.");
   }
 
   if (scope === "global") {
@@ -357,15 +339,6 @@ function mergeInitialSelectors(left: string[], right: string[]): string[] {
   return [
     ...new Set([...left, ...right].map((selector) => selector.trim()).filter(Boolean)),
   ].sort();
-}
-
-export async function getInstalledMapDescription(
-  cwd: string,
-  repo: RepoRef,
-): Promise<string | undefined> {
-  const repoId = `${repo.owner}/${repo.repo}`;
-  const maps = getProjectManifestMaps(await readScopeManifest("local", cwd));
-  return maps.find((item) => item.repo === repoId)?.description;
 }
 
 async function hasInstalledRepoMap(cwd: string, repo: RepoRef): Promise<boolean> {

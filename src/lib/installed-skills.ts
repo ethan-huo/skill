@@ -54,7 +54,6 @@ export async function listInstalledMaps(
       }));
       maps.push({
         ...metadata,
-        description: item.description ?? metadata.description,
         scope,
         installRoot,
       });

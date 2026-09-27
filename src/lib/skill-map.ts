@@ -12,7 +12,6 @@ export async function writeProjectSkillMap(options: {
   cloneDir: string;
   cwd: string;
   repo: RepoRef;
-  description: string;
 }): Promise<{ installRoot: string; mappedSkills: SkillCandidate[] }> {
   const cloneDir = options.cloneDir;
   const repo = options.repo;
@@ -26,7 +25,6 @@ export async function writeProjectSkillMap(options: {
   const contents = await renderSkillMap({
     cloneDir,
     repo,
-    description: options.description,
     skills: mappedSkills,
   });
 
@@ -36,16 +34,38 @@ export async function writeProjectSkillMap(options: {
   return { installRoot, mappedSkills };
 }
 
+// Agent Skills spec limit for frontmatter descriptions.
+const DESCRIPTION_MAX_LENGTH = 1024;
+
+// Derived from repository contents only: GitHub descriptions are often missing or
+// off-target. Listing skill names lets prompts mention a specific routed skill.
+export function getMapDescription(repo: RepoRef, skills: SkillCandidate[]): string {
+  const prefix = `${repo.repo} skills router`;
+  const names = [...new Set(skills.map((skill) => skill.displayLabel))];
+  if (names.length === 0) {
+    return prefix;
+  }
+
+  for (let count = names.length; count > 0; count--) {
+    const omitted = names.length - count;
+    const suffix = omitted > 0 ? `, +${omitted} more` : "";
+    const description = `${prefix}: ${names.slice(0, count).join(", ")}${suffix}`;
+    if (description.length <= DESCRIPTION_MAX_LENGTH) {
+      return description;
+    }
+  }
+  return prefix;
+}
+
 export async function renderSkillMap(options: {
   cloneDir: string;
   repo: RepoRef;
-  description: string;
   skills: SkillCandidate[];
 }): Promise<string> {
   const lines = [
     "---",
     `name: ${JSON.stringify(getVisibleMapDirName(options.repo))}`,
-    `description: ${JSON.stringify(options.description)}`,
+    `description: ${JSON.stringify(getMapDescription(options.repo, options.skills))}`,
     "---",
     "",
     `Source: \`github://${options.repo.owner}/${options.repo.repo}\``,

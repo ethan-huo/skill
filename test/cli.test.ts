@@ -106,7 +106,7 @@ describe("argc v7 CLI contract", () => {
     }
   });
 
-  test("list counts managed maps once, preserves stored intent, and tolerates damaged metadata", async () => {
+  test("list counts managed maps once, reads map frontmatter, and tolerates damaged metadata", async () => {
     const root = join(tmpdir(), `skill-cli-maps-${crypto.randomUUID()}`);
     const project = join(root, "project");
     const home = join(root, "home");
@@ -132,9 +132,10 @@ describe("argc v7 CLI contract", () => {
           summary: { count: number; estimatedTokens: number };
         };
       };
-      await writeFile(file, "---\nname: router\ndescription: Changed intent\n---\n");
+      await writeFile(file, "---\nname: router\ndescription: Router intent\n---\n");
+      // A retired pinned description in an older manifest is ignored, not rejected.
       expect(await list()).toEqual({
-        skills: [{ file, description: "Stored intent" }],
+        skills: [{ file, description: "Router intent" }],
         summary: { count: 1, estimatedTokens: 6 },
       });
       expect(await list("global")).toEqual({
@@ -153,7 +154,7 @@ describe("argc v7 CLI contract", () => {
       await symlink(source, join(base, "example.repo.other"));
       expect((await list()).summary).toEqual({ count: 2, estimatedTokens: 12 });
       await writeFile(file, "---\nname: [broken\n---\n");
-      expect((await list()).skills).toContainEqual({ file, description: "Stored intent" });
+      expect((await list()).skills).toContainEqual({ file, description: "" });
       await rm(file);
       expect((await list()).summary).toEqual({ count: 1, estimatedTokens: 6 });
       await mkdir(file);
