@@ -70,7 +70,7 @@ Use a map when the user wants coverage from a repo that has multiple skills and 
 
 Interactive project installs offer a repo map alongside individual skills. The two modes are mutually exclusive. Non-interactive installs must choose explicitly with `--map` or `--skills`.
 
-A map's description is derived from the repo contents (`{repo} skills router: <skill-a>, <skill-b>, ...`), so map installs never need a description from you. Mention a listed skill name in a prompt to route to it.
+A map's description is derived from the repo contents (`{owner}/{repo} skills router: <skill-a>, <skill-b>, ...`, or `{owner}/{repo} router: ...` when the repo name already ends in `skills`), so map installs never need a description from you. Mention a listed skill name in a prompt to route to it.
 
 Project-scope `skill update` regenerates maps recorded in `.agents/skills/manifest.json`.
 

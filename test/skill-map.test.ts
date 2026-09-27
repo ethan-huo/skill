@@ -37,7 +37,7 @@ describe("skill map", () => {
     });
 
     const mapContents = await readFile(join(mapRoot, "SKILL.md"), "utf8");
-    expect(mapContents).toContain('description: "designer-skills skills router: taste"');
+    expect(mapContents).toContain('description: "Owl-Listener/designer-skills router: taste"');
     expect(mapContents).toContain("Source: `github://Owl-Listener/designer-skills`");
     expect(mapContents).toContain("- When Improve visual taste, read `skills/taste/SKILL.md`.");
     expect(mapContents).not.toContain("stale map");
@@ -78,7 +78,7 @@ describe("skill map", () => {
       [
         "---",
         'name: "map-designer-skills-owl-listener"',
-        'description: "designer-skills skills router: color-system"',
+        'description: "Owl-Listener/designer-skills router: color-system"',
         "---",
         "",
         "Source: `github://Owl-Listener/designer-skills`",
@@ -121,15 +121,37 @@ describe("skill map", () => {
         displayLabel: name,
       }) satisfies SkillCandidate;
 
-    expect(getMapDescription(repo, [])).toBe("designer-skills skills router");
+    expect(getMapDescription(repo, [])).toBe("Owl-Listener/designer-skills router");
     expect(getMapDescription(repo, [skill("taste"), skill("color-system"), skill("taste")])).toBe(
-      "designer-skills skills router: taste, color-system",
+      "Owl-Listener/designer-skills router: taste, color-system",
     );
 
     const many = Array.from({ length: 200 }, (_, index) => skill(`skill-${index}`));
     const description = getMapDescription(repo, many);
     expect(description.length).toBeLessThanOrEqual(1024);
-    expect(description).toStartWith("designer-skills skills router: skill-0, skill-1, ");
+    expect(description).toStartWith("Owl-Listener/designer-skills router: skill-0, skill-1, ");
     expect(description).toMatch(/, \+\d+ more$/);
+  });
+
+  test("names the router by owner/repo without repeating a trailing skills noun", () => {
+    const skills = [
+      { relativeDir: "a", sourceDir: "skills/a", displayLabel: "a" },
+    ] satisfies SkillCandidate[];
+    const ref = (owner: string, name: string) => ({
+      owner,
+      repo: name,
+      cloneUrl: `https://github.com/${owner}/${name}.git`,
+      display: `${owner}/${name}`,
+    });
+
+    expect(getMapDescription(ref("better-auth", "skills"), skills)).toBe(
+      "better-auth/skills router: a",
+    );
+    expect(getMapDescription(ref("get-convex", "agent-skills"), skills)).toBe(
+      "get-convex/agent-skills router: a",
+    );
+    expect(getMapDescription(ref("ethan-huo", "agents"), skills)).toBe(
+      "ethan-huo/agents skills router: a",
+    );
   });
 });

@@ -185,7 +185,7 @@ Human-facing output is ANSI-highlighted when stdout is an interactive terminal. 
 - `owner/repo/skill` is shorthand for `skill add owner/repo --skills 'skill'`
 - visible skill folders and cached `SKILL.md` names use the Agent Skills-compatible `{skill-path}-{owner}` form; the manifest retains the repo and exact source path, and conflicting sources cannot claim the same visible folder
 - `skill install owner/repo --map` writes `.agents/skills/map-{repo}-{owner}/SKILL.md` with a `ctx read github://owner/repo/<path>` rule and `When ..., read path/SKILL.md` rows
-- a map's description is derived as `{repo} skills router: <skill-a>, <skill-b>, ...` (truncated with `+N more` at the 1024-character spec limit); it needs no GitHub metadata or caller input, and the manifest `map` item stores only the repo (a legacy pinned `description` is dropped on the next manifest write)
+- a map's description is derived as `{owner}/{repo} skills router: <skill-a>, <skill-b>, ...` (just `router` when the repo name already ends in `skill`/`skills`) (truncated with `+N more` at the 1024-character spec limit); it needs no GitHub metadata or caller input, and the manifest `map` item stores only the repo (a legacy pinned `description` is dropped on the next manifest write)
 - interactive project installs show "Install as repo map" above individual skills; selecting either mode disables the other
 - interactive repo skill selection preselects already installed skills from the target scope; `--global` preselects global installs, while project installs preselect project links
 - repo maps and selected skill installs are mutually exclusive per repo; installing one mode removes the other mode from the manifest and visible aliases

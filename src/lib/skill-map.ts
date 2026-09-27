@@ -40,7 +40,9 @@ const DESCRIPTION_MAX_LENGTH = 1024;
 // Derived from repository contents only: GitHub descriptions are often missing or
 // off-target. Listing skill names lets prompts mention a specific routed skill.
 export function getMapDescription(repo: RepoRef, skills: SkillCandidate[]): string {
-  const prefix = `${repo.repo} skills router`;
+  // `better-auth/skills` reads as "better-auth/skills router", not "skills skills router".
+  const noun = /skills?$/i.test(repo.repo) ? "router" : "skills router";
+  const prefix = `${repo.owner}/${repo.repo} ${noun}`;
   const names = [...new Set(skills.map((skill) => skill.displayLabel))];
   if (names.length === 0) {
     return prefix;
