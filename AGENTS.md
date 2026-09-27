@@ -22,7 +22,7 @@
 - `src/schema.ts` 是 CLI 公共契约的一部分；命令名、参数、example、帮助文案都在这里收口。
 - `src/commands/*` 做 orchestration，不要把解析、diff、路径规则、远程协议细节继续堆进去。
 - `src/lib/*` 放可复用逻辑；优先把纯决策和 effectful shell/file/network 操作拆开。
-- `test/*` 不是装饰。只改实现不补测试，通常说明你还没真正锁住行为。
+- 公开行为变更或 bug 修复应有对应的行为或回归测试；先检查 `test/*` 的现有覆盖，只补缺失的验证。
 
 ## References
 
@@ -39,7 +39,7 @@
 - 相关 `test/*.test.ts`
 - `README.md`
 
-一个常见错误是只改命令实现，不改 schema、README 或测试。这种提交通常不完整。
+逐项判断契约变更是否影响这些面，只更新受影响的内容；现有描述和测试已准确覆盖时保留。
 
 ## Verification
 
