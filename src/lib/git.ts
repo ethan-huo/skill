@@ -13,20 +13,14 @@ export async function shallowCloneRepo(repo: RepoRef): Promise<string> {
   }
 
   await mkdir(ownerCacheDir, { recursive: true });
-  await rm(cloneDir, { recursive: true, force: true });
+  // Clone into a private staging dir and publish it with one rename. The cache
+  // dir is shared by every concurrent caller (parallel worktrees, agents), so
+  // never delete it up front: another caller may have just published it.
   const stagingDir = `${cloneDir}.tmp-${crypto.randomUUID()}`;
 
   try {
     await runGit(["clone", "--depth", "1", repo.cloneUrl, stagingDir], "git clone failed");
-    await rename(stagingDir, cloneDir).catch(async (error: unknown) => {
-      // Another process may populate the same cache entry concurrently.
-      if ((error as NodeJS.ErrnoException).code === "EEXIST" && (await hasGitCheckout(cloneDir))) {
-        await rm(stagingDir, { recursive: true, force: true });
-        return;
-      }
-
-      throw error;
-    });
+    await publishClone(stagingDir, cloneDir);
     await pruneStaleRepoClones(ownerCacheDir, repo.repo, `${repo.repo}-${headHash}`);
   } catch (error) {
     await rm(stagingDir, { recursive: true, force: true });
@@ -34,6 +28,27 @@ export async function shallowCloneRepo(repo: RepoRef): Promise<string> {
   }
 
   return cloneDir;
+}
+
+// rename() onto an existing directory fails with EEXIST or ENOTEMPTY depending
+// on the platform. A usable checkout already there means another caller won the
+// race; anything else is a corrupt leftover we replace once.
+async function publishClone(stagingDir: string, cloneDir: string): Promise<void> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await rename(stagingDir, cloneDir);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "EEXIST" && code !== "ENOTEMPTY") throw error;
+      if (await hasGitCheckout(cloneDir)) {
+        await rm(stagingDir, { recursive: true, force: true });
+        return;
+      }
+      if (attempt === 0) await rm(cloneDir, { recursive: true, force: true });
+      else throw error;
+    }
+  }
 }
 
 async function resolveRemoteHeadHash(repo: RepoRef): Promise<string> {

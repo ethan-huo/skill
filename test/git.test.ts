@@ -52,6 +52,44 @@ describe("shallowCloneRepo", () => {
   });
 });
 
+describe("shallowCloneRepo concurrency", () => {
+  test("parallel callers for one repo all get a usable checkout", async () => {
+    const root = join(tmpdir(), `skill-git-race-${crypto.randomUUID()}`);
+    const remoteDir = join(root, "remote");
+    await mkdir(join(remoteDir, "skills", "ctx"), { recursive: true });
+    await writeFile(join(remoteDir, "skills", "ctx", "SKILL.md"), "---\nname: ctx\n---\n");
+    await runGit(["init", remoteDir]);
+    await runGit(["-C", remoteDir, "add", "."]);
+    await runGit([
+      "-C",
+      remoteDir,
+      "-c",
+      "user.name=Skill Test",
+      "-c",
+      "user.email=skill-test@example.com",
+      "commit",
+      "-m",
+      "add skill",
+    ]);
+    const repo = {
+      owner: `owner-${crypto.randomUUID()}`,
+      repo: "ctx",
+      cloneUrl: remoteDir,
+      display: "owner/ctx",
+    } satisfies RepoRef;
+
+    try {
+      const dirs = await Promise.all(Array.from({ length: 8 }, () => shallowCloneRepo(repo)));
+
+      expect(new Set(dirs).size).toBe(1);
+      expect(await Bun.file(join(dirs[0]!, "skills", "ctx", "SKILL.md")).exists()).toBe(true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+      await rm(join(tmpdir(), "skill-clones", repo.owner), { recursive: true, force: true });
+    }
+  });
+});
+
 async function runGit(args: string[]): Promise<string> {
   const proc = Bun.spawn(["git", ...args], {
     stdout: "pipe",
