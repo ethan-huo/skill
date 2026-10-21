@@ -136,8 +136,20 @@ function parseSourceSkillLinkTarget(
   return {
     owner: segments[sourceRootIndex + 1]!,
     repo: segments[sourceRootIndex + 2]!,
-    skill: segments.slice(sourceRootIndex + 3).join("/"),
+    skill: stripVersionedSourceLayout(segments.slice(sourceRootIndex + 3)).join("/"),
   };
+}
+
+// 0.6.3 linked agents into `.snapshots/<skill>/<sha256>` or `.current/<skill>`;
+// the skill is the path between the layout marker and the content hash.
+function stripVersionedSourceLayout(segments: string[]): string[] {
+  if (segments[0] === ".current") {
+    return segments.slice(1);
+  }
+  if (segments[0] === ".snapshots" && /^[a-f0-9]{64}$/.test(segments.at(-1) ?? "")) {
+    return segments.slice(1, -1);
+  }
+  return segments;
 }
 
 function parseVisibleSkillDirName(

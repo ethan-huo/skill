@@ -421,6 +421,69 @@ describe("global manifest bootstrap", () => {
     }
   });
 
+  test("global add adopts 0.6.3 snapshot links by their skill path", async () => {
+    const root = join(tmpdir(), `skill-snapshot-seed-${crypto.randomUUID()}`);
+    const previousHome = process.env.HOME;
+    process.env.HOME = root;
+    const legacyRepo = {
+      owner: `legacy-${crypto.randomUUID()}`,
+      repo: "agents",
+      cloneUrl: "https://github.com/legacy/agents.git",
+      display: "legacy/agents",
+    } satisfies RepoRef;
+    const newRepo = {
+      owner: `new-${crypto.randomUUID()}`,
+      repo: "agents",
+      cloneUrl: "https://github.com/new/agents.git",
+      display: "new/agents",
+    } satisfies RepoRef;
+    const repoDir = join(root, "repo");
+
+    try {
+      const snapshot = join(
+        getSourceInstallRoot(legacyRepo),
+        ".snapshots",
+        "agent-router",
+        "d".repeat(64),
+      );
+      await mkdir(snapshot, { recursive: true });
+      await writeFile(join(snapshot, "SKILL.md"), "---\nname: agent-router\n---\n");
+      await mkdir(getSkillsBaseDir("global", root), { recursive: true });
+      await symlink(
+        snapshot,
+        getVisibleSkillRoot("global", root, legacyRepo, "agent-router"),
+        "dir",
+      );
+      await mkdir(join(repoDir, "skills", "cx"), { recursive: true });
+      await writeFile(join(repoDir, "skills", "cx", "SKILL.md"), "---\nname: cx\n---\n");
+
+      expect((await listInstalledSkills(root)).map((skill) => skill.relativeDir)).toEqual([
+        "agent-router",
+      ]);
+
+      await installGlobalSkills({
+        cloneDir: repoDir,
+        cwd: root,
+        repo: newRepo,
+        selectedSkills,
+      });
+
+      const legacyItem = (await readScopeManifest("global", root)).items.find(
+        (item) => item.repo === `${legacyRepo.owner}/agents`,
+      );
+      expect(legacyItem).toMatchObject({ skills: [{ id: "agent-router" }] });
+    } finally {
+      await rm(getSourceInstallRoot(legacyRepo), { force: true, recursive: true });
+      await rm(getSourceInstallRoot(newRepo), { force: true, recursive: true });
+      await rm(root, { force: true, recursive: true });
+      if (previousHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = previousHome;
+      }
+    }
+  });
+
   test("home directory has no project scope", async () => {
     const root = join(tmpdir(), `skill-home-scope-${crypto.randomUUID()}`);
     const previousHome = process.env.HOME;
