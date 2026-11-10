@@ -34,7 +34,7 @@ describe("argc v7 CLI contract", () => {
     expect(result.stderr).toBe("");
     expect(result.stdout).toContain('call: skill <path> "<object>"');
     expect(result.stdout).toContain("favorite: {");
-    expect(result.stdout).toContain("install(input: { repo?: string[]");
+    expect(result.stdout).toMatch(/install\(input: \{\s+repo\?: string\[\]/);
   });
 
   test("legacy favorite path reaches the dotted command", async () => {
