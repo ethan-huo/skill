@@ -1,4 +1,4 @@
-import { mkdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -6,9 +6,15 @@ import { describe, expect, test } from "bun:test";
 import { colorizeYaml } from "../src/lib/human-output";
 const repositoryRoot = import.meta.dir.replace(/\/test$/, "");
 
-async function runSkill(args: string[], cwd = repositoryRoot, env: Record<string, string> = {}) {
+async function runSkill(
+  args: string[],
+  cwd = repositoryRoot,
+  env: Record<string, string> = {},
+  stdin?: string,
+) {
   const process = Bun.spawn(["bun", "run", join(repositoryRoot, "src", "cli.ts"), ...args], {
     cwd,
+    stdin: stdin === undefined ? "ignore" : new TextEncoder().encode(stdin),
     env: {
       ...Bun.env,
       ...env,
@@ -32,9 +38,25 @@ describe("argc v7 CLI contract", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe("");
-    expect(result.stdout).toContain('call: skill <path> "<object>"');
+    expect(result.stdout).toContain('skill <path> "<object>"');
+    expect(result.stdout).toContain("skill <path> - <<'EOF'");
     expect(result.stdout).toContain("favorite: {");
     expect(result.stdout).toMatch(/install\(input: \{\s+repo\?: string\[\]/);
+  });
+
+  test("the whole input object may arrive as YAML on stdin", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "skill-yaml-input-"));
+    try {
+      const result = await runSkill(["list", "-"], cwd, {}, "scope: local\n");
+      expect(result.stderr).toBe("");
+      expect(result.exitCode).toBe(0);
+
+      const bad = await runSkill(["list", "-"], cwd, {}, "scope: [\n");
+      expect(bad.exitCode).toBe(1);
+      expect(bad.stdout + bad.stderr).toContain("BAD_INPUT");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
   });
 
   test("legacy favorite path reaches the dotted command", async () => {
