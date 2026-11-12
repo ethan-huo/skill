@@ -40,8 +40,8 @@ describe("argc v7 CLI contract", () => {
     expect(result.stderr).toBe("");
     expect(result.stdout).toContain('skill <path> "<object>"');
     expect(result.stdout).toContain("skill <path> - <<'EOF'");
-    expect(result.stdout).toContain("favorite: {");
-    expect(result.stdout).toMatch(/install\(input: \{\s+repo\?: string\[\]/);
+    expect(result.stdout).toContain("### favorite.*");
+    expect(result.stdout).toMatch(/### install\n[^\n]+\n\{\n\s+repo\?: string\[\]/);
   });
 
   test("the whole input object may arrive as YAML on stdin", async () => {

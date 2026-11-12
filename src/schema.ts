@@ -9,10 +9,8 @@ export const schema = {
     .meta({
       description: "Install skills from a GitHub repository",
       examples: [
-        `skill add "{ repo: 'ethan-huo/agents' }"`,
         `skill add "{ repo: 'pbakaus/impeccable/audit' }"`,
         `skill add "{ repo: 'gh:ethan-huo/agents/skills/cx' }"`,
-        `skill add "{ repo: 'ethan-huo/agents', global: true }"`,
       ],
     })
     .positional("repo")
@@ -42,7 +40,6 @@ export const schema = {
   find: c
     .meta({
       description: "Search published skills",
-      examples: [`skill find "{ query: 'animation', limit: 5 }"`],
     })
     .positional("query")
     .input(
@@ -62,7 +59,6 @@ export const schema = {
       add: c
         .meta({
           description: "Save favorite repository or skill refs",
-          examples: [`skill favorite.add "{ ids: ['ethan-huo/agents', 'ethan-huo/agents/cx'] }"`],
         })
         .input(
           s(
@@ -105,7 +101,6 @@ export const schema = {
       install: c
         .meta({
           description: "Install favorites, or open an interactive selector when ids are omitted",
-          examples: [`skill favorite.install "{ ids: ['ethan-huo/agents/cx'], global: true }"`],
         })
         .input(
           s(
@@ -122,8 +117,6 @@ export const schema = {
     .meta({
       description: "Install GitHub skills, or restore links from the scope manifest",
       examples: [
-        `skill install "{ repo: ['ethan-huo/agents/cx'], global: true }"`,
-        `skill install "{ repo: ['gh:ethan-huo/agents/skills/cx'], global: true }"`,
         `skill install "{ repo: ['ethan-huo/agents'], skills: 'cx,fp-thinking' }"`,
         `skill install "{ repo: ['Owl-Listener/designer-skills'], map: true }"`,
       ],
@@ -161,7 +154,6 @@ export const schema = {
     .meta({
       description:
         "Remove installed GitHub repositories and skills; global repo removal also purges cache and favorites",
-      examples: [`skill remove "{ repo: ['gh:ethan-huo/agents/skills/cx'], global: true }"`],
     })
     .input(
       s(
@@ -181,7 +173,6 @@ export const schema = {
   update: c
     .meta({
       description: "Update shared source skill caches and reconcile visible links",
-      examples: [`skill update "{ concurrency: 4, progress: false }"`],
     })
     .input(
       s(
