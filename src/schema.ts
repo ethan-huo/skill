@@ -4,13 +4,18 @@ import * as v from "valibot";
 
 const s = toStandardJsonSchema;
 
+const globalFlag = v.optional(
+  v.pipe(v.boolean(), v.description("Use the user's global skill root instead of the project")),
+  false,
+);
+
 export const schema = {
   add: c
     .meta({
       description: "Install skills from a GitHub repository",
       examples: [
         `skill add "{ repo: 'pbakaus/impeccable/audit' }"`,
-        `skill add "{ repo: 'gh:ethan-huo/agents/skills/cx' }"`,
+        `skill add "{ repo: 'ethan-huo/agents', skills: 'core/{cx,fp-thinking},codex/pacer' }"`,
       ],
     })
     .positional("repo")
@@ -20,15 +25,15 @@ export const schema = {
           repo: v.pipe(
             v.string(),
             v.description(
-              "GitHub repository ref or canonical gh:<owner>/<repo>/<source-path> skill ID.",
+              "GitHub repository ref (owner/repo, owner/repo/skill) or canonical gh:<owner>/<repo>/<source-path> skill ID",
             ),
           ),
-          global: v.optional(v.boolean(), false),
+          global: globalFlag,
           skills: v.optional(
             v.pipe(
               v.string(),
               v.description(
-                "Select skills with skill, variant/skill, or variant/{skill,...} expressions.",
+                "Select skills with skill, variant/skill, or variant/{skill,...} expressions",
               ),
             ),
             "",
@@ -87,7 +92,10 @@ export const schema = {
         .input(
           s(
             v.object({
-              json: v.optional(v.boolean(), false),
+              json: v.optional(
+                v.pipe(v.boolean(), v.description("Print JSON instead of YAML")),
+                false,
+              ),
             }),
           ),
         ),
@@ -106,7 +114,7 @@ export const schema = {
           s(
             v.object({
               ids: v.optional(v.array(v.string()), []),
-              global: v.optional(v.boolean(), false),
+              global: globalFlag,
             }),
           ),
         ),
@@ -129,7 +137,7 @@ export const schema = {
               v.pipe(
                 v.string(),
                 v.description(
-                  "GitHub repository ref or canonical gh: skill ID; at most one source is accepted.",
+                  "GitHub repository ref or canonical gh: skill ID; at most one source is accepted",
                 ),
               ),
             ),
@@ -139,13 +147,19 @@ export const schema = {
             v.pipe(
               v.string(),
               v.description(
-                "Select skills with skill, variant/skill, or variant/{skill,...} expressions.",
+                "Select skills with skill, variant/skill, or variant/{skill,...} expressions",
               ),
             ),
             "",
           ),
-          map: v.optional(v.boolean(), false),
-          global: v.optional(v.boolean(), false),
+          map: v.optional(
+            v.pipe(
+              v.boolean(),
+              v.description("Install a repo map: one routing skill for the whole repo"),
+            ),
+            false,
+          ),
+          global: globalFlag,
         }),
       ),
     ),
@@ -159,7 +173,7 @@ export const schema = {
       s(
         v.object({
           repo: v.optional(v.array(v.string()), []),
-          global: v.optional(v.boolean(), false),
+          global: globalFlag,
         }),
       ),
     ),
@@ -178,7 +192,7 @@ export const schema = {
       s(
         v.object({
           concurrency: v.optional(v.pipe(v.number(), v.minValue(1)), 8),
-          progress: v.optional(v.boolean(), true),
+          progress: v.optional(v.pipe(v.boolean(), v.description("Show progress on stderr")), true),
         }),
       ),
     ),
