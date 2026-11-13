@@ -1,16 +1,13 @@
 {
-  "compilerOptions": {
-    "target": "ESNext",
-    "module": "Preserve",
-    "moduleResolution": "Bundler",
-    "moduleDetection": "force",
-    "allowImportingTsExtensions": true,
-    "strict": true,
-    "noEmit": true,
-    "types": ["bun"],
-    "skipLibCheck": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true
-  },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+	"extends": "@celados/harness/tsconfig/bun.json",
+	"compilerOptions": {
+		"noUncheckedIndexedAccess": true,
+		"noFallthroughCasesInSwitch": true
+	},
+	"include": [
+		"src/**/*.ts",
+		"test/**/*.ts",
+		"scripts/**/*.ts",
+		"vite.config.ts"
+	]
 }
