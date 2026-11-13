@@ -1,117 +1,117 @@
-export type InstallScope = "local" | "global";
+export type InstallScope = 'local' | 'global'
 
 export type RepoRef = {
-  owner: string;
-  repo: string;
-  cloneUrl: string;
-  display: string;
-};
+	owner: string
+	repo: string
+	cloneUrl: string
+	display: string
+}
 
 export type RepoSkillTarget = {
-  repo: RepoRef;
-  skill?: string;
-};
+	repo: RepoRef
+	skill?: string
+}
 
 export type SkillCandidate = {
-  relativeDir: string;
-  sourceDir: string;
-  displayLabel: string;
-  variant?: string;
-};
+	relativeDir: string
+	sourceDir: string
+	displayLabel: string
+	variant?: string
+}
 
 export type SkillGroup = {
-  relativeDir: string;
-  displayLabel: string;
-  candidates: SkillCandidate[];
-};
+	relativeDir: string
+	displayLabel: string
+	candidates: SkillCandidate[]
+}
 
 export type SkillSelector = {
-  skill: string;
-  variant?: string;
-};
+	skill: string
+	variant?: string
+}
 
 export type AddInput = {
-  repo: string;
-  global: boolean;
-  skills: string;
-};
+	repo: string
+	global: boolean
+	skills: string
+}
 
 export type InstallInput = {
-  repo: string[];
-  skills: string;
-  map: boolean;
-  global: boolean;
-};
+	repo: string[]
+	skills: string
+	map: boolean
+	global: boolean
+}
 
 export type ListInput = {
-  scope?: InstallScope;
-};
+	scope?: InstallScope
+}
 
 export type FindInput = {
-  query: string;
-  limit?: number;
-};
+	query: string
+	limit?: number
+}
 
 export type FavoriteAddInput = {
-  ids: string[];
-};
+	ids: string[]
+}
 
 export type FavoriteRemoveInput = {
-  ids: string[];
-};
+	ids: string[]
+}
 
 export type FavoriteListInput = {
-  json: boolean;
-};
+	json: boolean
+}
 
-export type FavoriteRefreshInput = {};
+export type FavoriteRefreshInput = {}
 
 export type FavoriteInstallInput = {
-  ids: string[];
-  global: boolean;
-};
+	ids: string[]
+	global: boolean
+}
 
 export type RemoveInput = {
-  repo: string[];
-  global: boolean;
-};
+	repo: string[]
+	global: boolean
+}
 
 export type UpdateInput = {
-  concurrency?: number;
-  progress?: boolean;
-};
+	concurrency?: number
+	progress?: boolean
+}
 
-export type SkillScopeLabel = InstallScope;
+export type SkillScopeLabel = InstallScope
 
 export type InstalledSkill = {
-  id: string;
-  owner: string;
-  repo: string;
-  relativeDir: string;
-  name: string;
-  description: string;
-  scope: SkillScopeLabel;
-  installRoot: string;
-};
+	id: string
+	owner: string
+	repo: string
+	relativeDir: string
+	name: string
+	description: string
+	scope: SkillScopeLabel
+	installRoot: string
+}
 
 export type SearchSkill = {
-  id: string;
-  name: string;
-  source: string;
-  installs: number;
-};
+	id: string
+	name: string
+	source: string
+	installs: number
+}
 
 export type FavoriteRef = {
-  id: string;
-  owner: string;
-  repo: string;
-  skill?: string;
-  description: string;
-  updatedAt?: string;
-};
+	id: string
+	owner: string
+	repo: string
+	skill?: string
+	description: string
+	updatedAt?: string
+}
 
 export type UpdateDiff = {
-  updated: string[];
-  removed: string[];
-  added: string[];
-};
+	updated: string[]
+	removed: string[]
+	added: string[]
+}

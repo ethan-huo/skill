@@ -1,178 +1,182 @@
-import type { FavoriteRef, RepoRef, RepoSkillTarget } from "../types";
+import type { FavoriteRef, RepoRef, RepoSkillTarget } from '../types'
 
-const GITHUB_HOST = "github.com";
+const GITHUB_HOST = 'github.com'
 
 export function parseRepoRef(raw: string): RepoRef {
-  const value = raw.trim();
-  if (!value) {
-    throw new Error("Repository cannot be empty.");
-  }
+	const value = raw.trim()
+	if (!value) {
+		throw new Error('Repository cannot be empty.')
+	}
 
-  const httpMatch = parseHttpRepo(value);
-  if (httpMatch) {
-    return httpMatch;
-  }
+	const httpMatch = parseHttpRepo(value)
+	if (httpMatch) {
+		return httpMatch
+	}
 
-  const sshMatch = parseSshRepo(value);
-  if (sshMatch) {
-    return sshMatch;
-  }
+	const sshMatch = parseSshRepo(value)
+	if (sshMatch) {
+		return sshMatch
+	}
 
-  const shortMatch = parseShortRepo(value);
-  if (shortMatch) {
-    return shortMatch;
-  }
+	const shortMatch = parseShortRepo(value)
+	if (shortMatch) {
+		return shortMatch
+	}
 
-  throw new Error(
-    "Unsupported repository format. Use owner/repo, https://github.com/owner/repo, or git@github.com:owner/repo.git.",
-  );
+	throw new Error(
+		'Unsupported repository format. Use owner/repo, https://github.com/owner/repo, or git@github.com:owner/repo.git.',
+	)
 }
 
 export function parseRepoSkillTarget(raw: string): RepoSkillTarget {
-  const value = raw.trim();
-  if (!value) {
-    throw new Error("Repository cannot be empty.");
-  }
+	const value = raw.trim()
+	if (!value) {
+		throw new Error('Repository cannot be empty.')
+	}
 
-  const skillMatch = parseShortSkillRef(value);
-  if (!skillMatch) {
-    return { repo: parseRepoRef(value) };
-  }
+	const skillMatch = parseShortSkillRef(value)
+	if (!skillMatch) {
+		return { repo: parseRepoRef(value) }
+	}
 
-  return {
-    repo: {
-      owner: assertSafeSegment(skillMatch.owner, "Owner"),
-      repo: assertSafeSegment(skillMatch.repo, "Repository"),
-      cloneUrl: `https://${GITHUB_HOST}/${skillMatch.owner}/${skillMatch.repo}.git`,
-      display: `${skillMatch.owner}/${skillMatch.repo}`,
-    },
-    skill: assertSafeSegment(skillMatch.skill, "Skill"),
-  };
+	return {
+		repo: {
+			owner: assertSafeSegment(skillMatch.owner, 'Owner'),
+			repo: assertSafeSegment(skillMatch.repo, 'Repository'),
+			cloneUrl: `https://${GITHUB_HOST}/${skillMatch.owner}/${skillMatch.repo}.git`,
+			display: `${skillMatch.owner}/${skillMatch.repo}`,
+		},
+		skill: assertSafeSegment(skillMatch.skill, 'Skill'),
+	}
 }
 
 export function parseFavoriteRef(raw: string): FavoriteRef {
-  const value = raw.trim();
-  if (!value) {
-    throw new Error("Favorite ref cannot be empty.");
-  }
+	const value = raw.trim()
+	if (!value) {
+		throw new Error('Favorite ref cannot be empty.')
+	}
 
-  const skillMatch = parseShortSkillRef(value);
-  if (skillMatch) {
-    const owner = assertSafeSegment(skillMatch.owner, "Owner");
-    const repo = assertSafeSegment(skillMatch.repo, "Repository");
-    const skill = assertSafeSegment(skillMatch.skill, "Skill");
+	const skillMatch = parseShortSkillRef(value)
+	if (skillMatch) {
+		const owner = assertSafeSegment(skillMatch.owner, 'Owner')
+		const repo = assertSafeSegment(skillMatch.repo, 'Repository')
+		const skill = assertSafeSegment(skillMatch.skill, 'Skill')
 
-    return {
-      id: `${owner}/${repo}/${skill}`,
-      owner,
-      repo,
-      skill,
-      description: "",
-    };
-  }
+		return {
+			id: `${owner}/${repo}/${skill}`,
+			owner,
+			repo,
+			skill,
+			description: '',
+		}
+	}
 
-  const repoMatch = parseShortRepo(value);
-  if (!repoMatch) {
-    throw new Error("Favorite ref must use owner/repo or owner/repo/skill format.");
-  }
+	const repoMatch = parseShortRepo(value)
+	if (!repoMatch) {
+		throw new Error(
+			'Favorite ref must use owner/repo or owner/repo/skill format.',
+		)
+	}
 
-  return {
-    id: repoMatch.display,
-    owner: repoMatch.owner,
-    repo: repoMatch.repo,
-    description: "",
-  };
+	return {
+		id: repoMatch.display,
+		owner: repoMatch.owner,
+		repo: repoMatch.repo,
+		description: '',
+	}
 }
 
 function parseHttpRepo(value: string): RepoRef | null {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return null;
-  }
+	let url: URL
+	try {
+		url = new URL(value)
+	} catch {
+		return null
+	}
 
-  if (url.hostname !== GITHUB_HOST) {
-    throw new Error("Only github.com repositories are supported right now.");
-  }
+	if (url.hostname !== GITHUB_HOST) {
+		throw new Error('Only github.com repositories are supported right now.')
+	}
 
-  const segments = url.pathname
-    .replace(/\.git$/, "")
-    .split("/")
-    .filter(Boolean);
+	const segments = url.pathname
+		.replace(/\.git$/, '')
+		.split('/')
+		.filter(Boolean)
 
-  if (segments.length < 2) {
-    throw new Error("GitHub repository URLs must include owner and repo.");
-  }
+	if (segments.length < 2) {
+		throw new Error('GitHub repository URLs must include owner and repo.')
+	}
 
-  if (segments.length > 2) {
-    throw new Error(
-      "GitHub repository URLs must point to the repository root. Use owner/repo/skill shorthand to target a specific skill.",
-    );
-  }
+	if (segments.length > 2) {
+		throw new Error(
+			'GitHub repository URLs must point to the repository root. Use owner/repo/skill shorthand to target a specific skill.',
+		)
+	}
 
-  const owner = assertSafeSegment(segments[0]!, "Owner");
-  const repo = assertSafeSegment(segments[1]!, "Repository");
+	const owner = assertSafeSegment(segments[0]!, 'Owner')
+	const repo = assertSafeSegment(segments[1]!, 'Repository')
 
-  return {
-    owner,
-    repo,
-    cloneUrl: `https://${GITHUB_HOST}/${owner}/${repo}.git`,
-    display: `${owner}/${repo}`,
-  };
+	return {
+		owner,
+		repo,
+		cloneUrl: `https://${GITHUB_HOST}/${owner}/${repo}.git`,
+		display: `${owner}/${repo}`,
+	}
 }
 
 function parseSshRepo(value: string): RepoRef | null {
-  const match = /^git@github\.com:([^/\s]+)\/([^/\s]+?)(?:\.git)?$/.exec(value);
-  if (!match) {
-    return null;
-  }
+	const match = /^git@github\.com:([^/\s]+)\/([^/\s]+?)(?:\.git)?$/.exec(value)
+	if (!match) {
+		return null
+	}
 
-  const owner = assertSafeSegment(match[1]!, "Owner");
-  const repo = assertSafeSegment(match[2]!, "Repository");
+	const owner = assertSafeSegment(match[1]!, 'Owner')
+	const repo = assertSafeSegment(match[2]!, 'Repository')
 
-  return {
-    owner,
-    repo,
-    cloneUrl: `https://${GITHUB_HOST}/${owner}/${repo}.git`,
-    display: `${owner}/${repo}`,
-  };
+	return {
+		owner,
+		repo,
+		cloneUrl: `https://${GITHUB_HOST}/${owner}/${repo}.git`,
+		display: `${owner}/${repo}`,
+	}
 }
 
 function parseShortRepo(value: string): RepoRef | null {
-  const match = /^([^/\s]+)\/([^/\s]+)$/.exec(value);
-  if (!match) {
-    return null;
-  }
+	const match = /^([^/\s]+)\/([^/\s]+)$/.exec(value)
+	if (!match) {
+		return null
+	}
 
-  const owner = assertSafeSegment(match[1]!, "Owner");
-  const repo = assertSafeSegment(match[2]!, "Repository");
+	const owner = assertSafeSegment(match[1]!, 'Owner')
+	const repo = assertSafeSegment(match[2]!, 'Repository')
 
-  return {
-    owner,
-    repo,
-    cloneUrl: `https://${GITHUB_HOST}/${owner}/${repo}.git`,
-    display: `${owner}/${repo}`,
-  };
+	return {
+		owner,
+		repo,
+		cloneUrl: `https://${GITHUB_HOST}/${owner}/${repo}.git`,
+		display: `${owner}/${repo}`,
+	}
 }
 
-function parseShortSkillRef(value: string): { owner: string; repo: string; skill: string } | null {
-  const match = /^([^/\s]+)\/([^/\s]+)\/([^/\s]+)$/.exec(value);
-  if (!match) {
-    return null;
-  }
+function parseShortSkillRef(
+	value: string,
+): { owner: string; repo: string; skill: string } | null {
+	const match = /^([^/\s]+)\/([^/\s]+)\/([^/\s]+)$/.exec(value)
+	if (!match) {
+		return null
+	}
 
-  return {
-    owner: match[1]!,
-    repo: match[2]!,
-    skill: match[3]!,
-  };
+	return {
+		owner: match[1]!,
+		repo: match[2]!,
+		skill: match[3]!,
+	}
 }
 
 function assertSafeSegment(value: string, label: string): string {
-  if (value === "." || value === "..") {
-    throw new Error(`${label} cannot be "." or "..".`);
-  }
+	if (value === '.' || value === '..') {
+		throw new Error(`${label} cannot be "." or "..".`)
+	}
 
-  return value;
+	return value
 }

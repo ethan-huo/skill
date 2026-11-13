@@ -1,175 +1,191 @@
-import { existsSync } from "node:fs";
-import { dirname } from "node:path";
+import { existsSync } from 'node:fs'
+import { dirname } from 'node:path'
 
-import { removeFavoritesForRepo } from "../lib/favorites";
+import type { RemoveInput } from '../types'
+
+import { removeFavoritesForRepo } from '../lib/favorites'
 import {
-  pruneEmptyParents,
-  removeVisibleRepoSkills,
-  removeVisibleSkillAliases,
-} from "../lib/install";
-import { listInstalledSkills } from "../lib/installed-skills";
+	pruneEmptyParents,
+	removeVisibleRepoSkills,
+	removeVisibleSkillAliases,
+} from '../lib/install'
+import { listInstalledSkills } from '../lib/installed-skills'
 import {
-  getInstallScope,
-  getManifestPath,
-  getSkillsBaseDir,
-  getVisibleRepoDirPrefix,
-} from "../lib/paths";
+	getInstallScope,
+	getManifestPath,
+	getSkillsBaseDir,
+	getVisibleRepoDirPrefix,
+} from '../lib/paths'
 import {
-  getProjectManifestSkills,
-  getProjectManifestMapRepos,
-  readScopeManifest,
-  removeProjectManifestRepo,
-  removeProjectManifestSkillIds,
-  writeScopeManifest,
-} from "../lib/project-manifest";
-import { searchableMultiselect } from "../lib/prompt";
-import { resolveSourceTarget } from "../lib/source-ref";
-import { formatManifestSkillId } from "../lib/skill-ref";
-import { parseRepoRef } from "../lib/repo-ref";
-import type { RemoveInput } from "../types";
+	getProjectManifestSkills,
+	getProjectManifestMapRepos,
+	readScopeManifest,
+	removeProjectManifestRepo,
+	removeProjectManifestSkillIds,
+	writeScopeManifest,
+} from '../lib/project-manifest'
+import { searchableMultiselect } from '../lib/prompt'
+import { parseRepoRef } from '../lib/repo-ref'
+import { formatManifestSkillId } from '../lib/skill-ref'
+import { resolveSourceTarget } from '../lib/source-ref'
 
 type RemovePrompt = (options: {
-  message: string;
-  options: Array<{ label: string; value: string }>;
-  required?: boolean;
-}) => Promise<string[]>;
+	message: string
+	options: Array<{ label: string; value: string }>
+	required?: boolean
+}) => Promise<string[]>
 
 type RemoveServices = {
-  searchableMultiselect?: RemovePrompt;
-  isTty?: () => boolean;
-};
+	searchableMultiselect?: RemovePrompt
+	isTty?: () => boolean
+}
 
 export async function runRemove(
-  args: { input: RemoveInput },
-  services: RemoveServices = {},
+	args: { input: RemoveInput },
+	services: RemoveServices = {},
 ): Promise<{ removed: Array<Awaited<ReturnType<typeof removeRef>>> }> {
-  const input = args.input;
-  const refs =
-    input.repo.length > 0 ? input.repo : await selectInstalledSkillRefs(input.global, services);
-  const removed = [];
-  for (const ref of refs) {
-    // Manifest writes share one file, so removals stay sequential to avoid lost updates.
-    removed.push(await removeRef(ref, input.global));
-  }
-  return { removed };
+	const input = args.input
+	const refs =
+		input.repo.length > 0
+			? input.repo
+			: await selectInstalledSkillRefs(input.global, services)
+	const removed = []
+	for (const ref of refs) {
+		// Manifest writes share one file, so removals stay sequential to avoid lost updates.
+		removed.push(await removeRef(ref, input.global))
+	}
+	return { removed }
 }
 
 async function removeRef(ref: string, global: boolean) {
-  const scope = getInstallScope(global);
-  const cwd = process.cwd();
-  const manifest = await readScopeManifest(scope, cwd);
-  const installedRef = getProjectManifestSkills(manifest).find(
-    (candidate) => formatManifestSkillId(candidate.repo, candidate) === ref,
-  );
-  const target = installedRef ? null : resolveSourceTarget(ref);
-  if (target?.sourcePath) {
-    throw new Error(`Nothing installed with skill ID ${ref}`);
-  }
-  const repo = installedRef ? parseRepoRef(installedRef.repo) : target!.repo;
-  const skill = installedRef ? installedRef.id : target!.skill;
-  const skillsBaseDir = getSkillsBaseDir(scope, cwd);
-  const targetPath = skill
-    ? `${skillsBaseDir}/${skill}`
-    : `${skillsBaseDir}/${getVisibleRepoDirPrefix(repo)}*`;
-  const repoSkills = getProjectManifestSkills(manifest).filter(
-    (candidate) => candidate.repo === `${repo.owner}/${repo.repo}`,
-  );
-  const removed = skill
-    ? await removeVisibleSkillAliases(skillsBaseDir, repo, skill)
-    : (
-        await Promise.all(
-          repoSkills.map((candidate) =>
-            removeVisibleSkillAliases(skillsBaseDir, repo, candidate.id),
-          ),
-        )
-      ).some(Boolean) || (await removeVisibleRepoSkills(skillsBaseDir, repo));
-  const removedManifest = await removeManifestRef(scope, cwd, `${repo.owner}/${repo.repo}`, skill);
-  const removedFavorites = global && !skill ? await removeFavoritesForRepo(repo) : [];
+	const scope = getInstallScope(global)
+	const cwd = process.cwd()
+	const manifest = await readScopeManifest(scope, cwd)
+	const installedRef = getProjectManifestSkills(manifest).find(
+		(candidate) => formatManifestSkillId(candidate.repo, candidate) === ref,
+	)
+	const target = installedRef ? null : resolveSourceTarget(ref)
+	if (target?.sourcePath) {
+		throw new Error(`Nothing installed with skill ID ${ref}`)
+	}
+	const repo = installedRef ? parseRepoRef(installedRef.repo) : target!.repo
+	const skill = installedRef ? installedRef.id : target!.skill
+	const skillsBaseDir = getSkillsBaseDir(scope, cwd)
+	const targetPath = skill
+		? `${skillsBaseDir}/${skill}`
+		: `${skillsBaseDir}/${getVisibleRepoDirPrefix(repo)}*`
+	const repoSkills = getProjectManifestSkills(manifest).filter(
+		(candidate) => candidate.repo === `${repo.owner}/${repo.repo}`,
+	)
+	const removed = skill
+		? await removeVisibleSkillAliases(skillsBaseDir, repo, skill)
+		: (
+				await Promise.all(
+					repoSkills.map((candidate) =>
+						removeVisibleSkillAliases(skillsBaseDir, repo, candidate.id),
+					),
+				)
+			).some(Boolean) || (await removeVisibleRepoSkills(skillsBaseDir, repo))
+	const removedManifest = await removeManifestRef(
+		scope,
+		cwd,
+		`${repo.owner}/${repo.repo}`,
+		skill,
+	)
+	const removedFavorites =
+		global && !skill ? await removeFavoritesForRepo(repo) : []
 
-  if (!removed && !removedManifest && removedFavorites.length === 0) {
-    throw new Error(`Nothing installed at ${targetPath}`);
-  }
+	if (!removed && !removedManifest && removedFavorites.length === 0) {
+		throw new Error(`Nothing installed at ${targetPath}`)
+	}
 
-  await pruneEmptyParents(dirname(targetPath), skillsBaseDir);
-  if (skill) {
-    return {
-      repo: repo.display,
-      skill,
-      scope,
-      removed: ["visible skill", ...(removedManifest ? ["manifest"] : [])],
-    };
-  }
+	await pruneEmptyParents(dirname(targetPath), skillsBaseDir)
+	if (skill) {
+		return {
+			repo: repo.display,
+			skill,
+			scope,
+			removed: ['visible skill', ...(removedManifest ? ['manifest'] : [])],
+		}
+	}
 
-  const removedTargets = [
-    removed ? `${scope} skills` : null,
-    removedManifest ? "project manifest" : null,
-    removedFavorites.length > 0 ? "favorites" : null,
-  ].filter((target): target is string => target !== null);
-  return {
-    repo: repo.display,
-    scope,
-    removed: removedTargets,
-  };
+	const removedTargets = [
+		removed ? `${scope} skills` : null,
+		removedManifest ? 'project manifest' : null,
+		removedFavorites.length > 0 ? 'favorites' : null,
+	].filter((target): target is string => target !== null)
+	return {
+		repo: repo.display,
+		scope,
+		removed: removedTargets,
+	}
 }
 
 async function removeManifestRef(
-  scope: "local" | "global",
-  cwd: string,
-  repoId: string,
-  skill: string | undefined,
+	scope: 'local' | 'global',
+	cwd: string,
+	repoId: string,
+	skill: string | undefined,
 ): Promise<boolean> {
-  if (!existsSync(getManifestPath(scope, cwd))) {
-    return false;
-  }
+	if (!existsSync(getManifestPath(scope, cwd))) {
+		return false
+	}
 
-  const manifest = await readScopeManifest(scope, cwd);
-  const next = skill
-    ? removeProjectManifestSkillIds(manifest, [`${repoId}/${skill}`])
-    : removeProjectManifestRepo(manifest, repoId);
+	const manifest = await readScopeManifest(scope, cwd)
+	const next = skill
+		? removeProjectManifestSkillIds(manifest, [`${repoId}/${skill}`])
+		: removeProjectManifestRepo(manifest, repoId)
 
-  if (JSON.stringify(next) === JSON.stringify(manifest)) {
-    return false;
-  }
+	if (JSON.stringify(next) === JSON.stringify(manifest)) {
+		return false
+	}
 
-  await writeScopeManifest(scope, cwd, next);
-  return true;
+	await writeScopeManifest(scope, cwd, next)
+	return true
 }
 
 async function selectInstalledSkillRefs(
-  global: boolean,
-  services: RemoveServices,
+	global: boolean,
+	services: RemoveServices,
 ): Promise<string[]> {
-  const scope = getInstallScope(global);
-  const installedSkills = (await listInstalledSkills(process.cwd())).filter(
-    (skill) => skill.scope === scope,
-  );
-  const mapRepos = getProjectManifestMapRepos(await readScopeManifest(scope, process.cwd()));
-  const options = [
-    ...installedSkills.map((skill) => ({
-      label: skill.description ? `${skill.id} (${skill.description})` : skill.id,
-      value: skill.id,
-    })),
-    // Maps are generated directories rather than source-cache symlinks, so the manifest is
-    // the installed-state source of truth for exposing them in the remove selector.
-    ...mapRepos.map((repo) => ({ label: `${repo} (map)`, value: repo })),
-  ].sort((left, right) => left.value.localeCompare(right.value));
+	const scope = getInstallScope(global)
+	const installedSkills = (await listInstalledSkills(process.cwd())).filter(
+		(skill) => skill.scope === scope,
+	)
+	const mapRepos = getProjectManifestMapRepos(
+		await readScopeManifest(scope, process.cwd()),
+	)
+	const options = [
+		...installedSkills.map((skill) => ({
+			label: skill.description
+				? `${skill.id} (${skill.description})`
+				: skill.id,
+			value: skill.id,
+		})),
+		// Maps are generated directories rather than source-cache symlinks, so the manifest is
+		// the installed-state source of truth for exposing them in the remove selector.
+		...mapRepos.map((repo) => ({ label: `${repo} (map)`, value: repo })),
+	].sort((left, right) => left.value.localeCompare(right.value))
 
-  if (options.length === 0) {
-    return [];
-  }
+	if (options.length === 0) {
+		return []
+	}
 
-  const isTty = services.isTty ?? (() => Boolean(process.stdin.isTTY && process.stdout.isTTY));
-  if (!isTty()) {
-    throw new Error("Interactive remove requires a TTY or explicit refs.");
-  }
+	const isTty =
+		services.isTty ??
+		(() => Boolean(process.stdin.isTTY && process.stdout.isTTY))
+	if (!isTty()) {
+		throw new Error('Interactive remove requires a TTY or explicit refs.')
+	}
 
-  const selectMany =
-    services.searchableMultiselect ?? ((promptOptions) => searchableMultiselect(promptOptions));
-  const response = await selectMany({
-    message: `Select ${scope} skills to remove`,
-    options,
-    required: true,
-  });
+	const selectMany =
+		services.searchableMultiselect ??
+		((promptOptions) => searchableMultiselect(promptOptions))
+	const response = await selectMany({
+		message: `Select ${scope} skills to remove`,
+		options,
+		required: true,
+	})
 
-  return [...response];
+	return [...response]
 }

@@ -1,45 +1,48 @@
-import { repoIdentityKey } from "./favorite-key";
-import { parseRepoRef } from "./repo-ref";
-import type { FavoriteRef, RepoRef, SkillSelector } from "../types";
+import type { FavoriteRef, RepoRef, SkillSelector } from '../types'
+
+import { repoIdentityKey } from './favorite-key'
+import { parseRepoRef } from './repo-ref'
 
 export type FavoriteInstallGroup = {
-  repo: RepoRef;
-  selectors: SkillSelector[];
-  promptForSelection: boolean;
-};
+	repo: RepoRef
+	selectors: SkillSelector[]
+	promptForSelection: boolean
+}
 
 type MutableFavoriteInstallGroup = {
-  repo: RepoRef;
-  selectors: Set<string>;
-  promptForSelection: boolean;
-};
+	repo: RepoRef
+	selectors: Set<string>
+	promptForSelection: boolean
+}
 
-export function groupFavoritesForInstall(favorites: FavoriteRef[]): FavoriteInstallGroup[] {
-  const grouped = new Map<string, MutableFavoriteInstallGroup>();
+export function groupFavoritesForInstall(
+	favorites: FavoriteRef[],
+): FavoriteInstallGroup[] {
+	const grouped = new Map<string, MutableFavoriteInstallGroup>()
 
-  for (const favorite of favorites) {
-    const repoId = repoIdentityKey(favorite);
-    const current = grouped.get(repoId) ?? {
-      repo: parseRepoRef(`${favorite.owner}/${favorite.repo}`),
-      selectors: new Set<string>(),
-      promptForSelection: false,
-    };
+	for (const favorite of favorites) {
+		const repoId = repoIdentityKey(favorite)
+		const current = grouped.get(repoId) ?? {
+			repo: parseRepoRef(`${favorite.owner}/${favorite.repo}`),
+			selectors: new Set<string>(),
+			promptForSelection: false,
+		}
 
-    if (favorite.skill) {
-      current.selectors.add(favorite.skill);
-    } else {
-      // Repo-level favorites must drive one repo-scoped install flow; skill-level refs only seed defaults.
-      current.promptForSelection = true;
-    }
+		if (favorite.skill) {
+			current.selectors.add(favorite.skill)
+		} else {
+			// Repo-level favorites must drive one repo-scoped install flow; skill-level refs only seed defaults.
+			current.promptForSelection = true
+		}
 
-    grouped.set(repoId, current);
-  }
+		grouped.set(repoId, current)
+	}
 
-  return [...grouped.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([, group]) => ({
-      repo: group.repo,
-      selectors: [...group.selectors].sort().map((skill) => ({ skill })),
-      promptForSelection: group.promptForSelection,
-    }));
+	return [...grouped.entries()]
+		.sort(([left], [right]) => left.localeCompare(right))
+		.map(([, group]) => ({
+			repo: group.repo,
+			selectors: [...group.selectors].sort().map((skill) => ({ skill })),
+			promptForSelection: group.promptForSelection,
+		}))
 }
