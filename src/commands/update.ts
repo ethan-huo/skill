@@ -31,7 +31,6 @@ import {
 } from '../lib/project-skills'
 import { parseRepoRef } from '../lib/repo-ref'
 import { updateSourceRepo } from '../lib/source-skills'
-import { diffSkillSets } from '../lib/update-diff'
 
 type RepoOutcome = {
 	kind: 'repo'

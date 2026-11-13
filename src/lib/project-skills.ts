@@ -1,15 +1,9 @@
 import { existsSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import type { RepoRef, SkillCandidate, SkillSelector } from '../types'
+import type { RepoRef, SkillCandidate } from '../types'
 import type { ManifestSkill } from './project-manifest'
 
-import {
-	installLocalProjectSkills,
-	type RepoInstallResult,
-	selectRepoSkills,
-} from './add-skills'
 import { shallowCloneRepo } from './git'
 import {
 	linkInstalledSkills,
@@ -24,7 +18,6 @@ import {
 } from './paths'
 import {
 	addScopeManifestMap,
-	getProjectManifestMapRepos,
 	getProjectManifestMaps,
 	getProjectManifestSkills,
 	readScopeManifest,
@@ -36,46 +29,6 @@ import { parseRepoRef } from './repo-ref'
 import { writeProjectSkillMap } from './skill-map'
 import { formatManifestSkillId } from './skill-ref'
 import { updateSourceRepo } from './source-skills'
-
-export async function installProjectRepoSkills(options: {
-	cwd: string
-	repo: RepoRef
-	selectors: SkillSelector[]
-}): Promise<RepoInstallResult> {
-	const { cloneDir, selectedSkills, selectedMode } = await selectRepoSkills({
-		cwd: options.cwd,
-		repo: options.repo,
-		selectors: options.selectors,
-		global: false,
-	})
-	if (selectedMode === 'map') {
-		await removeProjectRepoSkillAliases(options.cwd, options.repo)
-		const result = await writeProjectSkillMap({
-			cloneDir,
-			cwd: options.cwd,
-			repo: options.repo,
-		})
-		await addScopeManifestMap(
-			'local',
-			options.cwd,
-			`${options.repo.owner}/${options.repo.repo}`,
-		)
-		return {
-			kind: 'map',
-			installRoot: result.installRoot,
-			mappedSkills: result.mappedSkills,
-		}
-	}
-
-	const result = await installLocalProjectSkills({
-		cloneDir,
-		cwd: options.cwd,
-		repo: options.repo,
-		selectedSkills,
-	})
-
-	return { kind: 'skills', ...result }
-}
 
 export async function installProjectRepoMap(options: {
 	cwd: string
@@ -248,45 +201,6 @@ export async function restoreGlobalSkills(cwd: string): Promise<{
 	}
 
 	return { restored: restored.sort(), missing: missing.sort() }
-}
-
-export async function syncProjectMaps(cwd: string): Promise<
-	{
-		repoId: string
-		mappedSkills: number
-	}[]
-> {
-	const repoIds = await listProjectMapRepoIds(cwd)
-	if (repoIds.length === 0) {
-		return []
-	}
-
-	const syncedMaps: { repoId: string; mappedSkills: number }[] = []
-	for (const repoId of repoIds) {
-		syncedMaps.push(await syncProjectMapRepo({ cwd, repoId }))
-	}
-
-	// syncProjectMaps used to rewrite the manifest as a no-op touch. Preserve that
-	// by delegating to the same single-repo helper above, which already keeps the
-	// manifest in sync via writeProjectSkillMap.
-	if (syncedMaps.length > 0) {
-		const manifest = await readScopeManifest('local', cwd)
-		await writeScopeManifest('local', cwd, manifest)
-	}
-
-	return syncedMaps.sort((left, right) =>
-		left.repoId.localeCompare(right.repoId),
-	)
-}
-
-export async function listProjectMapRepoIds(cwd: string): Promise<string[]> {
-	if (!hasProjectManifest(cwd)) {
-		return []
-	}
-	const manifest = await readScopeManifest('local', cwd)
-	return [...getProjectManifestMapRepos(manifest)].sort((left, right) =>
-		left.localeCompare(right),
-	)
 }
 
 export async function syncProjectMapRepo(options: {

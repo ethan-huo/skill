@@ -15,11 +15,11 @@ import { parseFavoriteRef, parseRepoRef } from './repo-ref'
 const GITIGNORE_BEGIN = '# BEGIN skill managed entries'
 const GITIGNORE_END = '# END skill managed entries'
 
-export type ProjectManifestV1 = {
+type ProjectManifestV1 = {
 	skills: string[]
 }
 
-export type ProjectManifestV2 = {
+type ProjectManifestV2 = {
 	version: 2
 	items: Array<
 		| {
@@ -127,7 +127,7 @@ export async function writeScopeManifest(
 	}
 }
 
-export async function writeProjectManifest(
+async function writeProjectManifest(
 	cwd: string,
 	manifest: ProjectManifest,
 ): Promise<void> {
@@ -270,23 +270,6 @@ export async function addProjectManifestMap(
 ): Promise<void> {
 	const manifest = await readProjectManifest(cwd)
 	await writeProjectManifest(cwd, addMapToManifest(manifest, repoId))
-}
-
-export function getProjectManifestSkillIds(
-	manifest: ProjectManifest,
-): string[] {
-	const skillIds: string[] = []
-	for (const item of manifest.items) {
-		if (item.type !== 'skills') {
-			continue
-		}
-
-		for (const skill of item.skills) {
-			skillIds.push(`${item.repo}/${skill.id}`)
-		}
-	}
-
-	return skillIds.sort()
 }
 
 export function getProjectManifestSkills(

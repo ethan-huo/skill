@@ -61,9 +61,7 @@ export async function discoverSkillGroups(
 	return groupSkillCandidates(await discoverSkills(repoDir))
 }
 
-export function groupSkillCandidates(
-	candidates: SkillCandidate[],
-): SkillGroup[] {
+function groupSkillCandidates(candidates: SkillCandidate[]): SkillGroup[] {
 	const grouped = Map.groupBy(candidates, (candidate) => candidate.relativeDir)
 	return [...grouped.entries()]
 		.map(([relativeDir, group]) => {

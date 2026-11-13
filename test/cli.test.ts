@@ -281,11 +281,12 @@ describe('argc v7 CLI contract', () => {
 
 	test('enables colored output when the CLI runs inside a PTY', async () => {
 		let output = ''
+		const decoder = new TextDecoder()
 		await using terminal = new Bun.Terminal({
 			cols: 120,
 			rows: 40,
 			data(_terminal, data) {
-				output += data
+				output += decoder.decode(data, { stream: true })
 			},
 		})
 		const process = Bun.spawn(

@@ -53,7 +53,7 @@ export function getLegacyVisibleSkillDirName(
 	return `${repo.owner}.${repo.repo}.${skill}`
 }
 
-export function getLegacyVisibleMapDirName(repo: RepoRef): string {
+function getLegacyVisibleMapDirName(repo: RepoRef): string {
 	return `${repo.owner}.${repo.repo}.map`
 }
 
@@ -70,36 +70,12 @@ export function getVisibleSkillRoot(
 	return join(getSkillsBaseDir(scope, cwd), getVisibleSkillDirName(repo, skill))
 }
 
-export function getSourceScopedVisibleSkillRoot(
-	scope: InstallScope,
-	cwd: string,
-	repo: RepoRef,
-	skill: string,
-): string {
-	return join(
-		getSkillsBaseDir(scope, cwd),
-		getSourceScopedVisibleSkillDirName(repo, skill),
-	)
-}
-
 export function getVisibleMapRoot(
 	scope: InstallScope,
 	cwd: string,
 	repo: RepoRef,
 ): string {
 	return join(getSkillsBaseDir(scope, cwd), getVisibleMapDirName(repo))
-}
-
-export function getLegacyVisibleSkillRoot(
-	scope: InstallScope,
-	cwd: string,
-	repo: RepoRef,
-	skill: string,
-): string {
-	return join(
-		getSkillsBaseDir(scope, cwd),
-		getLegacyVisibleSkillDirName(repo, skill),
-	)
 }
 
 export function getLegacyVisibleMapRoot(

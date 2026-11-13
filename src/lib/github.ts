@@ -16,7 +16,7 @@ export async function fetchRepoDescription(repo: RepoRef): Promise<string> {
 	)
 }
 
-export function normalizeDescription(value: string): string {
+function normalizeDescription(value: string): string {
 	return value.replace(/\s+/g, ' ').trim()
 }
 

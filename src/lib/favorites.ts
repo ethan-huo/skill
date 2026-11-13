@@ -214,7 +214,7 @@ export async function refreshFavorites(
 	return { refreshed, removed, changed }
 }
 
-export function getFavoritesFilePath(): string {
+function getFavoritesFilePath(): string {
 	// Favorites are user-level preferences, so keep them in one global file instead of per-project roots.
 	return join(homedir(), '.agents', 'skill-favorites.json')
 }

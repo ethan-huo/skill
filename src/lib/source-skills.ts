@@ -1,4 +1,4 @@
-import { readdir, rm, stat } from 'node:fs/promises'
+import { rm, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 import type { RepoRef, SkillCandidate, UpdateDiff } from '../types'
@@ -16,45 +16,6 @@ import {
 } from './install'
 import { getSourceInstallRoot, getSourceSkillsBaseDir } from './paths'
 import { diffSkillSets } from './update-diff'
-
-export type SourceRepo = {
-	owner: string
-	repo: string
-	sourceRoot: string
-}
-
-export async function listSourceRepos(): Promise<SourceRepo[]> {
-	const baseDir = getSourceSkillsBaseDir()
-	const owners = await readdir(baseDir, { withFileTypes: true }).catch(() => [])
-	const repos: SourceRepo[] = []
-
-	for (const ownerEntry of owners) {
-		if (!ownerEntry.isDirectory()) {
-			continue
-		}
-
-		const ownerDir = join(baseDir, ownerEntry.name)
-		const repoEntries = await readdir(ownerDir, { withFileTypes: true }).catch(
-			() => [],
-		)
-
-		for (const repoEntry of repoEntries) {
-			if (!repoEntry.isDirectory()) {
-				continue
-			}
-
-			repos.push({
-				owner: ownerEntry.name,
-				repo: repoEntry.name,
-				sourceRoot: join(ownerDir, repoEntry.name),
-			})
-		}
-	}
-
-	return repos.sort((left, right) =>
-		`${left.owner}/${left.repo}`.localeCompare(`${right.owner}/${right.repo}`),
-	)
-}
 
 export async function updateSourceRepo(options: {
 	cloneDir: string

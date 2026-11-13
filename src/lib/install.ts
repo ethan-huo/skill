@@ -190,42 +190,6 @@ export async function resolveInstalledSkillSource(
 	return installedDir
 }
 
-export async function linkSkillDirectories(
-	targetRoot: string,
-	repo: RepoRef,
-	skills: Array<{ relativeDir: string; sourcePath: string }>,
-): Promise<void> {
-	await mkdir(targetRoot, { recursive: true })
-
-	for (const skill of skills) {
-		const destDir = join(
-			targetRoot,
-			getVisibleSkillDirName(repo, skill.relativeDir),
-		)
-		const sourceScopedDestDir = join(
-			targetRoot,
-			getSourceScopedVisibleSkillDirName(repo, skill.relativeDir),
-		)
-		const legacyDestDir = join(
-			targetRoot,
-			getLegacyVisibleSkillDirName(repo, skill.relativeDir),
-		)
-		const bareDestDir = join(
-			targetRoot,
-			normalizeSkillPathForLegacyBareAlias(skill.relativeDir),
-		)
-		await assertLinkCanBeReplaced(destDir, dirname(skill.sourcePath))
-		await rm(sourceScopedDestDir, { force: true, recursive: true })
-		await rm(legacyDestDir, { force: true, recursive: true })
-		await removeLegacyLink(bareDestDir)
-		await replaceSymlinkAtomically(
-			destDir,
-			skill.sourcePath,
-			dirname(skill.sourcePath),
-		)
-	}
-}
-
 async function removeLegacyLink(path: string): Promise<void> {
 	const entry = await lstat(path).catch(() => null)
 	if (entry?.isSymbolicLink()) {

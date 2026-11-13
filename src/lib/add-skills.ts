@@ -114,7 +114,7 @@ export async function installRepoSkills(options: {
 	return { kind: 'skills', ...result }
 }
 
-export async function selectRepoSkills(options: {
+async function selectRepoSkills(options: {
 	cwd: string
 	repo: RepoRef
 	selectors: SkillSelector[]

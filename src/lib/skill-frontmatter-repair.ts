@@ -3,19 +3,6 @@ import { readFile, writeFile } from 'node:fs/promises'
 const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/
 const TOP_LEVEL_KEY_PATTERN = /^([A-Za-z_][A-Za-z0-9_-]*):(?:[ \t]*(.*))?$/
 
-export async function repairSkillFrontmatterFile(
-	skillFile: string,
-): Promise<boolean> {
-	const contents = await readFile(skillFile, 'utf8')
-	const repaired = repairSkillFrontmatter(contents)
-	if (repaired === contents) {
-		return false
-	}
-
-	await writeFile(skillFile, repaired)
-	return true
-}
-
 export async function normalizeSkillFrontmatterFile(
 	skillFile: string,
 	name: string,
@@ -31,7 +18,7 @@ export async function normalizeSkillFrontmatterFile(
 	return true
 }
 
-export function repairSkillFrontmatter(contents: string): string {
+function repairSkillFrontmatter(contents: string): string {
 	const match = FRONTMATTER_PATTERN.exec(contents)
 	if (!match) {
 		return contents
@@ -51,7 +38,7 @@ export function repairSkillFrontmatter(contents: string): string {
 	return `---\n${yaml}\n---${match[2]!}${contents.slice(match[0].length)}`
 }
 
-export function rewriteSkillName(contents: string, name: string): string {
+function rewriteSkillName(contents: string, name: string): string {
 	const match = FRONTMATTER_PATTERN.exec(contents)
 	if (!match) {
 		throw new Error('SKILL.md must start with YAML frontmatter.')
