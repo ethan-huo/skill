@@ -41,6 +41,15 @@ export const schema = {
 						),
 						'',
 					),
+					description: v.optional(
+						v.pipe(
+							v.string(),
+							v.description(
+								'Repo map description you write: what the skills do + "Use when ..." triggers (60-1024 chars). Required for a map; reused from the manifest on update.',
+							),
+						),
+						'',
+					),
 				}),
 			),
 		),
@@ -135,7 +144,7 @@ export const schema = {
 				'Install GitHub skills, or restore links from the scope manifest',
 			examples: [
 				`skill install "{ repo: ['ethan-huo/agents'], skills: 'cx,fp-thinking' }"`,
-				`skill install "{ repo: ['Owl-Listener/designer-skills'], map: true }"`,
+				`skill install "{ repo: ['Owl-Listener/designer-skills'], map: true, description: 'Design critique, color, type and layout skills. Use when reviewing or building UI visuals.' }"`,
 			],
 		})
 		.input(
@@ -171,6 +180,15 @@ export const schema = {
 						false,
 					),
 					global: globalFlag,
+					description: v.optional(
+						v.pipe(
+							v.string(),
+							v.description(
+								'Repo map description you write: what the skills do + "Use when ..." triggers (60-1024 chars). Required for a map; reused from the manifest on update.',
+							),
+						),
+						'',
+					),
 				}),
 			),
 		),

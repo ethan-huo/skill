@@ -1,6 +1,7 @@
 const RESET = '\x1b[0m'
 const DIM = '\x1b[2m'
 const CYAN = '\x1b[36m'
+const RED = '\x1b[31m'
 const YELLOW = '\x1b[33m'
 const GREEN = '\x1b[32m'
 const MAGENTA = '\x1b[35m'
@@ -27,6 +28,9 @@ function colorizeYamlLine(line: string): string {
 
 	const key = KEY_PATTERN.exec(line)
 	if (key) {
+		if (key[2] === 'problem:') {
+			return `${key[1]}${DIM}${key[2]}${RESET}${RED}${key[3]}${RESET}`
+		}
 		return `${key[1]}${DIM}${key[2]}${RESET}${colorizeScalar(key[3]!)}`
 	}
 

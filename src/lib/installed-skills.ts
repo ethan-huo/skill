@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import type { InstallScope, InstalledSkill } from '../types'
 import type { ManifestSkill } from './project-manifest'
 
+import { checkMapDescription, getMapRetryCommand } from './map-description'
 import {
 	getManifestPath,
 	getSkillsBaseDir,
@@ -42,15 +43,17 @@ export async function listInstalledSkills(
 }
 
 // Keep routers out of the individual-skill inventory used by install and remove.
-export async function listInstalledMaps(
-	cwd: string,
-): Promise<
-	Pick<InstalledSkill, 'name' | 'description' | 'scope' | 'installRoot'>[]
-> {
-	const maps: Pick<
-		InstalledSkill,
-		'name' | 'description' | 'scope' | 'installRoot'
-	>[] = []
+export type InstalledMap = Pick<
+	InstalledSkill,
+	'name' | 'description' | 'scope' | 'installRoot'
+> & {
+	// Set when the manifest or SKILL.md lacks a description that can route.
+	problem?: string
+	fix?: string
+}
+
+export async function listInstalledMaps(cwd: string): Promise<InstalledMap[]> {
+	const maps: InstalledMap[] = []
 	for (const scope of ['local', 'global'] as const) {
 		const manifest = await readScopeManifest(scope, cwd)
 		for (const item of getProjectManifestMaps(manifest)) {
@@ -64,10 +67,20 @@ export async function listInstalledMaps(
 				name: '',
 				description: '',
 			}))
+			const repo = parseRepoRef(item.repo)
+			const problem =
+				checkMapDescription(item.description ?? '') ??
+				checkMapDescription(metadata.description)
 			maps.push({
 				...metadata,
 				scope,
 				installRoot,
+				...(problem
+					? {
+							problem: `map ${item.repo} has no valid description: ${problem}`,
+							fix: getMapRetryCommand(repo),
+						}
+					: {}),
 			})
 		}
 	}
