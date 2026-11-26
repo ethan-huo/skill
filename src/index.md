@@ -20,7 +20,13 @@ Read the section for your task, then only that slice: `skill @schema add`, or se
 
 ## Repo maps — install
 
-A map is one project-local synthetic skill for a broad catalog; it routes to upstream files with `ctx read github://owner/repo/<path>`. Use `install` with `map: true` when the user wants coverage from a multi-skill repo and no single target; don't install a pile of separate skills instead. `map` and `skills` are mutually exclusive, and a non-interactive install must choose one. The map's description is derived from the repo, so you never write it. Project-scope `update` regenerates recorded maps.
+A map is one project-local synthetic skill for a broad catalog; it routes to upstream files with `ctx read github://owner/repo/<path>`. Use `install` with `map: true` when the user wants coverage from a multi-skill repo and no single target; don't install a pile of separate skills instead. `map` and `skills` are mutually exclusive, and a non-interactive install must choose one. **You must write the map's description yourself** from the repo's real contents (read its skills first): what they do, then `Use when …` triggers (60–1024 chars). It is never derived from GitHub, skill names, or upstream text, and a missing or name-list description fails the install.
+
+```bash
+skill install "{ repo: ['rorkai/app-store-connect-cli-skills'], map: true, description: 'Operate App Store Connect through the asc CLI: signing, builds, TestFlight, metadata, review submission. Use when the user mentions publishing, TestFlight, or App Store Connect.' }"
+```
+
+The description is pinned in `.agents/skills/manifest.json`; `update` and restores reuse it. Change it by re-installing with a new `description`. `list` reports maps lacking a valid description under `problems` with a `fix` command. Project-scope `update` regenerates recorded maps.
 
 ## Maintenance — '{update,remove,favorite.*}'
 

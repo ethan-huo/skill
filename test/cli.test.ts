@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { colorizeYaml } from '../src/lib/human-output'
+import { estimateSkillListTokens } from '../src/lib/skill-token-estimate'
 const repositoryRoot = import.meta.dir.replace(/\/test$/, '')
 
 async function runSkill(
@@ -149,7 +150,12 @@ describe('argc v7 CLI contract', () => {
 		}
 	})
 
-	test('list counts managed maps once, reads map frontmatter, and tolerates damaged metadata', async () => {
+	test('list counts managed maps once, reads map frontmatter, tolerates damaged metadata, and flags maps without a valid description', async () => {
+		const valid =
+			'Routes the owner/repo toolkit for release automation. Use when the user mentions releases or deploys.'
+		const mapTokens = estimateSkillListTokens([
+			{ name: 'router', description: valid },
+		])
 		const root = join(tmpdir(), `skill-cli-maps-${crypto.randomUUID()}`)
 		const project = join(root, 'project')
 		const home = join(root, 'home')
@@ -162,9 +168,7 @@ describe('argc v7 CLI contract', () => {
 				join(base, 'manifest.json'),
 				JSON.stringify({
 					version: 3,
-					items: [
-						{ type: 'map', repo: 'owner/repo', description: 'Stored intent' },
-					],
+					items: [{ type: 'map', repo: 'owner/repo', description: valid }],
 				}),
 			)
 			const file = join(await realpath(map), 'SKILL.md')
@@ -176,17 +180,14 @@ describe('argc v7 CLI contract', () => {
 				expect(result.stderr).toBe('')
 				return Bun.YAML.parse(result.stdout) as {
 					skills: { file: string; description: string }[]
+					problems?: { file: string; problem: string; fix: string }[]
 					summary: { count: number; estimatedTokens: number }
 				}
 			}
-			await writeFile(
-				file,
-				'---\nname: router\ndescription: Router intent\n---\n',
-			)
-			// A retired pinned description in an older manifest is ignored, not rejected.
+			await writeFile(file, `---\nname: router\ndescription: ${valid}\n---\n`)
 			expect(await list()).toEqual({
-				skills: [{ file, description: 'Router intent' }],
-				summary: { count: 1, estimatedTokens: 6 },
+				skills: [{ file, description: valid }],
+				summary: { count: 1, estimatedTokens: mapTokens },
 			})
 			expect(await list('global')).toEqual({
 				skills: [],
@@ -202,18 +203,21 @@ describe('argc v7 CLI contract', () => {
 				'---\nname: example\ndescription: Example skill\n---\n',
 			)
 			await symlink(source, join(base, 'example.repo.other'))
-			expect((await list()).summary).toEqual({ count: 2, estimatedTokens: 12 })
+			expect((await list()).summary).toEqual({
+				count: 2,
+				estimatedTokens: mapTokens + 6,
+			})
 			await writeFile(file, '---\nname: [broken\n---\n')
 			expect((await list()).skills).toContainEqual({ file, description: '' })
 			await rm(file)
-			expect((await list()).summary).toEqual({ count: 1, estimatedTokens: 6 })
+			expect((await list()).summary).toEqual({
+				count: 1,
+				estimatedTokens: 6,
+			})
 			await mkdir(file)
 			expect((await list()).summary.count).toBe(1)
 			await rm(file, { recursive: true })
-			await writeFile(
-				file,
-				'---\nname: router\ndescription: Restored intent\n---\n',
-			)
+			await writeFile(file, `---\nname: router\ndescription: ${valid}\n---\n`)
 			expect((await list()).summary.count).toBe(2)
 			const removed = await runSkill(['remove', 'owner/repo'], project, {
 				HOME: home,
@@ -234,17 +238,20 @@ describe('argc v7 CLI contract', () => {
 				join(globalMap, 'SKILL.md'),
 				'---\nname: router\ndescription: Legacy intent\n---\n',
 			)
-			expect(await list('global')).toEqual({
-				skills: [
-					{ file: join(globalMap, 'SKILL.md'), description: 'Legacy intent' },
-				],
-				summary: { count: 1, estimatedTokens: 6 },
-			})
+			const legacy = await list('global')
+			expect(legacy.skills).toEqual([
+				{ file: join(globalMap, 'SKILL.md'), description: 'Legacy intent' },
+			])
+			expect(legacy.problems).toHaveLength(1)
+			expect(legacy.problems![0]!.problem).toContain('missing')
+			expect(legacy.problems![0]!.fix).toContain(
+				"skill install \"{ repo: ['owner/repo'], map: true, description:",
+			)
 			expect((await list()).summary.count).toBe(1)
 			const combined = await runSkill(['list'], project, { HOME: home })
 			expect(combined.exitCode).toBe(0)
 			expect(Bun.YAML.parse(combined.stdout)).toMatchObject({
-				summary: { count: 2, estimatedTokens: 12 },
+				summary: { count: 2 },
 			})
 		} finally {
 			await rm(root, { recursive: true, force: true })

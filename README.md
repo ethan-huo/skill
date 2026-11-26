@@ -47,7 +47,7 @@ skill install owner/repo/skill
 skill install gh:owner/repo/path/to/skill
 skill install owner/repo --skills 'skill-a,skill-b'
 skill install owner/repo --skills 'core/{skill-a,skill-b},codex/skill-c'
-skill install owner/repo --map
+skill install owner/repo --map --description 'what it does. Use when ...'
 skill list
 ```
 
@@ -137,7 +137,7 @@ The positional and flag forms below remain the shorter human-facing surface.
 | `skill install gh:owner/repo/path/skill`  | Install one exact GitHub skill ID                                  |
 | `skill install owner/repo/skill --global` | Install a shared source and link one skill globally                |
 | `skill install owner/repo --skills 'a,b'` | Link multiple selected skills into this project                    |
-| `skill install owner/repo --map`          | Generate one repo-level map skill with ctx-read routing rows       |
+| `skill install owner/repo --map`          | Generate one repo-level map skill; requires `--description`        |
 
 ### Favorites
 
@@ -167,7 +167,7 @@ The positional and flag forms below remain the shorter human-facing surface.
 the absolute path to its installed `SKILL.md` through the visible skill link.
 Use `skill list --scope global` or `skill list --scope local` to filter; omit
 `--scope` to include both. Structured input also accepts `skill list "{ scope: 'global' }"`.
-Managed repo maps count as one entry each, using their `SKILL.md` frontmatter. Unmanaged
+Managed repo maps count as one entry each, using their `SKILL.md` frontmatter. A map whose manifest or `SKILL.md` lacks a valid description is reported under `problems` (`file`, `problem`, `fix`), highlighted red on a terminal. Unmanaged
 inline directories are excluded. Missing or non-file `SKILL.md` paths are skipped; malformed
 frontmatter keeps the entry with empty metadata.
 The summary count and estimated tokens describe only the returned skills.
@@ -184,8 +184,8 @@ Human-facing output is ANSI-highlighted when stdout is an interactive terminal. 
 - copied `SKILL.md` files with repairable malformed YAML frontmatter are repaired before entering the shared source cache
 - `owner/repo/skill` is shorthand for `skill add owner/repo --skills 'skill'`
 - visible skill folders and cached `SKILL.md` names use the Agent Skills-compatible `{skill-path}-{owner}` form; the manifest retains the repo and exact source path, and conflicting sources cannot claim the same visible folder
-- `skill install owner/repo --map` writes `.agents/skills/map-{repo}-{owner}/SKILL.md` with a `ctx read github://owner/repo/<path>` rule and `When ..., read path/SKILL.md` rows
-- a map's description is derived as `{owner}/{repo} skills router: <skill-a>, <skill-b>, ...` (just `router` when the repo name already ends in `skill`/`skills`) (truncated with `+N more` at the 1024-character spec limit); it needs no GitHub metadata or caller input, and the manifest `map` item stores only the repo (a legacy pinned `description` is dropped on the next manifest write)
+- `skill install owner/repo --map` writes `.agents/skills/map-{repo}-{owner}/SKILL.md` with a `ctx read github://owner/repo/<path>` rule and one `- <skill>: \`path/SKILL.md\`` pointer row per upstream skill (no upstream text is copied)
+- a map's description is never derived: it comes from `--description` (new text wins) or the manifest `map` item, otherwise the install fails with a retry command; `update` and manifest restores reuse the pinned value. It must be 60–1024 characters and say when to use the map (`Use when …`, `when the user …`, `当…时使用` etc.); name lists are rejected. `--description` outside `--map` is an error
 - interactive project installs show "Install as repo map" above individual skills; selecting either mode disables the other
 - interactive repo skill selection preselects already installed skills from the target scope; `--global` preselects global installs, while project installs preselect project links
 - repo maps and selected skill installs are mutually exclusive per repo; installing one mode removes the other mode from the manifest and visible aliases

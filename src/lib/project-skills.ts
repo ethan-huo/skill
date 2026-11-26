@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type { RepoRef, SkillCandidate } from '../types'
 import type { ManifestSkill } from './project-manifest'
 
+import { getInstalledMapDescription } from './add-skills'
 import { shallowCloneRepo } from './git'
 import {
 	linkInstalledSkills,
@@ -11,6 +12,7 @@ import {
 	removeVisibleSkillAliases,
 } from './install'
 import { seedGlobalManifestFromVisibleLinks } from './installed-skills'
+import { resolveMapDescription } from './map-description'
 import {
 	getSkillsBaseDir,
 	getSourceInstallRoot,
@@ -33,18 +35,27 @@ import { updateSourceRepo } from './source-skills'
 export async function installProjectRepoMap(options: {
 	cwd: string
 	repo: RepoRef
+	description?: string
 }): Promise<{ installRoot: string; mappedSkills: SkillCandidate[] }> {
+	// Resolve the description before cloning so a missing one fails fast.
+	const description = resolveMapDescription({
+		repo: options.repo,
+		explicit: options.description,
+		stored: await getInstalledMapDescription(options.cwd, options.repo),
+	})
 	const cloneDir = await shallowCloneRepo(options.repo)
 	await removeProjectRepoSkillAliases(options.cwd, options.repo)
 	const result = await writeProjectSkillMap({
 		cloneDir,
 		cwd: options.cwd,
 		repo: options.repo,
+		description,
 	})
 	await addScopeManifestMap(
 		'local',
 		options.cwd,
 		`${options.repo.owner}/${options.repo.repo}`,
+		description,
 	)
 	return result
 }
@@ -113,8 +124,17 @@ export async function restoreProjectSkills(cwd: string): Promise<{
 
 	for (const item of getProjectManifestMaps(manifest)) {
 		const repo = parseRepoRef(item.repo)
+		const description = resolveMapDescription({
+			repo,
+			stored: item.description,
+		})
 		const cloneDir = await shallowCloneRepo(repo)
-		const result = await writeProjectSkillMap({ cloneDir, cwd, repo })
+		const result = await writeProjectSkillMap({
+			cloneDir,
+			cwd,
+			repo,
+			description,
+		})
 		restored.push(`${item.repo} (map: ${result.mappedSkills.length} skills)`)
 	}
 
@@ -212,8 +232,17 @@ export async function syncProjectMapRepo(options: {
 }> {
 	const { cwd, repoId } = options
 	const repo = parseRepoRef(repoId)
+	const description = resolveMapDescription({
+		repo,
+		stored: await getInstalledMapDescription(cwd, repo),
+	})
 	const cloneDir = await shallowCloneRepo(repo)
-	const result = await writeProjectSkillMap({ cloneDir, cwd, repo })
+	const result = await writeProjectSkillMap({
+		cloneDir,
+		cwd,
+		repo,
+		description,
+	})
 	return { repoId, mappedSkills: result.mappedSkills.length }
 }
 
@@ -221,11 +250,13 @@ export async function syncProjectMapFromClone(options: {
 	cwd: string
 	repo: RepoRef
 	cloneDir: string
+	description: string
 }): Promise<{ repoId: string; mappedSkills: number }> {
 	const result = await writeProjectSkillMap({
 		cloneDir: options.cloneDir,
 		cwd: options.cwd,
 		repo: options.repo,
+		description: options.description,
 	})
 	return {
 		repoId: `${options.repo.owner}/${options.repo.repo}`,

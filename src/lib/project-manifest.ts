@@ -45,6 +45,8 @@ export type ProjectManifestSkillsItem = {
 export type ProjectManifestMapItem = {
 	type: 'map'
 	repo: string
+	// Written by the caller; never derived from upstream.
+	description?: string
 }
 
 export type ProjectManifestItem =
@@ -259,17 +261,26 @@ export async function addScopeManifestMap(
 	scope: InstallScope,
 	cwd: string,
 	repoId: string,
+	description: string,
 ): Promise<void> {
 	const manifest = await readScopeManifest(scope, cwd)
-	await writeScopeManifest(scope, cwd, addMapToManifest(manifest, repoId))
+	await writeScopeManifest(
+		scope,
+		cwd,
+		addMapToManifest(manifest, repoId, description),
+	)
 }
 
 export async function addProjectManifestMap(
 	cwd: string,
 	repoId: string,
+	description: string,
 ): Promise<void> {
 	const manifest = await readProjectManifest(cwd)
-	await writeProjectManifest(cwd, addMapToManifest(manifest, repoId))
+	await writeProjectManifest(
+		cwd,
+		addMapToManifest(manifest, repoId, description),
+	)
 }
 
 export function getProjectManifestSkills(
@@ -404,12 +415,13 @@ function addSkillsToManifest(
 function addMapToManifest(
 	manifest: ProjectManifest,
 	repoId: string,
+	description: string,
 ): ProjectManifest {
 	const nextItems = manifest.items.filter((item) => item.repo !== repoId)
 
 	return normalizeProjectManifest({
 		version: 3,
-		items: [...nextItems, { type: 'map', repo: repoId }],
+		items: [...nextItems, { type: 'map', repo: repoId, description }],
 	})
 }
 
@@ -457,11 +469,11 @@ function migrateProjectManifestV2(
 
 function normalizeProjectManifest(manifest: ProjectManifest): ProjectManifest {
 	const skillsByRepo = new Map<string, Map<string, ManifestSkill>>()
-	const maps = new Set<string>()
+	const maps = new Map<string, string | undefined>()
 
 	for (const item of manifest.items) {
 		if (item.type === 'map') {
-			maps.add(item.repo)
+			maps.set(item.repo, item.description ?? maps.get(item.repo))
 			skillsByRepo.delete(item.repo)
 			continue
 		}
@@ -491,11 +503,12 @@ function normalizeProjectManifest(manifest: ProjectManifest): ProjectManifest {
 		}
 	}
 
-	// Rebuilding map items drops the retired pinned `description` field on the next write.
-	for (const repo of [...maps].sort((left, right) =>
-		left.localeCompare(right),
+	for (const [repo, description] of [...maps.entries()].sort((left, right) =>
+		left[0].localeCompare(right[0]),
 	)) {
-		items.push({ type: 'map', repo })
+		items.push(
+			description ? { type: 'map', repo, description } : { type: 'map', repo },
+		)
 	}
 
 	assertUniqueVisibleSkillNames(items)
@@ -551,9 +564,17 @@ function isProjectManifestV3Item(data: unknown): data is ProjectManifestItem {
 		return false
 	}
 
-	const item = data as { type?: unknown; repo?: unknown; skills?: unknown }
+	const item = data as {
+		type?: unknown
+		repo?: unknown
+		skills?: unknown
+		description?: unknown
+	}
 	if (item.type === 'map') {
-		return typeof item.repo === 'string'
+		return (
+			typeof item.repo === 'string' &&
+			(item.description === undefined || typeof item.description === 'string')
+		)
 	}
 
 	return (
