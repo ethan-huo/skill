@@ -1,4 +1,4 @@
-import { harness } from '@celados/harness'
+import { harness, ignore } from '@celados/harness'
 import { defineConfig } from 'vite-plus'
 
-export default defineConfig(harness({ ignore: ['dist/**', '.lane/**'] }))
+export default defineConfig({ ...harness(ignore('.lane/**')) })
